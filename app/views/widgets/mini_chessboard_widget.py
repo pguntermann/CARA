@@ -13,6 +13,21 @@ from app.utils.path_resolver import get_app_resource_path
 _SVG_RENDERER_CACHE: Dict[str, Dict[Tuple[str, str], QSvgRenderer]] = {}
 
 
+def mini_board_base_size(config: Optional[Dict[str, Any]] = None) -> int:
+    """Shared 1.0x board size from ``ui.styles.mini_board.size`` (before scale_factor)."""
+    try:
+        raw = (
+            (config or {})
+            .get("ui", {})
+            .get("styles", {})
+            .get("mini_board", {})
+            .get("size", 160)
+        )
+        return max(8, int(raw))
+    except (TypeError, ValueError):
+        return 160
+
+
 class MiniChessBoardWidget(QWidget):
     """Mini chessboard widget displaying pieces (popup or embedded), following main-board style."""
 
@@ -105,13 +120,46 @@ class MiniChessBoardWidget(QWidget):
                 self.border_color = mini_border['color']
         
         # Size: keep an integer square size (board divisible by 8) to avoid aliasing seams.
+        # View → Miniature Boards surfaces share ui.styles.mini_board.size as the 1.0x origin.
         if self._size_override is not None:
             base_size = int(self._size_override)
+        elif isinstance(mini_board_config, dict) and "size" in mini_board_config:
+            try:
+                base_size = max(8, int(mini_board_config["size"]))
+            except (TypeError, ValueError):
+                base_size = mini_board_base_size(self.config)
         else:
-            base_size = int(mini_board_config.get('size', 160))
+            base_size = mini_board_base_size(self.config)
         scaled = max(8, int(round(base_size * float(self._scale_factor))))
         self.square_size = max(1, scaled // 8)
         self.board_size = self.square_size * 8
+
+        # Arrow proportions (ui.styles.mini_board.arrow), relative to square size.
+        arrow_cfg = mini_board_config.get("arrow", {})
+        if not isinstance(arrow_cfg, dict):
+            arrow_cfg = {}
+        try:
+            self._arrow_line_width_ratio = max(
+                0.0, float(arrow_cfg.get("line_width_ratio", 0.08))
+            )
+        except (TypeError, ValueError):
+            self._arrow_line_width_ratio = 0.08
+        try:
+            self._arrow_head_ratio = max(0.0, float(arrow_cfg.get("arrowhead_ratio", 0.26)))
+        except (TypeError, ValueError):
+            self._arrow_head_ratio = 0.26
+        try:
+            self._arrow_head_wing_ratio = max(
+                0.0, float(arrow_cfg.get("arrowhead_wing_ratio", 0.62))
+            )
+        except (TypeError, ValueError):
+            self._arrow_head_wing_ratio = 0.62
+        try:
+            self._arrow_min_line_width = max(
+                0.0, float(arrow_cfg.get("min_line_width", 1.0))
+            )
+        except (TypeError, ValueError):
+            self._arrow_min_line_width = 1.0
         
         # Get best next move arrow color (same as main board)
         bestnextmove_arrow_config = board_config.get('bestnextmove_arrow', {})
@@ -127,6 +175,18 @@ class MiniChessBoardWidget(QWidget):
         if self._size_override == size:
             return
         self._size_override = size
+        self._load_config()
+        self.update()
+
+    def set_scale_factor(self, scale_factor: float) -> None:
+        """Update the scale multiplier applied to the base / override size."""
+        try:
+            value = float(scale_factor)
+        except (TypeError, ValueError):
+            return
+        if abs(float(self._scale_factor) - value) < 0.01:
+            return
+        self._scale_factor = value
         self._load_config()
         self.update()
 
@@ -339,81 +399,92 @@ class MiniChessBoardWidget(QWidget):
         """
         if move is None:
             return
-        
-        # Get move squares
-        from_square = move.from_square
-        to_square = move.to_square
-        
-        # Convert square indices to file and rank
-        from_file = chess.square_file(from_square)
-        from_rank = chess.square_rank(from_square)
-        to_file = chess.square_file(to_square)
-        to_rank = chess.square_rank(to_square)
-        
-        # Adjust for flipped board
-        if self._is_flipped:
-            from_file = 7 - from_file
-            from_rank = 7 - from_rank
-            to_file = 7 - to_file
-            to_rank = 7 - to_rank
-        
-        # CRITICAL: In python-chess, ranks are 0-based from bottom (0=rank1, 7=rank8)
-        # But in our drawing system, row 0 is at the top (rank 8), row 7 is at the bottom (rank 1)
-        # So we need to convert: visual_row = 7 - rank
-        from_visual_rank = 7 - from_rank
-        to_visual_rank = 7 - to_rank
-        
-        # Calculate square centers
-        from_x = board_start_x + from_file * self.square_size + self.square_size / 2
-        from_y = board_start_y + from_visual_rank * self.square_size + self.square_size / 2
-        to_x = board_start_x + to_file * self.square_size + self.square_size / 2
-        to_y = board_start_y + to_visual_rank * self.square_size + self.square_size / 2
-        
-        # Set up pen for arrow — width scales with square size so supersampled
-        # PDF renders (and scaled UI boards) keep a readable stroke weight.
-        arrow_color = QColor(color[0], color[1], color[2])
-        line_width = max(2.5, float(self.square_size) * 0.16)
-        pen = QPen(arrow_color)
-        pen.setWidthF(line_width)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        painter.setPen(pen)
-        painter.setBrush(QBrush(arrow_color))
-        
-        # Draw arrow line from source to destination
-        # Shorten the line to leave space for arrowhead
-        arrowhead_size = self.square_size * 0.22
-        dx = to_x - from_x
-        dy = to_y - from_y
-        length = (dx * dx + dy * dy) ** 0.5
-        if length > 0:
-            # Normalize direction
-            unit_x = dx / length
-            unit_y = dy / length
-            
-            # Shorten line to make room for arrowhead
-            shortened_to_x = to_x - unit_x * arrowhead_size
-            shortened_to_y = to_y - unit_y * arrowhead_size
-            
-            # Draw line
-            painter.drawLine(
-                QPointF(from_x, from_y),
-                QPointF(shortened_to_x, shortened_to_y),
+        if not isinstance(color, (list, tuple)) or len(color) < 3:
+            return
+
+        painter.save()
+        try:
+            # Get move squares
+            from_square = move.from_square
+            to_square = move.to_square
+
+            # Convert square indices to file and rank
+            from_file = chess.square_file(from_square)
+            from_rank = chess.square_rank(from_square)
+            to_file = chess.square_file(to_square)
+            to_rank = chess.square_rank(to_square)
+
+            # Adjust for flipped board
+            if self._is_flipped:
+                from_file = 7 - from_file
+                from_rank = 7 - from_rank
+                to_file = 7 - to_file
+                to_rank = 7 - to_rank
+
+            # CRITICAL: In python-chess, ranks are 0-based from bottom (0=rank1, 7=rank8)
+            # But in our drawing system, row 0 is at the top (rank 8), row 7 is at the bottom (rank 1)
+            # So we need to convert: visual_row = 7 - rank
+            from_visual_rank = 7 - from_rank
+            to_visual_rank = 7 - to_rank
+
+            # Calculate square centers
+            from_x = board_start_x + from_file * self.square_size + self.square_size / 2
+            from_y = board_start_y + from_visual_rank * self.square_size + self.square_size / 2
+            to_x = board_start_x + to_file * self.square_size + self.square_size / 2
+            to_y = board_start_y + to_visual_rank * self.square_size + self.square_size / 2
+
+            # Set up pen for arrow — thinner shaft, flat caps for a sharper look.
+            arrow_color = QColor(int(color[0]), int(color[1]), int(color[2]))
+            line_width = max(
+                float(self._arrow_min_line_width),
+                float(self.square_size) * float(self._arrow_line_width_ratio),
             )
-            
-            # Draw arrowhead (triangle pointing to destination)
-            arrowhead_points = QPolygonF([
-                QPointF(to_x, to_y),
-                QPointF(
-                    shortened_to_x - unit_y * arrowhead_size * 0.55,
-                    shortened_to_y + unit_x * arrowhead_size * 0.55
-                ),
-                QPointF(
-                    shortened_to_x + unit_y * arrowhead_size * 0.55,
-                    shortened_to_y - unit_x * arrowhead_size * 0.55
+            pen = QPen(arrow_color)
+            pen.setWidthF(line_width)
+            pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+
+            # Draw arrow line from source to destination
+            # Shorten the line to leave space for arrowhead
+            arrowhead_size = float(self.square_size) * float(self._arrow_head_ratio)
+            wing = float(self._arrow_head_wing_ratio)
+            dx = to_x - from_x
+            dy = to_y - from_y
+            length = (dx * dx + dy * dy) ** 0.5
+            if length > 0:
+                # Normalize direction
+                unit_x = dx / length
+                unit_y = dy / length
+
+                # Shorten line to make room for arrowhead
+                shortened_to_x = to_x - unit_x * arrowhead_size
+                shortened_to_y = to_y - unit_y * arrowhead_size
+
+                # Draw shaft
+                painter.drawLine(
+                    QPointF(from_x, from_y),
+                    QPointF(shortened_to_x, shortened_to_y),
                 )
-            ])
-            painter.drawPolygon(arrowhead_points)
+
+                # Filled head only (no stroke) so triangle tips stay crisp
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(arrow_color))
+                arrowhead_points = QPolygonF([
+                    QPointF(to_x, to_y),
+                    QPointF(
+                        shortened_to_x - unit_y * arrowhead_size * wing,
+                        shortened_to_y + unit_x * arrowhead_size * wing
+                    ),
+                    QPointF(
+                        shortened_to_x + unit_y * arrowhead_size * wing,
+                        shortened_to_y - unit_x * arrowhead_size * wing
+                    )
+                ])
+                painter.drawPolygon(arrowhead_points)
+        finally:
+            painter.restore()
     
     def set_move(self, move: Optional[chess.Move], show_arrow: bool) -> None:
         """Set the move to display with an arrow.

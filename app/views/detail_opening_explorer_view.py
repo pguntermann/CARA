@@ -47,18 +47,21 @@ _DENSITY_FALLBACK_PRESETS: Dict[str, Dict[str, Any]] = {
         "hero_size": 112,
         "row_spacing": 6,
         "flow_boards": False,
+        "board_scale": 0.5,
     },
     "comfortable": {
         "mini_size": 128,
         "hero_size": 160,
         "row_spacing": 8,
         "flow_boards": False,
+        "board_scale": 1.0,
     },
     "gallery": {
         "mini_size": 140,
         "hero_size": 180,
         "row_spacing": 10,
         "flow_boards": True,
+        "board_scale": 1.0,
     },
 }
 
@@ -90,9 +93,13 @@ def _mini_board_border_size(config: Dict[str, Any]) -> int:
     return 4
 
 
-def _mini_board_outer_size(config: Dict[str, Any], board_size: int) -> int:
-    """Full mini-board widget size including border on both sides."""
-    return int(board_size) + 2 * _mini_board_border_size(config)
+def _mini_board_outer_size(
+    config: Dict[str, Any], board_size: int, scale_factor: float = 1.0
+) -> int:
+    """Full mini-board widget size including border (matches MiniChessBoardWidget)."""
+    scaled = max(8, int(round(int(board_size) * float(scale_factor))))
+    board = (scaled // 8) * 8
+    return board + 2 * _mini_board_border_size(config)
 
 
 def _open_lichess_url(url: str) -> None:
@@ -373,6 +380,17 @@ class DetailOpeningExplorerView(QWidget):
         self._pane_bg = tabs.get("pane_background", [40, 40, 45])
 
         self._show_arrows = bool(cfg.get("show_move_arrows", True))
+        try:
+            from app.utils.miniature_board_arrows import OPENING_EXPLORER
+            from app.services.user_settings_service import UserSettingsService
+
+            self._show_arrows = bool(
+                UserSettingsService.get_instance()
+                .get_miniature_board_arrows()
+                .get(OPENING_EXPLORER, self._show_arrows)
+            )
+        except Exception:
+            pass
         self._max_depth = int(cfg.get("max_continuation_depth", OpeningService.MAX_CONTINUATION_DEPTH))
         self._empty_text = cfg.get("placeholder_text_no_game", "No game selected.")
         self._focus_dim_opacity = float(cfg.get("focus_dim_opacity", 0.38))
@@ -409,11 +427,16 @@ class DetailOpeningExplorerView(QWidget):
             raw = presets_cfg.get(mode, {}) if isinstance(presets_cfg, dict) else {}
             if not isinstance(raw, dict):
                 raw = {}
+            try:
+                board_scale = float(raw.get("board_scale", fallback["board_scale"]))
+            except (TypeError, ValueError):
+                board_scale = float(fallback["board_scale"])
             self._density_presets[mode] = {
                 "mini_size": int(raw.get("mini_size", fallback["mini_size"])),
                 "hero_size": int(raw.get("hero_size", fallback["hero_size"])),
                 "row_spacing": int(raw.get("row_spacing", fallback["row_spacing"])),
                 "flow_boards": bool(raw.get("flow_boards", fallback["flow_boards"])),
+                "board_scale": board_scale,
             }
 
         layout_cfg = cfg.get("layout", {})
@@ -435,15 +458,6 @@ class DetailOpeningExplorerView(QWidget):
         if not hasattr(self, "_density_mode"):
             self._density_mode = default_density if default_density in self._density_presets else "gallery"
         self._apply_density_preset()
-        # Shared mini-board size feeds the comfortable preset baseline.
-        cfg_mini = (
-            self.config.get("ui", {}).get("styles", {}).get("mini_board", {}).get("size")
-        )
-        if cfg_mini is not None and self._density_mode == "comfortable":
-            comfort = self._density_presets.get("comfortable", _DENSITY_FALLBACK_PRESETS["comfortable"])
-            hero_extra = int(comfort["hero_size"]) - int(comfort["mini_size"])
-            self._mini_size = int(cfg_mini)
-            self._hero_size = int(cfg_mini) + max(0, hero_extra)
 
         placeholder = cfg.get("placeholder", {})
         self._placeholder_text_color = placeholder.get("text_color", [150, 150, 150])
@@ -451,15 +465,47 @@ class DetailOpeningExplorerView(QWidget):
         self._placeholder_padding = int(placeholder.get("padding", 20))
 
     def _apply_density_preset(self) -> None:
+        """Apply density layout; board pixel size always uses shared mini_board base."""
+        from app.views.widgets.mini_chessboard_widget import mini_board_base_size
+
         preset = self._density_presets.get(
             self._density_mode,
             self._density_presets.get("comfortable", _DENSITY_FALLBACK_PRESETS["comfortable"]),
         )
-        self._mini_size = int(preset["mini_size"])
-        self._hero_size = int(preset["hero_size"])
+        base = mini_board_base_size(self.config)
+        # Density may enlarge the current (hero) step relative to the shared base.
+        hero_extra = max(0, int(preset["hero_size"]) - int(preset["mini_size"]))
+        self._mini_size = base
+        self._hero_size = base + hero_extra
+        try:
+            self._density_board_scale = max(0.05, float(preset.get("board_scale", 1.0)))
+        except (TypeError, ValueError):
+            self._density_board_scale = 1.0
         self._row_spacing = int(preset["row_spacing"])
         self._horizontal_path = bool(preset.get("flow_boards", False))
         self._flow_boards = self._horizontal_path
+
+    def _miniature_board_scale(self) -> float:
+        """User View scale × density board_scale (compact defaults to half size)."""
+        from app.utils.miniature_board_scales import OPENING_EXPLORER
+        from app.services.user_settings_service import UserSettingsService
+
+        user_scale = float(
+            UserSettingsService.get_instance()
+            .get_miniature_boards()
+            .get(OPENING_EXPLORER, 1.0)
+        )
+        density_scale = float(getattr(self, "_density_board_scale", 1.0))
+        return user_scale * density_scale
+
+    def set_miniature_board_scale(self, scale_factor: float) -> None:
+        """Apply a new View → Miniature Boards scale and refresh the explorer."""
+        self.refresh()
+
+    def set_show_move_arrows(self, show: bool) -> None:
+        """Toggle move arrows on Opening Explorer miniature boards."""
+        self._show_arrows = bool(show)
+        self.refresh()
 
     def _continuation_colors(self) -> Dict[str, Any]:
         return {
@@ -1274,6 +1320,7 @@ class DetailOpeningExplorerView(QWidget):
                 is_flipped=is_flipped,
                 is_current=is_current,
                 mini_size=board_size,
+                scale_factor=self._miniature_board_scale(),
                 show_arrow=self._show_arrows,
                 on_activate=lambda p=step.ply_index: self._navigate_to_ply(p),
                 lichess_url=(
@@ -1311,7 +1358,10 @@ class DetailOpeningExplorerView(QWidget):
                 self._current_path_row = row
 
         if self._flow_boards:
-            board_outer = _mini_board_outer_size(self.config, self._mini_size)
+            scale = self._miniature_board_scale()
+            board_outer = _mini_board_outer_size(
+                self.config, self._mini_size, scale_factor=scale
+            )
             # Card chrome: horizontal margins + configured gallery tile extras.
             tile_w = int(board_outer + self._gallery_tile_extra_width)
             tile_h = int(board_outer + self._gallery_tile_extra_height)
@@ -1359,6 +1409,7 @@ class DetailOpeningExplorerView(QWidget):
                         depth=1,
                         max_depth=self._max_depth,
                         mini_size=self._mini_size,
+                        scale_factor=self._miniature_board_scale(),
                         show_arrow=self._show_arrows,
                         colors=self._continuation_colors(),
                         is_played_next=is_played_next,
@@ -1430,6 +1481,7 @@ class _OpeningStepRow(QFrame):
         encyclopedia_display: Optional[OpeningDisplay] = None,
         on_encyclopedia: Optional[Callable[[], None]] = None,
         compact_horizontal: bool = False,
+        scale_factor: float = 1.0,
     ) -> None:
         super().__init__()
         self._on_activate = on_activate
@@ -1489,6 +1541,7 @@ class _OpeningStepRow(QFrame):
             is_flipped=is_flipped,
             embedded=True,
             size_override=mini_size,
+            scale_factor=scale_factor,
         )
         if move_uci and show_arrow:
             try:
@@ -1562,7 +1615,9 @@ class _OpeningStepRow(QFrame):
 
         if compact_horizontal:
             # Uniform card tile for gallery grid (include mini-board border).
-            board_outer = _mini_board_outer_size(config, mini_size)
+            board_outer = _mini_board_outer_size(
+                config, mini_size, scale_factor=float(scale_factor)
+            )
             self.setFixedSize(board_outer + tile_extra_w, board_outer + tile_extra_h)
             # One card-level tooltip only (child tooltips look unstyled / native).
             tip = title if not subtitle or subtitle == "Start" else f"{title}\n{subtitle}"
@@ -1608,6 +1663,7 @@ class _ContinuationNode(QWidget):
         on_expand_changed: Optional[Callable[["_ContinuationNode", bool], None]] = None,
         encyclopedia_service: Optional[OpeningEncyclopediaService] = None,
         on_encyclopedia: Optional[Callable[[OpeningDisplay, Optional[str]], None]] = None,
+        scale_factor: float = 1.0,
     ) -> None:
         super().__init__()
         self._config = config
@@ -1620,6 +1676,7 @@ class _ContinuationNode(QWidget):
         self._depth = depth
         self._max_depth = max_depth
         self._mini_size = mini_size
+        self._scale_factor = float(scale_factor)
         self._show_arrow = show_arrow
         self._colors = colors
         self._on_expand_changed = on_expand_changed
@@ -1705,6 +1762,7 @@ class _ContinuationNode(QWidget):
             is_flipped=is_flipped,
             embedded=True,
             size_override=mini_size,
+            scale_factor=scale_factor,
         )
         if show_arrow:
             try:
@@ -1860,6 +1918,7 @@ class _ContinuationNode(QWidget):
                 depth=self._depth + 1,
                 max_depth=self._max_depth,
                 mini_size=self._mini_size,
+                scale_factor=self._scale_factor,
                 show_arrow=self._show_arrow,
                 colors=self._colors,
                 on_expand_changed=None,

@@ -22,6 +22,7 @@ class UserSettingsModel(QObject):
     pgn_notation_changed = pyqtSignal()  # Emitted when PGN notation settings change
     game_analysis_changed = pyqtSignal()  # Emitted when game analysis settings change
     manual_analysis_changed = pyqtSignal()  # Emitted when manual analysis settings change
+    miniature_boards_changed = pyqtSignal()  # Emitted when miniature board scales change
     annotations_changed = pyqtSignal()  # Emitted when annotation settings change
     ai_settings_changed = pyqtSignal()  # Emitted when AI settings change
     player_stats_time_series_changed = pyqtSignal()  # Player Stats time-series binning / display prefs
@@ -336,6 +337,59 @@ class UserSettingsModel(QObject):
         self._settings["manual_analysis"] = settings.copy()
         self.manual_analysis_changed.emit()
         self.settings_changed.emit()
+
+    def get_miniature_boards(self) -> Dict[str, float]:
+        """Get per-surface miniature board scale factors.
+
+        When ``miniature_boards`` is absent, materialize defaults so the section
+        persists on the next save.
+        """
+        from app.utils.miniature_board_scales import normalize_miniature_board_scales
+
+        raw = self._settings.get("miniature_boards")
+        if not isinstance(raw, dict):
+            scales = normalize_miniature_board_scales(None)
+            self._settings["miniature_boards"] = scales
+            return dict(scales)
+        return normalize_miniature_board_scales(raw)
+
+    def set_miniature_boards(self, scales: Dict[str, Any]) -> None:
+        """Replace miniature board scale factors."""
+        from app.utils.miniature_board_scales import normalize_miniature_board_scales
+
+        self._settings["miniature_boards"] = normalize_miniature_board_scales(scales)
+        self.miniature_boards_changed.emit()
+        self.settings_changed.emit()
+
+    def update_miniature_board_scale(self, key: str, scale: float) -> None:
+        """Update one miniature board surface scale."""
+        cur = self.get_miniature_boards()
+        cur[str(key)] = float(scale)
+        self.set_miniature_boards(cur)
+
+    def get_miniature_board_arrows(self) -> Dict[str, bool]:
+        """Get miniature-board arrow visibility flags."""
+        from app.utils.miniature_board_arrows import normalize_miniature_board_arrows
+
+        raw = self._settings.get("miniature_board_arrows")
+        if not isinstance(raw, dict):
+            arrows = normalize_miniature_board_arrows(None)
+            self._settings["miniature_board_arrows"] = arrows
+            return dict(arrows)
+        return normalize_miniature_board_arrows(raw)
+
+    def set_miniature_board_arrows(self, arrows: Dict[str, Any]) -> None:
+        """Replace miniature-board arrow visibility flags."""
+        from app.utils.miniature_board_arrows import normalize_miniature_board_arrows
+
+        self._settings["miniature_board_arrows"] = normalize_miniature_board_arrows(arrows)
+        self.settings_changed.emit()
+
+    def update_miniature_board_arrow(self, key: str, enabled: bool) -> None:
+        """Update one miniature-board arrow visibility flag."""
+        cur = self.get_miniature_board_arrows()
+        cur[str(key)] = bool(enabled)
+        self.set_miniature_board_arrows(cur)
     
     def get_annotations(self) -> Dict[str, Any]:
         """Get annotation settings.

@@ -1275,6 +1275,7 @@ class OpeningEncyclopediaDialog(QDialog):
                         is_flipped=False,
                         embedded=True,
                         clickable=True,
+                        scale_factor=self._miniature_board_scale(),
                     )
                     board.setToolTip(self._board_overlay_tooltip)
                     board.clicked.connect(self._open_board_overlay)
@@ -1886,6 +1887,27 @@ class OpeningEncyclopediaDialog(QDialog):
             )
         except Exception:
             pass
+
+    def _miniature_board_scale(self) -> float:
+        from app.utils.miniature_board_scales import OPENING_ENCYCLOPEDIA
+        from app.services.user_settings_service import UserSettingsService
+
+        try:
+            return float(
+                UserSettingsService.get_instance()
+                .get_miniature_boards()
+                .get(OPENING_ENCYCLOPEDIA, 1.0)
+            )
+        except Exception:
+            return 1.0
+
+    def set_miniature_board_scale(self, scale_factor: float) -> None:
+        """Update the tabiya diagram scale from View → Miniature Boards."""
+        board = getattr(self, "_tabiya_board", None)
+        if board is not None and hasattr(board, "set_scale_factor"):
+            board.set_scale_factor(float(scale_factor))
+            self._beside_block_count = None
+            self._sync_scroll_content_size()
 
     def _set_show_miniature_board(self, show: bool) -> None:
         show = bool(show)

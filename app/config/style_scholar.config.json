@@ -466,6 +466,12 @@
           "color": {
             "$ref": "$_COLOR_COPPER_ORANGE"
           }
+        },
+        "arrow": {
+          "line_width_ratio": 0.08,
+          "arrowhead_ratio": 0.26,
+          "arrowhead_wing_ratio": 0.62,
+          "min_line_width": 1.0
         }
       },
       "scrollbar": {
@@ -3077,19 +3083,22 @@
                 "mini_size": 96,
                 "hero_size": 112,
                 "row_spacing": 6,
-                "flow_boards": false
+                "flow_boards": false,
+                "board_scale": 0.5
               },
               "comfortable": {
                 "mini_size": 128,
                 "hero_size": 160,
                 "row_spacing": 8,
-                "flow_boards": false
+                "flow_boards": false,
+                "board_scale": 1.0
               },
               "gallery": {
                 "mini_size": 140,
                 "hero_size": 180,
                 "row_spacing": 10,
-                "flow_boards": true
+                "flow_boards": true,
+                "board_scale": 1.0
               }
             }
           },

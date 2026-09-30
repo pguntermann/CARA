@@ -1410,8 +1410,15 @@ class AppController:
             if manual_analysis_model:
                 self.user_settings_service.update_manual_analysis({
                     "enable_miniature_preview": manual_analysis_model.enable_miniature_preview,
-                    "miniature_preview_scale_factor": manual_analysis_model.miniature_preview_scale_factor
+                    "miniature_preview_show_move_arrow": manual_analysis_model.miniature_preview_show_move_arrow,
                 })
+                from app.utils.miniature_board_scales import MANUAL_ANALYSIS
+
+                scales = self.user_settings_service.get_miniature_boards()
+                scales[MANUAL_ANALYSIS] = float(
+                    manual_analysis_model.miniature_preview_scale_factor
+                )
+                self.user_settings_service.set_miniature_boards(scales)
         
         # Tell UserSettingsService to persist all settings to file
         success = self.user_settings_service.save()

@@ -990,8 +990,22 @@
     "max_pieces_to_explore": 3,
     "max_exploration_depth": 3,
     "enable_miniature_preview": true,
-    "miniature_preview_scale_factor": 1.25,
+    "miniature_preview_show_move_arrow": true,
     "show_wdl_probabilities": true
+  },
+  "miniature_boards": {
+    "manual_analysis": 1.25,
+    "opening_explorer": 1.0,
+    "game_summary_highlights": 1.0,
+    "opening_encyclopedia": 1.0,
+    "move_link_popups": 1.0
+  },
+  "miniature_board_arrows": {
+    "opening_explorer": true,
+    "game_summary_played": true,
+    "game_summary_best_alternative": true,
+    "move_link_played": true,
+    "move_link_best_alternative": true
   },
   "annotations": {
     "preset_colors": [

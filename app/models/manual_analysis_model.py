@@ -39,6 +39,7 @@ class ManualAnalysisModel(QObject):
     enable_miniature_preview_changed = pyqtSignal(bool)  # Emitted when miniature preview setting changes
     show_wdl_probabilities_changed = pyqtSignal(bool)  # Emitted when WDL bar visibility preference changes
     miniature_preview_scale_factor_changed = pyqtSignal(float)  # Emitted when miniature preview scale factor changes
+    miniature_preview_arrows_changed = pyqtSignal()  # Emitted when miniature PV arrow toggles change
     
     def __init__(self) -> None:
         """Initialize the manual analysis model."""
@@ -52,6 +53,8 @@ class ManualAnalysisModel(QObject):
         self._enable_miniature_preview: bool = True  # Enable miniature board preview on PV hover
         self._show_wdl_probabilities: bool = True  # Show PV1 UCI W/D/L bar when available
         self._miniature_preview_scale_factor: float = 1.25  # Matches template default; menu presets 1.0–2.0
+        # Show the hovered PV move's arrow on the miniature preview
+        self._miniature_preview_show_move_arrow: bool = True
     
     @property
     def lines(self) -> List[AnalysisLine]:
@@ -327,6 +330,18 @@ class ManualAnalysisModel(QObject):
         if self._miniature_preview_scale_factor != value:
             self._miniature_preview_scale_factor = value
             self.miniature_preview_scale_factor_changed.emit(value)
+
+    @property
+    def miniature_preview_show_move_arrow(self) -> bool:
+        """Whether the miniature preview should draw an arrow for the hovered move."""
+        return self._miniature_preview_show_move_arrow
+
+    @miniature_preview_show_move_arrow.setter
+    def miniature_preview_show_move_arrow(self, value: bool) -> None:
+        value = bool(value)
+        if self._miniature_preview_show_move_arrow != value:
+            self._miniature_preview_show_move_arrow = value
+            self.miniature_preview_arrows_changed.emit()
     
     def reset(self) -> None:
         """Reset analysis to default state."""

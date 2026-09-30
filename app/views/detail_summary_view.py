@@ -3547,10 +3547,32 @@ class DetailSummaryView(QWidget):
                     .get("highlights", {})
                 )
                 cards_cfg = highlights_cfg.get("cards", {}) if isinstance(highlights_cfg, dict) else {}
-                mini_size = int(
-                    self.config.get("ui", {}).get("styles", {}).get("mini_board", {}).get("size", 160)
+                from app.views.widgets.mini_chessboard_widget import mini_board_base_size
+
+                mini_size = mini_board_base_size(self.config)
+                from app.utils.miniature_board_scales import GAME_SUMMARY_HIGHLIGHTS
+                from app.services.user_settings_service import UserSettingsService
+
+                scale_factor = float(
+                    UserSettingsService.get_instance()
+                    .get_miniature_boards()
+                    .get(GAME_SUMMARY_HIGHLIGHTS, 1.0)
                 )
-                show_arrows = bool(cards_cfg.get("show_move_arrows", True)) if isinstance(cards_cfg, dict) else True
+                from app.utils.miniature_board_arrows import (
+                    GAME_SUMMARY_BEST_ALTERNATIVE,
+                    GAME_SUMMARY_PLAYED,
+                )
+
+                show_played = bool(cards_cfg.get("show_move_arrows", True)) if isinstance(cards_cfg, dict) else True
+                show_alternative = show_played
+                try:
+                    arrow_prefs = UserSettingsService.get_instance().get_miniature_board_arrows()
+                    show_played = bool(arrow_prefs.get(GAME_SUMMARY_PLAYED, show_played))
+                    show_alternative = bool(
+                        arrow_prefs.get(GAME_SUMMARY_BEST_ALTERNATIVE, show_alternative)
+                    )
+                except Exception:
+                    pass
                 for highlight in phase_highlights:
                     cards_col.addWidget(
                         self._create_highlight_card(
@@ -3560,7 +3582,9 @@ class DetailSummaryView(QWidget):
                             bg_color=bg_color,
                             border_color=border_color,
                             mini_size=mini_size,
-                            show_arrows=show_arrows,
+                            scale_factor=scale_factor,
+                            show_played_arrow=show_played,
+                            show_alternative_arrow=show_alternative,
                             is_flipped=is_flipped,
                         )
                     )
@@ -3592,7 +3616,12 @@ class DetailSummaryView(QWidget):
         return fen_and_played_uci(self._latest_moves, move_number, is_white)
 
     def _half_move_arrows(
-        self, move_number: int, is_white: bool
+        self,
+        move_number: int,
+        is_white: bool,
+        *,
+        show_played: bool = True,
+        show_alternative: bool = True,
     ) -> List[Tuple[chess.Move, List[int]]]:
         """Played-move and best-alternative arrows in the tooltip theme colors."""
         style = load_tooltip_style(self.config)
@@ -3606,8 +3635,23 @@ class DetailSummaryView(QWidget):
             alternative_uci=uci_from_san(self._fen_before_half_move(move_number, is_white), best),
             played_color=style.played_move_arrow_color,
             alternative_color=style.best_alternative_arrow_color,
-            show_alternative=style.show_best_alternative_arrow,
+            show_alternative=bool(show_alternative) and bool(style.show_best_alternative_arrow),
+            show_played=bool(show_played),
         )
+
+    def set_highlight_mini_board_scale(self, scale_factor: float) -> None:
+        """Rebuild Game Summary content so highlight cards pick up a new mini-board scale."""
+        if self.current_summary is None:
+            return
+        self._clear_content()
+        self._build_summary_content(
+            total_moves=len(self._latest_moves),
+            moves=self._latest_moves,
+        )
+
+    def set_highlight_mini_board_arrows(self, show: bool) -> None:
+        """Rebuild Game Summary highlight cards when move-arrow visibility changes."""
+        self.set_highlight_mini_board_scale(1.0)
 
     def _create_highlight_card(
         self,
@@ -3618,8 +3662,10 @@ class DetailSummaryView(QWidget):
         bg_color: QColor,
         border_color: QColor,
         mini_size: int,
-        show_arrows: bool,
+        show_played_arrow: bool,
+        show_alternative_arrow: bool,
         is_flipped: bool,
+        scale_factor: float = 1.0,
     ) -> QWidget:
         """Horizontal card: mini board on the left, move + wrapping description on the right."""
         card = QFrame()
@@ -3649,17 +3695,24 @@ class DetailSummaryView(QWidget):
                 is_flipped=is_flipped,
                 embedded=True,
                 size_override=mini_size,
+                scale_factor=scale_factor,
             )
-            if show_arrows:
+            if show_played_arrow or show_alternative_arrow:
                 board.set_arrows(
-                    self._half_move_arrows(highlight.move_number, highlight.is_white)
+                    self._half_move_arrows(
+                        highlight.move_number,
+                        highlight.is_white,
+                        show_played=show_played_arrow,
+                        show_alternative=show_alternative_arrow,
+                    )
                 )
             self._highlight_mini_boards.append(board)
             layout.addWidget(board, 0, Qt.AlignmentFlag.AlignTop)
         else:
             placeholder = QLabel("No board")
             placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            placeholder.setFixedSize(mini_size, mini_size)
+            placeholder_size = max(8, int(round(mini_size * float(scale_factor))))
+            placeholder.setFixedSize(placeholder_size, placeholder_size)
             placeholder.setStyleSheet(
                 f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
                 "border: none; background: transparent;"

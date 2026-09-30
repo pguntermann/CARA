@@ -59,11 +59,12 @@ def position_board_arrows(
     played_color: Tuple[int, int, int],
     alternative_color: Tuple[int, int, int],
     show_alternative: bool,
+    show_played: bool = True,
 ) -> List[Tuple[chess.Move, List[int]]]:
     """Played-move arrow, then the best alternative when it is a different move."""
     arrows: List[Tuple[chess.Move, List[int]]] = []
     played = move_from_uci(played_uci)
-    if played is not None:
+    if show_played and played is not None:
         arrows.append((played, list(played_color)))
     if show_alternative:
         alternative = move_from_uci(alternative_uci)
@@ -198,11 +199,22 @@ class MoveLinkPopup(QWidget):
 
         self._board: Optional[MiniChessBoardWidget] = None
         if self._style.show_position_board:
+            from app.utils.miniature_board_scales import MOVE_LINK_POPUPS
+            from app.services.user_settings_service import UserSettingsService
+
+            try:
+                scale = float(
+                    UserSettingsService.get_instance()
+                    .get_miniature_boards()
+                    .get(MOVE_LINK_POPUPS, 1.0)
+                )
+            except Exception:
+                scale = 1.0
             self._board = MiniChessBoardWidget(
                 config,
                 chess.STARTING_FEN,
                 embedded=True,
-                size_override=self._style.position_board_size,
+                scale_factor=scale,
             )
             self._board.hide()
             row.addWidget(self._board, 0, Qt.AlignmentFlag.AlignTop)
@@ -241,6 +253,11 @@ class MoveLinkPopup(QWidget):
     @property
     def hover_delay_ms(self) -> int:
         return self._style.hover_delay_ms
+
+    def set_miniature_board_scale(self, scale_factor: float) -> None:
+        """Update the optional position board scale from View → Miniature Boards."""
+        if self._board is not None and hasattr(self._board, "set_scale_factor"):
+            self._board.set_scale_factor(float(scale_factor))
 
     def present(self, anchor: QWidget, tip: MoveLinkTip, *, is_flipped: bool) -> None:
         """Show ``tip`` with the caret aimed at ``anchor``."""
@@ -379,12 +396,27 @@ class MoveLinkPopup(QWidget):
     def _board_arrows(self, tip: MoveLinkTip) -> List[Tuple[chess.Move, List[int]]]:
         """Played move in the theme color, then the best alternative when it differs."""
         style = self._style
+        show_played = True
+        show_alternative = bool(style.show_best_alternative_arrow)
+        try:
+            from app.utils.miniature_board_arrows import (
+                MOVE_LINK_BEST_ALTERNATIVE,
+                MOVE_LINK_PLAYED,
+            )
+            from app.services.user_settings_service import UserSettingsService
+
+            arrows = UserSettingsService.get_instance().get_miniature_board_arrows()
+            show_played = bool(arrows.get(MOVE_LINK_PLAYED, True))
+            show_alternative = bool(arrows.get(MOVE_LINK_BEST_ALTERNATIVE, show_alternative))
+        except Exception:
+            pass
         return position_board_arrows(
             played_uci=tip.arrow_uci,
             alternative_uci=tip.alternative_uci,
             played_color=style.played_move_arrow_color,
             alternative_color=style.best_alternative_arrow_color,
-            show_alternative=style.show_best_alternative_arrow,
+            show_alternative=show_alternative,
+            show_played=show_played,
         )
 
     def _clear_details(self) -> None:
