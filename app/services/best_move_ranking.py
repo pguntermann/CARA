@@ -50,7 +50,8 @@ class RankedBestMove:
     evaluation: str
     best_move: str
     display_gain: float
-    selection_reason: str = ""
+    tip_subtitle: str = ""
+    tip_details: tuple[tuple[str, str], ...] = ()
 
 
 def assessment_rank(assessment: str) -> int:
@@ -175,7 +176,7 @@ def ranking_eval_gain(
     return max(0.0, display_gain)
 
 
-def format_best_move_selection_reason(
+def format_best_move_tip(
     *,
     assessment: str,
     tactic_type: str = "",
@@ -184,39 +185,44 @@ def format_best_move_selection_reason(
     display_gain: float = 0.0,
     gain_ignored: Optional[str] = None,
     is_filler: bool = False,
-) -> str:
-    """Plain-text tooltip explaining why this ply made the top-best list."""
-    lines: List[str] = []
+) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Subtitle and detail rows explaining why this ply made the top-best list."""
     text = str(assessment or "")
+    details: List[tuple[str, str]] = []
     if text.startswith("Brilliant"):
-        lines.append("Chosen as a Brilliant move")
+        subtitle = text
     elif text == "Best Move":
-        lines.append("Chosen as a Best Move")
+        subtitle = "Best Move"
     elif is_filler or text == "Good Move":
-        lines.append("Good Move included to fill the top 3")
+        subtitle = "Good Move"
     elif text:
-        lines.append(f"Chosen as {text}")
+        subtitle = text
+    else:
+        subtitle = "Best move"
+
+    if is_filler:
+        details.append(("Listed", "included to fill the top 3"))
 
     if tactic_type:
         label = _TACTIC_LABELS.get(tactic_type, tactic_type.replace("_", " "))
-        lines.append(f"Tactic: {label}")
+        details.append(("Tactic", label))
 
     if only_move:
         if only_move_cpl2 is not None:
-            lines.append(f"Only engine move (next-best CPL {only_move_cpl2:.0f})")
+            details.append(("Only move", f"next-best CPL {only_move_cpl2:.0f}"))
         else:
-            lines.append("Only engine move")
+            details.append(("Only move", "no close alternative"))
 
     if gain_ignored:
-        lines.append(f"Eval jump ignored: {gain_ignored}")
+        details.append(("Eval jump", f"ignored ({gain_ignored})"))
     elif text.startswith("Brilliant") or text == "Best Move":
         n = max(0, int(round(float(display_gain or 0.0))))
         if n == 0:
-            lines.append("CP gain 0 counted in ranking")
+            details.append(("CP gain", "0 counted in ranking"))
         else:
-            lines.append(f"CP gain {n:+d} counted in ranking")
+            details.append(("CP gain", f"{n:+d} counted in ranking"))
 
-    return "\n".join(lines)
+    return subtitle, tuple(details)
 
 
 def load_best_move_tactic_rules(
@@ -423,6 +429,15 @@ def select_top_best_moves(
     )
     ranked: List[RankedBestMove] = []
     for candidate in pool[:count]:
+        subtitle, details = format_best_move_tip(
+            assessment=candidate.assessment,
+            tactic_type=candidate.tactic_type,
+            only_move=candidate.only_move,
+            only_move_cpl2=candidate.only_move_cpl2 if candidate.only_move else None,
+            display_gain=candidate.display_gain,
+            gain_ignored=candidate.gain_ignored,
+            is_filler=candidate.class_rank == FILLER_MAX_RANK,
+        )
         ranked.append(
             RankedBestMove(
                 move_number=candidate.move_number,
@@ -432,15 +447,8 @@ def select_top_best_moves(
                 evaluation=candidate.evaluation,
                 best_move=candidate.best_move,
                 display_gain=candidate.display_gain,
-                selection_reason=format_best_move_selection_reason(
-                    assessment=candidate.assessment,
-                    tactic_type=candidate.tactic_type,
-                    only_move=candidate.only_move,
-                    only_move_cpl2=candidate.only_move_cpl2 if candidate.only_move else None,
-                    display_gain=candidate.display_gain,
-                    gain_ignored=candidate.gain_ignored,
-                    is_filler=candidate.class_rank == FILLER_MAX_RANK,
-                ),
+                tip_subtitle=subtitle,
+                tip_details=details,
             )
         )
     return ranked

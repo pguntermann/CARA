@@ -60,22 +60,6 @@ def setup_manual_analysis_menu(mw, menu_bar: QMenuBar) -> None:
     mw.show_wdl_probabilities_action.triggered.connect(mw._on_show_wdl_probabilities_toggled)
     manual_analysis_menu.addAction(mw.show_wdl_probabilities_action)
 
-    mw.miniature_preview_scale_menu = manual_analysis_menu.addMenu(
-        "Set miniature preview scale factor"
-    )
-    mw._apply_menu_styling(mw.miniature_preview_scale_menu)
-    scale_factors = [1.0, 1.25, 1.5, 1.75, 2.0]
-    mw.miniature_preview_scale_actions = {}
-    for scale in scale_factors:
-        action = QAction(f"{scale}x", mw)
-        action.setCheckable(True)
-        action.setData(scale)
-        action.triggered.connect(
-            lambda checked, s=scale: mw._on_miniature_preview_scale_factor_selected(s)
-        )
-        mw.miniature_preview_scale_menu.addAction(action)
-        mw.miniature_preview_scale_actions[scale] = action
-
     manual_analysis_menu.addSeparator()
 
     mw.explore_pv1_plans_action = QAction("Explore PV1 Positional Plans", mw)

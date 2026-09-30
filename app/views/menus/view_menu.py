@@ -18,6 +18,113 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
 
     # Theme switching (runtime) should be at the top
     mw._setup_theme_menu(view_menu)
+
+    from app.utils.miniature_board_scales import (
+        GAME_SUMMARY_HIGHLIGHTS,
+        MANUAL_ANALYSIS,
+        MINIATURE_BOARD_SCALE_MENU_ITEMS,
+        MINIATURE_BOARD_SCALE_PRESETS,
+        MOVE_LINK_POPUPS,
+        OPENING_EXPLORER,
+    )
+    from app.utils.miniature_board_arrows import (
+        GAME_SUMMARY_BEST_ALTERNATIVE,
+        GAME_SUMMARY_PLAYED,
+        MOVE_LINK_BEST_ALTERNATIVE,
+        MOVE_LINK_PLAYED,
+        OPENING_EXPLORER as ARROWS_OPENING_EXPLORER,
+    )
+
+    miniature_boards_menu = view_menu.addMenu("Miniature Boards")
+    mw._apply_menu_styling(miniature_boards_menu)
+    mw.miniature_board_scale_actions = {}
+    mw.miniature_board_arrow_actions = {}
+    for surface_key, surface_label in MINIATURE_BOARD_SCALE_MENU_ITEMS:
+        surface_menu = miniature_boards_menu.addMenu(surface_label)
+        mw._apply_menu_styling(surface_menu)
+        actions_for_surface = {}
+        for scale in MINIATURE_BOARD_SCALE_PRESETS:
+            action = QAction(f"{scale}x", mw)
+            action.setCheckable(True)
+            action.setData(scale)
+            action.triggered.connect(
+                lambda checked=False, key=surface_key, s=scale: mw._on_miniature_board_scale_selected(
+                    key, s
+                )
+            )
+            surface_menu.addAction(action)
+            actions_for_surface[scale] = action
+        mw.miniature_board_scale_actions[surface_key] = actions_for_surface
+
+        # Arrow toggles use the same labels as Board → Show … Move
+        if surface_key == MANUAL_ANALYSIS:
+            surface_menu.addSeparator()
+            mw.miniature_preview_move_arrow_action = QAction("Show Move Arrow", mw)
+            mw.miniature_preview_move_arrow_action.setCheckable(True)
+            mw.miniature_preview_move_arrow_action.setChecked(True)
+            mw.miniature_preview_move_arrow_action.toggled.connect(
+                mw._on_miniature_preview_move_arrow_toggled
+            )
+            surface_menu.addAction(mw.miniature_preview_move_arrow_action)
+        elif surface_key == OPENING_EXPLORER:
+            surface_menu.addSeparator()
+            action = QAction("Show Played Move", mw)
+            action.setCheckable(True)
+            action.setChecked(True)
+            action.triggered.connect(
+                lambda checked=False, key=ARROWS_OPENING_EXPLORER: mw._on_miniature_board_arrow_toggled(
+                    key, checked
+                )
+            )
+            surface_menu.addAction(action)
+            mw.miniature_board_arrow_actions[ARROWS_OPENING_EXPLORER] = action
+        elif surface_key == GAME_SUMMARY_HIGHLIGHTS:
+            surface_menu.addSeparator()
+            played_action = QAction("Show Played Move", mw)
+            played_action.setCheckable(True)
+            played_action.setChecked(True)
+            played_action.triggered.connect(
+                lambda checked=False, key=GAME_SUMMARY_PLAYED: mw._on_miniature_board_arrow_toggled(
+                    key, checked
+                )
+            )
+            surface_menu.addAction(played_action)
+            mw.miniature_board_arrow_actions[GAME_SUMMARY_PLAYED] = played_action
+
+            alt_action = QAction("Show Best Alternative Move", mw)
+            alt_action.setCheckable(True)
+            alt_action.setChecked(True)
+            alt_action.triggered.connect(
+                lambda checked=False, key=GAME_SUMMARY_BEST_ALTERNATIVE: mw._on_miniature_board_arrow_toggled(
+                    key, checked
+                )
+            )
+            surface_menu.addAction(alt_action)
+            mw.miniature_board_arrow_actions[GAME_SUMMARY_BEST_ALTERNATIVE] = alt_action
+        elif surface_key == MOVE_LINK_POPUPS:
+            surface_menu.addSeparator()
+            played_action = QAction("Show Played Move", mw)
+            played_action.setCheckable(True)
+            played_action.setChecked(True)
+            played_action.triggered.connect(
+                lambda checked=False, key=MOVE_LINK_PLAYED: mw._on_miniature_board_arrow_toggled(
+                    key, checked
+                )
+            )
+            surface_menu.addAction(played_action)
+            mw.miniature_board_arrow_actions[MOVE_LINK_PLAYED] = played_action
+
+            alt_action = QAction("Show Best Alternative Move", mw)
+            alt_action.setCheckable(True)
+            alt_action.setChecked(True)
+            alt_action.triggered.connect(
+                lambda checked=False, key=MOVE_LINK_BEST_ALTERNATIVE: mw._on_miniature_board_arrow_toggled(
+                    key, checked
+                )
+            )
+            surface_menu.addAction(alt_action)
+            mw.miniature_board_arrow_actions[MOVE_LINK_BEST_ALTERNATIVE] = alt_action
+
     view_menu.addSeparator()
 
     mw.view_keyboard_shortcuts_action = QAction("Keyboard Shortcuts...", mw)

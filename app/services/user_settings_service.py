@@ -405,6 +405,14 @@ class UserSettingsService:
                     model.set_game_analysis_settings(template_value)
                 elif key == "manual_analysis":
                     model.set_manual_analysis(template_value)
+                elif key == "miniature_boards":
+                    model.set_miniature_boards(
+                        template_value if isinstance(template_value, dict) else {}
+                    )
+                elif key == "miniature_board_arrows":
+                    model.set_miniature_board_arrows(
+                        template_value if isinstance(template_value, dict) else {}
+                    )
                 elif key == "annotations":
                     model.set_annotations(template_value)
                 elif key == "engines":
@@ -452,6 +460,10 @@ class UserSettingsService:
                         model.set_game_analysis_settings(section_dict)
                     elif key == "manual_analysis":
                         model.set_manual_analysis(section_dict)
+                    elif key == "miniature_boards":
+                        model.set_miniature_boards(section_dict)
+                    elif key == "miniature_board_arrows":
+                        model.set_miniature_board_arrows(section_dict)
                     elif key == "annotations":
                         model.set_annotations(section_dict)
                     elif key == "engine_assignments":
@@ -899,7 +911,7 @@ class UserSettingsService:
     
     def update_manual_analysis(self, settings: Dict[str, Any]) -> None:
         """Update manual analysis settings.
-        
+
         Args:
             settings: Dictionary with manual analysis settings.
         """
@@ -907,10 +919,34 @@ class UserSettingsService:
         current = model.get_manual_analysis()
         current.update(settings)
         model.set_manual_analysis(current)
-    
+
+    def get_miniature_boards(self) -> Dict[str, float]:
+        """Return per-surface miniature board scale factors."""
+        return self.get_model().get_miniature_boards()
+
+    def update_miniature_board_scale(self, key: str, scale: float) -> None:
+        """Update one miniature board surface scale (write-on-exit)."""
+        self.get_model().update_miniature_board_scale(str(key), float(scale))
+
+    def set_miniature_boards(self, scales: Dict[str, Any]) -> None:
+        """Replace miniature board scale factors (write-on-exit)."""
+        self.get_model().set_miniature_boards(scales)
+
+    def get_miniature_board_arrows(self) -> Dict[str, bool]:
+        """Return miniature-board arrow visibility flags."""
+        return self.get_model().get_miniature_board_arrows()
+
+    def update_miniature_board_arrow(self, key: str, enabled: bool) -> None:
+        """Update one miniature-board arrow visibility flag (write-on-exit)."""
+        self.get_model().update_miniature_board_arrow(str(key), bool(enabled))
+
+    def set_miniature_board_arrows(self, arrows: Dict[str, Any]) -> None:
+        """Replace miniature-board arrow visibility flags (write-on-exit)."""
+        self.get_model().set_miniature_board_arrows(arrows)
+
     def update_annotations(self, settings: Dict[str, Any]) -> None:
         """Update annotation preferences.
-        
+
         Args:
             settings: Dictionary with annotation settings (preset_colors, text_font_family, text_font_size).
         """

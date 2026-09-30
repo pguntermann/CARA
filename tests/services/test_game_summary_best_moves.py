@@ -9,13 +9,16 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.models.moveslist_model import MoveData
-from app.services.best_move_ranking import format_best_move_selection_reason
+from app.services.best_move_ranking import format_best_move_tip
 from app.services.game_summary_service import (
     CriticalMove,
     GameSummaryService,
     _EVAL_IMPROVEMENT_CAP_CP,
     format_best_move_stat,
     format_cp_gain,
+    format_half_move_notation,
+    format_half_move_tip,
+    format_worst_move_tip,
 )
 from tests.highlight_rules.helpers import moves_from_pgn
 
@@ -234,7 +237,7 @@ class TestFindTopBestMoves(unittest.TestCase):
 
 class TestBestMoveSelectionReason(unittest.TestCase):
     def test_format_covers_class_tactic_only_move_and_ignored_gain(self) -> None:
-        text = format_best_move_selection_reason(
+        subtitle, details = format_best_move_tip(
             assessment="Best Move",
             tactic_type="fork",
             only_move=True,
@@ -242,24 +245,24 @@ class TestBestMoveSelectionReason(unittest.TestCase):
             display_gain=500.0,
             gain_ignored="capture",
         )
+        self.assertEqual(subtitle, "Best Move")
         self.assertEqual(
-            text,
-            "Chosen as a Best Move\n"
-            "Tactic: fork\n"
-            "Only engine move (next-best CPL 80)\n"
-            "Eval jump ignored: capture",
+            details,
+            (
+                ("Tactic", "fork"),
+                ("Only move", "next-best CPL 80"),
+                ("Eval jump", "ignored (capture)"),
+            ),
         )
 
     def test_format_brilliant_and_good_filler(self) -> None:
         self.assertEqual(
-            format_best_move_selection_reason(assessment="Brilliant (3,4)"),
-            "Chosen as a Brilliant move\nCP gain 0 counted in ranking",
+            format_best_move_tip(assessment="Brilliant (3,4)"),
+            ("Brilliant (3,4)", (("CP gain", "0 counted in ranking"),)),
         )
         self.assertEqual(
-            format_best_move_selection_reason(
-                assessment="Good Move", is_filler=True
-            ),
-            "Good Move included to fill the top 3",
+            format_best_move_tip(assessment="Good Move", is_filler=True),
+            ("Good Move", (("Listed", "included to fill the top 3"),)),
         )
 
     def test_fork_tooltip_names_the_tactic(self) -> None:
@@ -270,8 +273,8 @@ class TestBestMoveSelectionReason(unittest.TestCase):
             analysis={10: {"white": {"cpl": "0", "assess": "Best Move", "eval": "+0.50"}}},
         )
         top = _svc()._find_top_best_moves([quiet] + fork_rows, is_white=True, count=1)
-        self.assertIn("Chosen as a Best Move", top[0].selection_reason)
-        self.assertIn("Tactic: fork", top[0].selection_reason)
+        self.assertEqual(top[0].tip_subtitle, "Best Move")
+        self.assertIn(("Tactic", "fork"), top[0].tip_details)
 
     def test_capture_tooltip_says_eval_jump_ignored(self) -> None:
         moves = [
@@ -281,7 +284,7 @@ class TestBestMoveSelectionReason(unittest.TestCase):
         ]
         top = _svc()._find_top_best_moves(moves, is_white=True, count=3)
         rxe5 = next(m for m in top if m.move_notation == "2. Rxe5")
-        self.assertIn("Eval jump ignored: capture", rxe5.selection_reason)
+        self.assertIn(("Eval jump", "ignored (capture)"), rxe5.tip_details)
 
     def test_only_move_tooltip(self) -> None:
         moves = [
@@ -289,7 +292,7 @@ class TestBestMoveSelectionReason(unittest.TestCase):
             _white(2, "d4", eval_white="+0.40", eval_black="+0.20", cpl_2="80"),
         ]
         top = _svc()._find_top_best_moves(moves, is_white=True, count=1)
-        self.assertIn("Only engine move (next-best CPL 80)", top[0].selection_reason)
+        self.assertIn(("Only move", "next-best CPL 80"), top[0].tip_details)
 
     def test_good_filler_tooltip(self) -> None:
         moves = [
@@ -298,7 +301,7 @@ class TestBestMoveSelectionReason(unittest.TestCase):
             _white(3, "Qh5", assess="Good Move", eval_white="+0.50"),
         ]
         top = _svc()._find_top_best_moves(moves, is_white=True, count=3)
-        self.assertIn("fill the top 3", top[2].selection_reason)
+        self.assertIn(("Listed", "included to fill the top 3"), top[2].tip_details)
 
     def test_search_noise_tooltip(self) -> None:
         moves = [
@@ -308,25 +311,70 @@ class TestBestMoveSelectionReason(unittest.TestCase):
         ]
         top = _svc()._find_top_best_moves(moves, is_white=True, count=3)
         kf4 = next(m for m in top if m.move_notation == "2. Kf4")
-        self.assertIn("Eval jump ignored: search noise", kf4.selection_reason)
+        self.assertIn(("Eval jump", "ignored (search noise)"), kf4.tip_details)
 
     def test_quiet_best_tooltip_includes_counted_gain(self) -> None:
-        text = format_best_move_selection_reason(
+        subtitle, details = format_best_move_tip(
             assessment="Best Move",
             display_gain=10.0,
         )
-        self.assertEqual(
-            text,
-            "Chosen as a Best Move\nCP gain +10 counted in ranking",
-        )
+        self.assertEqual(subtitle, "Best Move")
+        self.assertEqual(details, (("CP gain", "+10 counted in ranking"),))
 
     def test_wrap_tooltip_preserves_newlines(self) -> None:
         from app.utils.tooltip_utils import wrap_tooltip_text
 
-        html = wrap_tooltip_text("Chosen as a Best Move\nTactic: fork")
+        html = wrap_tooltip_text("Best Move\nTactic: fork")
         self.assertIn("white-space: nowrap", html)
-        self.assertIn("Chosen as a Best Move", html)
+        self.assertIn("Best Move", html)
         self.assertIn("Tactic: fork", html)
+
+
+class TestHalfMoveTip(unittest.TestCase):
+    def test_notation_matches_white_and_black(self) -> None:
+        self.assertEqual(format_half_move_notation(12, True, "Nf3"), "12. Nf3")
+        self.assertEqual(format_half_move_notation(12, False, "Nf6"), "12. ...Nf6")
+        self.assertEqual(format_half_move_notation(12, True, "  "), "")
+
+    def test_description_is_the_subtitle_and_assessment_stays_a_detail(self) -> None:
+        self.assertEqual(
+            format_half_move_tip(
+                assessment="Good Move",
+                cpl="18.2",
+                best_move="Nxe3",
+                description="White secured the bishop pair",
+            ),
+            (
+                "White secured the bishop pair",
+                (("Assessment", "Good Move"), ("CPL", "18"), ("Best", "Nxe3")),
+            ),
+        )
+
+    def test_assessment_is_the_subtitle_when_there_is_no_description(self) -> None:
+        self.assertEqual(
+            format_half_move_tip(assessment="Blunder", cpl="120", best_move=""),
+            ("Blunder", (("CPL", "120"),)),
+        )
+
+    def test_omits_blank_rows(self) -> None:
+        self.assertEqual(
+            format_half_move_tip(assessment="", cpl="", best_move="", description=""),
+            ("", ()),
+        )
+
+
+class TestWorstMoveTip(unittest.TestCase):
+    def test_includes_assessment_cpl_and_best(self) -> None:
+        self.assertEqual(
+            format_worst_move_tip(assessment="Blunder", cpl=9463, best_move="Qd4"),
+            ("Blunder", (("CPL", "9463"), ("Best", "Qd4"))),
+        )
+
+    def test_omits_empty_best_move(self) -> None:
+        self.assertEqual(
+            format_worst_move_tip(assessment="", cpl=12.4, best_move=""),
+            ("Worst move", (("CPL", "12"),)),
+        )
 
 
 if __name__ == "__main__":

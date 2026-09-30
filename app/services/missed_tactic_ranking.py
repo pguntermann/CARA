@@ -64,7 +64,8 @@ class RankedMissedTactic:
     evaluation: str
     best_move: str
     tactic_type: str
-    selection_reason: str
+    tip_subtitle: str = ""
+    tip_details: tuple[tuple[str, str], ...] = ()
     eval_drop: float = 0.0
     pv_uci: str = ""
 
@@ -88,23 +89,22 @@ def format_missed_tactic_line(move: object) -> str:
     return f"Missed: {pv1}"
 
 
-def format_missed_tactic_selection_reason(
+def format_missed_tactic_tip(
     *,
     played: str,
     pv1: str,
     assessment: str,
     cpl: float,
     kind: str,
-) -> str:
-    """Plain-text tooltip explaining why this ply made the missed-tactics list."""
+) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Subtitle and detail rows explaining why this ply made the missed-tactics list."""
     label = missed_kind_label(kind) or "tactic"
-    lines = [
-        f"Missed {label}",
-        f"Engine line: {pv1}",
-        f"Played {played} ({assessment})",
-        f"CPL {float(cpl):.0f}",
-    ]
-    return "\n".join(lines)
+    details = (
+        ("Engine line", str(pv1)),
+        ("Played", f"{played} ({assessment})"),
+        ("CPL", f"{float(cpl):.0f}"),
+    )
+    return f"Missed {label}", details
 
 
 def load_missed_tactic_rules(
@@ -503,6 +503,13 @@ def select_top_missed_tactics(
         gain = display_eval_gain_cp(moves, index, is_white, parse_eval)
         eval_drop = max(0.0, -gain)
         notation = f"{move.move_number}. {played}"
+        tip_subtitle, tip_details = format_missed_tactic_tip(
+            played=played,
+            pv1=pv1,
+            assessment=assessment,
+            cpl=cpl,
+            kind=kind,
+        )
         ranked.append(
             (
                 kind_rank,
@@ -517,13 +524,8 @@ def select_top_missed_tactics(
                     evaluation=getattr(move, eval_field) or "",
                     best_move=pv1,
                     tactic_type=kind,
-                    selection_reason=format_missed_tactic_selection_reason(
-                        played=played,
-                        pv1=pv1,
-                        assessment=assessment,
-                        cpl=cpl,
-                        kind=kind,
-                    ),
+                    tip_subtitle=tip_subtitle,
+                    tip_details=tip_details,
                     eval_drop=eval_drop,
                     pv_uci=pv_move.uci(),
                 ),

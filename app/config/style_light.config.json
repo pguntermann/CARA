@@ -348,6 +348,12 @@
           "color": {
             "$ref": "$_COLOR_BORDER"
           }
+        },
+        "arrow": {
+          "line_width_ratio": 0.08,
+          "arrowhead_ratio": 0.26,
+          "arrowhead_wing_ratio": 0.62,
+          "min_line_width": 1.0
         }
       },
       "scrollbar": {
@@ -703,7 +709,40 @@
         "padding": 10,
         "text_color": {
           "$ref": "$_COLOR_TEXT_3"
-        }
+        },
+        "font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "title_color": {
+          "$ref": "$_COLOR_TEXT_PRIMARY"
+        },
+        "title_font_size": 13,
+        "title_font_weight": "bold",
+        "muted_color": {
+          "$ref": "$_COLOR_TEXT_4"
+        },
+        "separator_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "caret_size": 8,
+        "anchor_gap": 4,
+        "hover_delay_ms": 300,
+        "show_position_board": true,
+        "position_board_size": 112,
+        "played_move_arrow_color": [
+          255,
+          255,
+          0
+        ],
+        "show_best_alternative_arrow": true,
+        "best_alternative_arrow_color": [
+          200,
+          0,
+          100
+        ]
       }
     },
     "positional_heatmap": {
@@ -3104,19 +3143,22 @@
                 "mini_size": 96,
                 "hero_size": 112,
                 "row_spacing": 6,
-                "flow_boards": false
+                "flow_boards": false,
+                "board_scale": 0.5
               },
               "comfortable": {
                 "mini_size": 128,
                 "hero_size": 160,
                 "row_spacing": 8,
-                "flow_boards": false
+                "flow_boards": false,
+                "board_scale": 1.0
               },
               "gallery": {
                 "mini_size": 140,
                 "hero_size": 180,
                 "row_spacing": 10,
-                "flow_boards": true
+                "flow_boards": true,
+                "board_scale": 1.0
               }
             }
           },

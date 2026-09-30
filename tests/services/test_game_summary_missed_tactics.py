@@ -18,7 +18,7 @@ from app.services.game_summary_service import (
 )
 from app.services.missed_tactic_ranking import (
     fen_before_for_ply,
-    format_missed_tactic_selection_reason,
+    format_missed_tactic_tip,
     missed_kind_label,
     mover_already_lost,
 )
@@ -115,8 +115,8 @@ class TestFindTopMissedTactics(unittest.TestCase):
         self.assertEqual(top[0].best_move, "Nd6")
         self.assertEqual(top[0].tactic_type, "fork")
         self.assertEqual(format_missed_tactic_line(top[0]), "Missed: Nd6 (fork)")
-        self.assertIn("Missed fork", top[0].selection_reason)
-        self.assertIn("Engine line: Nd6", top[0].selection_reason)
+        self.assertEqual(top[0].tip_subtitle, "Missed fork")
+        self.assertIn(("Engine line", "Nd6"), top[0].tip_details)
 
     def test_check_fork_still_counts_as_named_tactic(self) -> None:
         fen = "r3k3/8/8/1N6/8/8/8/4K3 w - - 0 10"
@@ -267,7 +267,6 @@ class TestFindTopMissedTactics(unittest.TestCase):
             evaluation="-1.50",
             best_move="Qc7+",
             tactic_type="fork",
-            selection_reason="",
             pv_uci="c2c7",
         )
         late = RankedMissedTactic(
@@ -278,7 +277,6 @@ class TestFindTopMissedTactics(unittest.TestCase):
             evaluation="-4.00",
             best_move="Qc7+",
             tactic_type="fork",
-            selection_reason="",
             pv_uci="c4c7",
         )
         # Pre-sorted like select_top_missed_tactics: better CPL first.
@@ -357,15 +355,25 @@ class TestMissedTacticDisplay(unittest.TestCase):
             "-2.00",
             best_move="Nd6",
             tactic_type="fork",
-            selection_reason=format_missed_tactic_selection_reason(
+        )
+        self.assertEqual(format_missed_tactic_line(move), "Missed: Nd6 (fork)")
+        self.assertEqual(
+            format_missed_tactic_tip(
                 played="Ke2",
                 pv1="Nd6",
                 assessment="Miss",
                 cpl=180.0,
                 kind="fork",
             ),
+            (
+                "Missed fork",
+                (
+                    ("Engine line", "Nd6"),
+                    ("Played", "Ke2 (Miss)"),
+                    ("CPL", "180"),
+                ),
+            ),
         )
-        self.assertEqual(format_missed_tactic_line(move), "Missed: Nd6 (fork)")
         self.assertEqual(
             format_missed_tactic_line(
                 CriticalMove(1, "1. a3", 100.0, "Miss", "", best_move="Qxh7#", tactic_type="mate")

@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QLabel
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QMouseEvent
 import chess
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 from app.controllers.board_controller import BoardController
@@ -197,72 +197,98 @@ class HoverablePvLabel(QLabel):
                             self.setText(match.group(1))
     
     def _on_hover_timeout(self) -> None:
-        """Handle hover timeout - show mini-board with position."""
+        """Handle hover timeout - show mini-board with position after this move."""
         # Use frozen PV snapshot if available (prevents updates during hover)
-        pv_moves_to_use = self._frozen_pv_moves if self._frozen_pv_moves is not None else self._pv_moves
-        current_fen_to_use = self._frozen_current_fen if self._frozen_current_fen is not None else self._current_fen
-        
-        # Calculate position after applying moves up to and including this move
+        pv_moves_to_use = (
+            self._frozen_pv_moves
+            if self._frozen_pv_moves is not None
+            else self._pv_moves
+        )
+        current_fen_to_use = (
+            self._frozen_current_fen
+            if self._frozen_current_fen is not None
+            else self._current_fen
+        )
+
         try:
-            # Start from frozen analysis position
-            board = chess.Board(current_fen_to_use)
-            
-            # Apply moves up to and including this move (using frozen PV)
-            moves_to_apply = pv_moves_to_use[:self._move_index + 1]
-            
-            for move_text in moves_to_apply:
-                try:
-                    move = board.parse_san(move_text)
-                    board.push(move)
-                except (chess.InvalidMoveError, ValueError):
-                    # Invalid move - abort
-                    return
-            
-            # Get FEN after applying moves
-            new_fen = board.fen()
-            
-            # Get board orientation and arrow visibility from board controller
             is_flipped = False
-            show_arrow = False
-            move_to_show = None
-            
             if self._board_controller:
                 board_model = self._board_controller.get_board_model()
                 if board_model:
                     is_flipped = board_model.is_flipped
-                    # Check if "Show best move arrow" is enabled
-                    show_arrow = board_model.show_bestnextmove_arrow
-                    
-                    # Get the move for this position (the move that leads to this position)
-                    if self._move_index < len(pv_moves_to_use):
-                        move_text = pv_moves_to_use[self._move_index]
-                        try:
-                            # Parse the move from the position before this move
-                            temp_board = chess.Board(current_fen_to_use)
-                            # Apply moves up to (but not including) this move
-                            for i in range(self._move_index):
-                                temp_move = temp_board.parse_san(pv_moves_to_use[i])
-                                temp_board.push(temp_move)
-                            # Now parse this move
-                            move_to_show = temp_board.parse_san(move_text)
-                        except (chess.InvalidMoveError, ValueError):
-                            move_to_show = None
-            
-            # Show or update mini-board
-            self._show_mini_board(new_fen, is_flipped, move_to_show, show_arrow)
-            
+
+            board = chess.Board(current_fen_to_use)
+            for move_text in pv_moves_to_use[: self._move_index + 1]:
+                try:
+                    board.push(board.parse_san(move_text))
+                except (chess.InvalidMoveError, ValueError):
+                    return
+            new_fen = board.fen()
+
+            arrows = self._hovered_move_arrows(current_fen_to_use, pv_moves_to_use)
+            self._show_mini_board(new_fen, is_flipped, arrows)
+
         except Exception:
-            # Any error - hide mini-board
             self._hide_mini_board()
-    
-    def _show_mini_board(self, fen: str, is_flipped: bool, move: Optional[chess.Move] = None, show_arrow: bool = False) -> None:
+
+    def _normalize_rgb(self, raw: Any, default: List[int]) -> List[int]:
+        """Coerce a config color to ``[r, g, b]`` ints."""
+        if isinstance(raw, (list, tuple)) and len(raw) >= 3:
+            try:
+                return [int(raw[0]), int(raw[1]), int(raw[2])]
+            except (TypeError, ValueError):
+                pass
+        return list(default)
+
+    def _pv_arrow_color(self, multipv: int) -> List[int]:
+        """RGB color for the hovered PV line, matching the main board."""
+        board_cfg = (
+            self.config.get("ui", {})
+            .get("panels", {})
+            .get("main", {})
+            .get("board", {})
+        )
+        if multipv == 2:
+            return self._normalize_rgb(
+                board_cfg.get("pv2_arrow", {}).get("color"), [100, 150, 255]
+            )
+        if multipv == 3:
+            return self._normalize_rgb(
+                board_cfg.get("pv3_arrow", {}).get("color"), [150, 150, 150]
+            )
+        return self._normalize_rgb(
+            board_cfg.get("bestnextmove_arrow", {}).get("color"), [0, 0, 255]
+        )
+
+    def _hovered_move_arrows(
+        self, analysis_fen: str, hovered_pv_moves: List[str]
+    ) -> List[Tuple[chess.Move, List[int]]]:
+        """Arrow for the hovered move when Show Move Arrow is enabled."""
+        model = self._analysis_model
+        if model is None or not model.miniature_preview_show_move_arrow:
+            return []
+        if not hovered_pv_moves or self._move_index >= len(hovered_pv_moves):
+            return []
+        try:
+            temp_board = chess.Board(analysis_fen)
+            for i in range(self._move_index):
+                temp_board.push(temp_board.parse_san(hovered_pv_moves[i]))
+            move = temp_board.parse_san(hovered_pv_moves[self._move_index])
+        except Exception:
+            return []
+        return [(move, self._pv_arrow_color(int(self._multipv)))]    
+    def _show_mini_board(
+        self,
+        fen: str,
+        is_flipped: bool,
+        arrows: Optional[List[Tuple[chess.Move, List[int]]]] = None,
+    ) -> None:
         """Show mini-board popup at cursor position.
         
         Args:
             fen: FEN string of position to display.
             is_flipped: Whether board should be flipped.
-            move: Optional move to show with arrow.
-            show_arrow: Whether to show the arrow (if "Show best move arrow" is enabled).
+            arrows: Optional move/color pairs to draw on the board.
         """
         # Get scale factor from analysis model
         scale_factor = 1.0
@@ -285,7 +311,7 @@ class HoverablePvLabel(QLabel):
         # Update position and orientation
         self._mini_board.set_position(fen)
         self._mini_board.set_flipped(is_flipped)
-        self._mini_board.set_move(move, show_arrow)
+        self._mini_board.set_arrows(arrows or [])
         
         # Get cursor position in global coordinates
         from PyQt6.QtGui import QCursor

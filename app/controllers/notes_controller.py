@@ -116,6 +116,10 @@ class NotesController:
         """Apply a toolbar formatting action to the selected plain-text range."""
         return NotesFormatterService.apply_toolbar_action(kind=kind, plain=plain, start=start, end=end)
 
+    @property
+    def game_controller(self) -> GameController:
+        return self._game_controller
+
     def navigate_from_move_link(self, notation: str) -> bool:
         """Navigate to the move referenced by a clicked link (notation from href)."""
         if not notation:

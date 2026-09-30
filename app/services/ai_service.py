@@ -563,12 +563,22 @@ class AIService:
             return False, error_message
         
         data = response.json()
-        content = data.get("content", [{}])[0].get("text", "")
+        content = self.anthropic_message_text(data)
         
         if not content:
             return False, "Empty response from API"
         
         return True, content
+
+    @staticmethod
+    def anthropic_message_text(data: Dict[str, Any]) -> str:
+        """Visible reply text, skipping thinking blocks that precede it on newer models."""
+        parts = [
+            block.get("text", "")
+            for block in data.get("content", [])
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        return "".join(parts).strip()
     
     @staticmethod
     def parse_model_string(model_string: str) -> Tuple[str, str]:
