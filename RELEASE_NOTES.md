@@ -1,5 +1,27 @@
 # Release Notes
 
+# CARA v2.9.1 - Move-link previews & integrated miniature board settings
+
+**Release Date:** 30.09.2026
+
+This release adds fancier **move-link tooltips** with miniature boards in **game summary**, **AI Summary/Chat** and **Notes**, and centralizes **miniature board scale and arrow** options under a new **View → Miniature Boards** menu. It also fixes a bug with newer Anthropic models (Opus 5.0 and above).
+
+## New Features
+
+- **Move-link tooltips:** Hovering linked moves (in Game Summary, AI Summary/Chat or Notes-View) shows a new fancy themed tooltip popup with a miniature board.
+- **View → Miniature Boards:** Per-surface scale presets (Manual Analysis, Opening Explorer, Game Summary highlights, Opening Encyclopedia, Tooltips) and arrow visibility toggles in one place under the View menu.
+
+## Enhancements
+
+- **Shared miniature board styling:** Common base size and arrow proportions from style configs so previews look consistent across surfaces.
+- **Opening Explorer density:** Compact layout uses a config-defined board scale relative to comfort layout.
+
+## Bug Fixes
+
+- **AI Summary/Chat:** Fixed a bug where responses from Claude Opus 5 and newer models wouldn't be read correctly and the app would show an "Empty API response" message instead.
+
+---
+
 # CARA v2.9.0 - Maintenance Release
 
 **Release Date:** 24.09.2026
@@ -48,7 +70,7 @@ This is a small **maintenance and bugfix** release focused on improving performa
 
 This release lets you **show or hide detail tabs** (and their related menus), **customize and persist PGN database table columns** with a global default or per-file overrides, and it moves **repeated same-position error patterns** into their own Player Stats section.
 
-## New Features
+## New FeaturesKlölkkj
 
 - **View → Show/Hide:** Toggle which detail tabs are available (and, where applicable, their matching top-level menus). Choices are persisted in user settings. Hidden tabs stay out of the tab bar and related View shortcuts until you show them again.
 - **Database table columns:** Reorder, resize, and show/hide columns on the game table (including extra columns for non-standard PGN headers when present). From a database tab’s context menu you can **Save column settings (global)** as the user-wide default, **Restore default column settings** to reset the global default to the app's recommended default settings, or use **Save column settings (this file)** / **Remove column settings for this file** for per-file settings. Note: If you restore the default column settings, your current per-file overrides remain untouched until you remove them.
