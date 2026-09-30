@@ -83,7 +83,8 @@ class CriticalMove:
     evaluation: str
     best_move: str = ""  # Best alternative move suggested by engine
     eval_improvement: float = 0.0  # Capped mover-perspective CP gain (display; ranking may discount it)
-    selection_reason: str = ""  # Why this ply made a critical list (tooltip)
+    tip_subtitle: str = ""  # Hover-popup heading under the move notation
+    tip_details: tuple[tuple[str, str], ...] = ()  # Hover-popup label/value rows
     tactic_type: str = ""  # Missed-tactic kind (fork, mate, capture, …); empty for best/worst
 
 
@@ -93,6 +94,57 @@ def format_cp_gain(gain: float) -> str:
     if n == 0:
         return "CP gain: 0"
     return f"CP gain: {n:+d}"
+
+
+def format_half_move_notation(move_number: int, is_white: bool, san: str) -> str:
+    """Display notation for one half-move, e.g. ``12. Nf3`` or ``12. ...Nf6``."""
+    text = str(san or "").strip()
+    if not text:
+        return ""
+    if is_white:
+        return f"{int(move_number)}. {text}"
+    return f"{int(move_number)}. ...{text}"
+
+
+def format_half_move_tip(
+    *,
+    assessment: str,
+    cpl: str,
+    best_move: str,
+    description: str = "",
+) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Subtitle and detail rows for a linked half-move that is not a ranked critical move."""
+    assessment_text = str(assessment or "").strip()
+    description_text = str(description or "").strip()
+    subtitle = description_text or assessment_text
+    details: list[tuple[str, str]] = []
+    if description_text and assessment_text:
+        details.append(("Assessment", assessment_text))
+    cpl_text = str(cpl or "").strip()
+    if cpl_text:
+        try:
+            details.append(("CPL", f"{float(cpl_text):.0f}"))
+        except ValueError:
+            details.append(("CPL", cpl_text))
+    best = str(best_move or "").strip()
+    if best:
+        details.append(("Best", best))
+    return subtitle, tuple(details)
+
+
+def format_worst_move_tip(
+    *,
+    assessment: str,
+    cpl: float,
+    best_move: str,
+) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Subtitle and detail rows for a top-worst-move hover."""
+    subtitle = str(assessment or "").strip() or "Worst move"
+    details: list[tuple[str, str]] = [("CPL", f"{float(cpl):.0f}")]
+    best = str(best_move or "").strip()
+    if best:
+        details.append(("Best", best))
+    return subtitle, tuple(details)
 
 
 def format_best_move_stat(move: "CriticalMove") -> str:
@@ -1684,13 +1736,20 @@ class GameSummaryService:
                 # Format move notation (e.g., "23. Qd4")
                 move_notation = f"{move.move_number}. {move_str}"
                 
+                tip_subtitle, tip_details = format_worst_move_tip(
+                    assessment=assessment,
+                    cpl=cpl,
+                    best_move=best_move,
+                )
                 critical_moves.append(CriticalMove(
                     move_number=move.move_number,
                     move_notation=move_notation,
                     cpl=cpl,
                     assessment=assessment,
                     evaluation=evaluation,
-                    best_move=best_move
+                    best_move=best_move,
+                    tip_subtitle=tip_subtitle,
+                    tip_details=tip_details,
                 ))
             except (ValueError, TypeError):
                 continue
@@ -1762,7 +1821,8 @@ class GameSummaryService:
                 evaluation=item.evaluation,
                 best_move=item.best_move,
                 eval_improvement=item.display_gain,
-                selection_reason=item.selection_reason,
+                tip_subtitle=item.tip_subtitle,
+                tip_details=item.tip_details,
             )
             for item in ranked
         ]
@@ -1814,7 +1874,8 @@ class GameSummaryService:
                 assessment=item.assessment,
                 evaluation=item.evaluation,
                 best_move=item.best_move,
-                selection_reason=item.selection_reason,
+                tip_subtitle=item.tip_subtitle,
+                tip_details=item.tip_details,
                 tactic_type=item.tactic_type,
             )
             for item in ranked

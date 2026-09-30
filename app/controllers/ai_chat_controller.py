@@ -453,6 +453,10 @@ Please provide a brief analysis of this position, including:
             logging_service = LoggingService.get_instance()
             logging_service.warning(f"Failed to build move label cache: {exc}", exc_info=exc)
 
+    def move_notation_to_ply_map(self) -> Dict[str, int]:
+        """Notations the AI was told to link, mapped to mainline ply."""
+        return self._move_lookup_by_notation
+
     def handle_move_link_click(self, move_notation: str) -> bool:
         """Handle move link clicks from the AI chat view."""
         if not move_notation:

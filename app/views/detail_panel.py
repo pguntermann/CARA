@@ -354,7 +354,8 @@ class DetailPanel(QWidget):
         self.ai_chat_view = DetailAIChatView(
             self.config,
             game_model=self._game_model,
-            ai_chat_controller=self._ai_chat_controller
+            ai_chat_controller=self._ai_chat_controller,
+            moves_list_model=self.moveslist_model,
         )
         self.tab_widget.addTab(self.ai_chat_view, "AI Summary")
         
@@ -362,7 +363,8 @@ class DetailPanel(QWidget):
         self.notes_view = DetailNotesView(
             self.config,
             game_model=self._game_model,
-            notes_controller=self._notes_controller
+            notes_controller=self._notes_controller,
+            moves_list_model=self.moveslist_model,
         )
         self.tab_widget.addTab(self.notes_view, "Notes")
         

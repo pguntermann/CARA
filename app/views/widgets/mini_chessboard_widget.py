@@ -49,6 +49,7 @@ class MiniChessBoardWidget(QWidget):
         self._is_flipped = is_flipped
         self._move_to_show: Optional[chess.Move] = None
         self._show_arrow = False
+        self._arrows: List[Tuple[chess.Move, List[int]]] = []
         self._scale_factor = scale_factor
         self._embedded = embedded
         self._size_override = size_override
@@ -287,9 +288,8 @@ class MiniChessBoardWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         self._draw_pieces(painter, board_start_x, board_start_y)
         
-        # Draw arrow if enabled and move is set
-        if self._show_arrow and self._move_to_show is not None:
-            self._draw_arrow(painter, self._move_to_show, self.arrow_color, board_start_x, board_start_y)
+        for move, color in self._arrows:
+            self._draw_arrow(painter, move, color, board_start_x, board_start_y)
     
     def _draw_pieces(self, painter: QPainter, board_start_x: float, board_start_y: float) -> None:
         """Draw chess pieces on the board.
@@ -423,6 +423,20 @@ class MiniChessBoardWidget(QWidget):
             show_arrow: Whether to show the arrow (if "Show best move arrow" is enabled).
         """
         self._move_to_show = move
-        self._show_arrow = show_arrow
+        self._show_arrow = bool(show_arrow) and move is not None
+        if self._show_arrow and move is not None:
+            self._arrows = [(move, list(self.arrow_color))]
+        else:
+            self._arrows = []
+        self.update()
+
+    def set_arrows(self, arrows: List[Tuple[chess.Move, List[int]]]) -> None:
+        """Replace every arrow. Each entry is a move and its RGB color.
+
+        Drawn in list order, so a later arrow paints over an earlier one.
+        """
+        self._arrows = [(move, list(color)) for move, color in arrows if move is not None]
+        self._move_to_show = self._arrows[0][0] if self._arrows else None
+        self._show_arrow = bool(self._arrows)
         self.update()
 

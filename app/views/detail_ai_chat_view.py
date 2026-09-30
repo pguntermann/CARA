@@ -8,12 +8,20 @@ from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect, QMenu, QApplication
 )
 from PyQt6.QtCore import Qt, QTimer, QEvent, QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
-from PyQt6.QtGui import QPalette, QColor, QAction, QContextMenuEvent, QTextDocument
+from PyQt6.QtGui import QPalette, QColor, QAction, QContextMenuEvent, QMouseEvent, QTextDocument
 from typing import Dict, Any, Optional, List
 
 from app.models.game_model import GameModel
 from app.controllers.ai_chat_controller import AIChatController
 from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.views.widgets.half_move_link import (
+    board_is_flipped,
+    build_half_move_link_tip,
+    half_move_from_ply,
+    resolve_linked_ply,
+)
+from app.views.widgets.move_link_hover import MoveLinkHover, label_move_link
+from app.views.widgets.move_link_popup import MoveLinkPopup, MoveLinkTip
 
 
 class MessageLabel(QLabel):
@@ -22,6 +30,34 @@ class MessageLabel(QLabel):
     def __init__(self, text: str, parent_view: Optional[QWidget] = None, parent: Optional[QWidget] = None) -> None:
         super().__init__(text, parent)
         self._parent_view = parent_view
+        self._track_move_links = False
+
+    def set_track_move_links(self, enabled: bool) -> None:
+        self._track_move_links = bool(enabled)
+        self.setMouseTracking(self._track_move_links)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if not self._track_move_links:
+            return
+        hover = getattr(self._parent_view, "_move_link_hover", None)
+        if hover is None:
+            return
+        found = label_move_link(self, event.position().toPoint())
+        if found is None:
+            hover.hide()
+            return
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        notation, rect = found
+        hover.update(notation, rect)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        if self._track_move_links:
+            hover = getattr(self._parent_view, "_move_link_hover", None)
+            if hover is not None:
+                hover.hide()
+            self.unsetCursor()
+        super().leaveEvent(event)
 
     def _copy_plain_text(self) -> None:
         """Copy label content as plain text (strip HTML)."""
@@ -57,7 +93,8 @@ class DetailAIChatView(QWidget):
     
     def __init__(self, config: Dict[str, Any],
                  game_model: Optional[GameModel] = None,
-                 ai_chat_controller: Optional[AIChatController] = None) -> None:
+                 ai_chat_controller: Optional[AIChatController] = None,
+                 moves_list_model=None) -> None:
         """Initialize the AI chat view.
         
         Args:
@@ -69,12 +106,21 @@ class DetailAIChatView(QWidget):
         self.config = config
         self._game_model: Optional[GameModel] = None
         self._ai_chat_controller: Optional[AIChatController] = None
+        self._moves_list_model = moves_list_model
         
         # Load config
         self._load_config()
         
         # Setup UI
         self._setup_ui()
+        self._move_link_popup = MoveLinkPopup(config, self)
+        self._move_link_hover = MoveLinkHover(
+            self,
+            self._move_link_popup,
+            self._tip_for_notation,
+            self._is_board_flipped,
+        )
+        self.scroll_area.verticalScrollBar().valueChanged.connect(self._move_link_hover.hide)
         
         # Connect to game model if provided
         if game_model:
@@ -752,6 +798,7 @@ class DetailAIChatView(QWidget):
         
         if role == "ai":
             message_label.setOpenExternalLinks(False)
+            message_label.set_track_move_links(True)
             message_label.linkActivated.connect(self._on_ai_move_link_activated)
         
         # Add message row to messages layout
@@ -812,6 +859,7 @@ class DetailAIChatView(QWidget):
     
     def _clear_messages(self) -> None:
         """Clear all messages from the chat."""
+        self._move_link_hover.hide()
         # Remove all widgets except the stretch
         while self.messages_layout.count() > 1:
             item = self.messages_layout.takeAt(0)
@@ -966,8 +1014,34 @@ class DetailAIChatView(QWidget):
         """
         self._add_message("system", f"Error: {error_message}")
     
+    def _tip_for_notation(self, notation: str) -> Optional[MoveLinkTip]:
+        controller = self._ai_chat_controller
+        if controller is None or controller.game_controller is None:
+            return None
+        ply = resolve_linked_ply(
+            notation,
+            controller.game_controller.get_move_notation_to_ply_map(),
+            controller.move_notation_to_ply_map(),
+        )
+        if ply is None or ply < 1:
+            return None
+        move_number, is_white = half_move_from_ply(ply)
+        moves = self._moves_list_model.get_all_moves() if self._moves_list_model is not None else []
+        return build_half_move_link_tip(moves, move_number, is_white)
+
+    def _is_board_flipped(self) -> bool:
+        controller = self._ai_chat_controller
+        if controller is None:
+            return False
+        return board_is_flipped(controller.game_controller)
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._move_link_hover.hide()
+        super().hideEvent(event)
+
     def _on_ai_move_link_activated(self, link: str) -> None:
         """Handle clicks on AI move links."""
+        self._move_link_hover.hide()
         if not link or not self._ai_chat_controller:
             return
         if link.startswith("move:"):

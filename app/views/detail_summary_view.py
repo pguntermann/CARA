@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QGridLayout, QSizePolicy, QSplitter, QMenu, QApplication, QToolButton, QButtonGroup,
     QFileDialog, QMessageBox, QToolTip,
 )
-from PyQt6.QtCore import Qt, QEvent, QRect, QRectF, QPointF, QPoint, QVariantAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QEvent, QRect, QRectF, QPointF, QPoint, QTimer, QVariantAnimation, QEasingCurve
 from PyQt6.QtGui import (
     QPainter,
     QColor,
@@ -36,8 +36,19 @@ from app.services.game_summary_service import (
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.tooltip_utils import wrap_tooltip_text
-from app.views.style.tooltip import tooltip_qss_block
+from app.views.style.tooltip import load_tooltip_style, tooltip_qss_block
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
+from app.views.widgets.half_move_link import (
+    build_half_move_link_tip,
+    fen_and_played_uci,
+    fen_before_half_move,
+)
+from app.views.widgets.move_link_popup import (
+    MoveLinkPopup,
+    MoveLinkTip,
+    position_board_arrows,
+    uci_from_san,
+)
 
 if TYPE_CHECKING:
     from app.controllers.game_summary_controller import GameSummaryController
@@ -64,14 +75,66 @@ class ClickableMoveLabel(QLabel):
         self.move_number = move_number
         self.is_white = is_white
         self.game_controller = game_controller
+        self._link_tip: Optional[MoveLinkTip] = None
+        self._link_popup: Optional[MoveLinkPopup] = None
+        self._flip_provider: Optional[Callable[[], bool]] = None
+        self._hover_timer: Optional[QTimer] = None
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-    
+
+    def attach_link_tip(
+        self,
+        tip: MoveLinkTip,
+        popup: MoveLinkPopup,
+        flip_provider: Callable[[], bool],
+    ) -> None:
+        """Show ``tip`` in ``popup`` while the pointer is over this move."""
+        self._link_tip = tip
+        self._link_popup = popup
+        self._flip_provider = flip_provider
+        if self._hover_timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._show_link_tip)
+            self._hover_timer = timer
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        super().enterEvent(event)
+        tip = self._link_tip
+        popup = self._link_popup
+        timer = self._hover_timer
+        if tip is None or popup is None or timer is None:
+            return
+        delay = popup.hover_delay_ms
+        if delay <= 0:
+            self._show_link_tip()
+        else:
+            timer.start(delay)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        if self._hover_timer is not None:
+            self._hover_timer.stop()
+        if self._link_popup is not None:
+            self._link_popup.hide_for(self)
+        super().leaveEvent(event)
+
+    def _show_link_tip(self) -> None:
+        tip = self._link_tip
+        popup = self._link_popup
+        if tip is None or popup is None or not self.underMouse():
+            return
+        flipped = bool(self._flip_provider()) if self._flip_provider is not None else False
+        popup.present(self, tip, is_flipped=flipped)
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse click to navigate to the move.
         
         Args:
             event: Mouse event.
         """
+        if self._hover_timer is not None:
+            self._hover_timer.stop()
+        if self._link_popup is not None:
+            self._link_popup.hide_for(self)
         if event.button() == Qt.MouseButton.LeftButton and self.game_controller:
             try:
                 # Calculate ply_index from move_number and is_white
@@ -1652,6 +1715,7 @@ class DetailSummaryView(QWidget):
         self._last_unavailable_reason: str = "not_analyzed"
         self._highlight_mini_boards: List[MiniChessBoardWidget] = []
         self._highlights_mode_buttons: Dict[str, QToolButton] = {}
+        self._move_link_popup: Optional[MoveLinkPopup] = None
         highlights_cfg = (
             self.config.get("ui", {})
             .get("panels", {})
@@ -1746,6 +1810,8 @@ class DetailSummaryView(QWidget):
         self.content_layout.addWidget(self.placeholder_label)
         
         scroll_area.setWidget(self.content_widget)
+        scroll_area.verticalScrollBar().valueChanged.connect(self._hide_move_link_popup)
+        scroll_area.horizontalScrollBar().valueChanged.connect(self._hide_move_link_popup)
         splitter.addWidget(scroll_area)
         
         # Configure splitter sizes and stretch factors from config
@@ -2005,8 +2071,78 @@ class DetailSummaryView(QWidget):
             # Widget was deleted, ignore
             pass
     
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._hide_move_link_popup()
+        super().hideEvent(event)
+
+    def _ensure_move_link_popup(self) -> MoveLinkPopup:
+        popup = self._move_link_popup
+        if popup is None:
+            popup = MoveLinkPopup(self.config, self)
+            self._move_link_popup = popup
+        return popup
+
+    def _hide_move_link_popup(self, *_args) -> None:
+        popup = self._move_link_popup
+        if popup is not None:
+            popup.hide()
+
+    def _critical_move_link_tip(self, move, is_white: bool) -> MoveLinkTip:
+        move_number = int(getattr(move, "move_number", 1) or 1)
+        fen, uci = self._fen_and_played_move(move_number, is_white)
+        raw_details = getattr(move, "tip_details", ()) or ()
+        details = tuple((str(label), str(value)) for label, value in raw_details)
+        return MoveLinkTip(
+            title=str(getattr(move, "move_notation", "") or ""),
+            subtitle=str(getattr(move, "tip_subtitle", "") or ""),
+            details=details,
+            fen=fen,
+            arrow_uci=uci,
+            alternative_uci=uci_from_san(
+                self._fen_before_half_move(move_number, is_white),
+                str(getattr(move, "best_move", "") or ""),
+            ),
+        )
+
+    def _attach_critical_move_tip(self, label: ClickableMoveLabel, move, is_white: bool) -> None:
+        label.attach_link_tip(
+            self._critical_move_link_tip(move, is_white),
+            self._ensure_move_link_popup(),
+            self._is_board_flipped,
+        )
+
+    def _attach_half_move_tip(
+        self,
+        label: ClickableMoveLabel,
+        move_number: int,
+        is_white: bool,
+        *,
+        description: str = "",
+    ) -> None:
+        """Hover popup for a linked half-move outside the critical-moments lists."""
+        label.attach_link_tip(
+            self._half_move_link_tip(move_number, is_white, description=description),
+            self._ensure_move_link_popup(),
+            self._is_board_flipped,
+        )
+
+    def _half_move_link_tip(
+        self,
+        move_number: int,
+        is_white: bool,
+        *,
+        description: str = "",
+    ) -> MoveLinkTip:
+        return build_half_move_link_tip(
+            self._latest_moves,
+            move_number,
+            is_white,
+            description=description,
+        )
+
     def _clear_content(self) -> None:
         """Clear all content widgets except placeholder."""
+        self._hide_move_link_popup()
         self.accuracy_curve = None
         # Clear widgets safely to prevent accessing deleted widgets
         while self.content_layout.count() > 1:  # Keep placeholder
@@ -2833,6 +2969,7 @@ class DetailSummaryView(QWidget):
                     move_count_label.setFont(label_font)
                     move_count_label.setFrameShape(QLabel.Shape.NoFrame)
                     move_count_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); font-weight: bold; border: none; background: transparent; padding: 0px; margin: 0px; text-decoration: underline;")
+                    self._attach_half_move_tip(move_count_label, move_number, is_white_move)
                     phase_header_layout.addWidget(move_count_label)
                 elif move_range:
                     # Move count not clickable (no game controller)
@@ -2971,7 +3108,6 @@ class DetailSummaryView(QWidget):
                 border: 1px solid rgb({border_color.red()}, {border_color.green()}, {border_color.blue()});
                 border-radius: {border_radius}px;
             }}
-            {tooltip_qss_block(self.config)}
         """)
         
         layout = QVBoxLayout(widget)
@@ -3006,6 +3142,17 @@ class DetailSummaryView(QWidget):
         
         worst_layout = QVBoxLayout()
         worst_layout.setSpacing(critical_moments_list_spacing)
+        r, g, b = text_color.red(), text_color.green(), text_color.blue()
+        label_qss = (
+            f"QLabel {{ color: rgb({r}, {g}, {b}); border: none; "
+            f"background: transparent; padding: 0px; margin: 0px; }}"
+        )
+        clickable_qss = (
+            f"QLabel {{ color: rgb({r}, {g}, {b}); border: none; "
+            f"background: transparent; padding: 0px; margin: 0px; "
+            f"text-decoration: underline; }}"
+        )
+        row_qss = "QWidget { border: none; background: transparent; }"
         for i, move in enumerate(top_worst[:worst_n], 1):
             # Defensive checks for None/missing values in CriticalMove
             if not move:
@@ -3020,7 +3167,7 @@ class DetailSummaryView(QWidget):
             
             # Create a container widget with horizontal layout for the move line
             move_container = QWidget()
-            move_container.setStyleSheet("border: none; background: transparent;")
+            move_container.setStyleSheet(row_qss)
             move_line_layout = QHBoxLayout(move_container)
             move_line_layout.setContentsMargins(0, 0, 0, 0)
             move_line_layout.setSpacing(0)
@@ -3029,29 +3176,29 @@ class DetailSummaryView(QWidget):
             prefix_text = f"{i}. "
             prefix_label = QLabel(prefix_text)
             prefix_label.setFont(value_font)
-            prefix_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
+            prefix_label.setStyleSheet(label_qss)
             move_line_layout.addWidget(prefix_label)
             
             # Clickable move notation (e.g., "28. Rxd7")
             move_clickable = ClickableMoveLabel(move_notation, move_number, is_white, self._game_controller)
             move_clickable.setFont(value_font)
             move_clickable.setFrameShape(QLabel.Shape.NoFrame)
-            base_style = f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent; padding: 0px; margin: 0px;"
-            move_clickable.setStyleSheet(base_style + " text-decoration: underline;")
+            move_clickable.setStyleSheet(clickable_qss)
+            self._attach_critical_move_tip(move_clickable, move, is_white)
             move_line_layout.addWidget(move_clickable)
             
             # Assessment part (e.g., " (Blunder, CPL: 9463)")
             assessment_text = f" ({assessment}, CPL: {cpl:.0f})"
             assessment_label = QLabel(assessment_text)
             assessment_label.setFont(value_font)
-            assessment_label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
+            assessment_label.setStyleSheet(label_qss)
             move_line_layout.addWidget(assessment_label)
             
             move_line_layout.addStretch()
             
             # Create container for the full move entry (move line + best move line if available)
             full_move_container = QWidget()
-            full_move_container.setStyleSheet("border: none; background: transparent;")
+            full_move_container.setStyleSheet(row_qss)
             full_move_layout = QVBoxLayout(full_move_container)
             full_move_layout.setContentsMargins(0, 0, 0, 0)
             full_move_layout.setSpacing(0)
@@ -3075,24 +3222,6 @@ class DetailSummaryView(QWidget):
         
         best_layout = QVBoxLayout()
         best_layout.setSpacing(critical_moments_list_spacing)
-        # Scope label rules so unscoped padding/border cannot leak onto QToolTip.
-        tip_qss = tooltip_qss_block(self.config)
-        r, g, b = text_color.red(), text_color.green(), text_color.blue()
-        label_qss = (
-            f"QLabel {{ color: rgb({r}, {g}, {b}); border: none; "
-            f"background: transparent; padding: 0px; margin: 0px; }}\n"
-            f"{tip_qss}"
-        )
-        clickable_qss = (
-            f"QLabel {{ color: rgb({r}, {g}, {b}); border: none; "
-            f"background: transparent; padding: 0px; margin: 0px; "
-            f"text-decoration: underline; }}\n"
-            f"{tip_qss}"
-        )
-        row_qss = (
-            f"QWidget {{ border: none; background: transparent; }}\n"
-            f"{tip_qss}"
-        )
         for i, move in enumerate(top_best[:best_n], 1):
             # Defensive checks for None/missing values in CriticalMove
             if not move:
@@ -3121,6 +3250,7 @@ class DetailSummaryView(QWidget):
             move_clickable.setFont(value_font)
             move_clickable.setFrameShape(QLabel.Shape.NoFrame)
             move_clickable.setStyleSheet(clickable_qss)
+            self._attach_critical_move_tip(move_clickable, move, is_white)
             move_line_layout.addWidget(move_clickable)
             
             # Assessment part (e.g., " (Best Move, CP gain: +130)")
@@ -3131,13 +3261,6 @@ class DetailSummaryView(QWidget):
             move_line_layout.addWidget(assessment_label)
             
             move_line_layout.addStretch()
-            reason = str(getattr(move, "selection_reason", "") or "")
-            if reason:
-                tip = wrap_tooltip_text(reason)
-                move_container.setToolTip(tip)
-                prefix_label.setToolTip(tip)
-                move_clickable.setToolTip(tip)
-                assessment_label.setToolTip(tip)
             best_layout.addWidget(move_container)
         layout.addLayout(best_layout)
 
@@ -3195,6 +3318,7 @@ class DetailSummaryView(QWidget):
                 move_clickable.setFont(value_font)
                 move_clickable.setFrameShape(QLabel.Shape.NoFrame)
                 move_clickable.setStyleSheet(clickable_qss)
+                self._attach_critical_move_tip(move_clickable, move, is_white)
                 move_line_layout.addWidget(move_clickable)
 
                 assessment_label = QLabel(f" ({assessment})")
@@ -3204,26 +3328,13 @@ class DetailSummaryView(QWidget):
                 move_line_layout.addStretch()
                 full_move_layout.addWidget(move_container)
 
-                missed_sub = None
                 if missed_line:
                     missed_row, missed_sub = _aligned_subline(
                         prefix_text, missed_line, scoped=True
                     )
-                    missed_sub.setStyleSheet(
-                        f"{secondary_label_scoped_qss}\n{tip_qss}"
-                    )
+                    missed_sub.setStyleSheet(secondary_label_scoped_qss)
                     full_move_layout.addWidget(missed_row)
 
-                reason = str(getattr(move, "selection_reason", "") or "")
-                if reason:
-                    tip = wrap_tooltip_text(reason)
-                    full_move_container.setToolTip(tip)
-                    move_container.setToolTip(tip)
-                    prefix_label.setToolTip(tip)
-                    move_clickable.setToolTip(tip)
-                    assessment_label.setToolTip(tip)
-                    if missed_sub is not None:
-                        missed_sub.setToolTip(tip)
                 missed_layout.addWidget(full_move_container)
             layout.addLayout(missed_layout)
         
@@ -3281,30 +3392,8 @@ class DetailSummaryView(QWidget):
             _rgb(colors_cfg.get("header_text"), [240, 240, 240]),
         )
         font_pt = max(8, int(scale_font_size(view_mode_cfg.get("font_size", 10))))
-
-        tooltip_cfg = self.config.get("ui", {}).get("styles", {}).get("tooltip", {})
-        tip_bg = tooltip_cfg.get("background_color", [45, 45, 50])
-        tip_fg = tooltip_cfg.get("text_color", [220, 220, 220])
-        tip_border = tooltip_cfg.get("border_color", [60, 60, 65])
-        if not isinstance(tip_bg, list) or len(tip_bg) < 3:
-            tip_bg = [45, 45, 50]
-        if not isinstance(tip_fg, list) or len(tip_fg) < 3:
-            tip_fg = [220, 220, 220]
-        if not isinstance(tip_border, list) or len(tip_border) < 3:
-            tip_border = [60, 60, 65]
-        tip_border_width = int(tooltip_cfg.get("border_width", 1))
-        tip_radius = int(tooltip_cfg.get("border_radius", 5))
-        tip_padding = int(tooltip_cfg.get("padding", 10))
-        # Widget stylesheets can override app QToolTip styling; embed tip rules here.
-        tooltip_ss = f"""
-                QToolTip {{
-                    background-color: rgb({int(tip_bg[0])}, {int(tip_bg[1])}, {int(tip_bg[2])});
-                    color: rgb({int(tip_fg[0])}, {int(tip_fg[1])}, {int(tip_fg[2])});
-                    border: {tip_border_width}px solid rgb({int(tip_border[0])}, {int(tip_border[1])}, {int(tip_border[2])});
-                    border-radius: {tip_radius}px;
-                    padding: {tip_padding}px;
-                }}
-        """
+        # Widget stylesheets override the application QToolTip theme.
+        tooltip_ss = tooltip_qss_block(self.config)
 
         for i, (mode, label) in enumerate(_HIGHLIGHTS_MODE_LABELS):
             btn = QToolButton()
@@ -3494,35 +3583,31 @@ class DetailSummaryView(QWidget):
                 return move
         return None
 
-    def _fen_and_move_for_highlight(
-        self, highlight
-    ) -> Tuple[Optional[str], Optional[chess.Move]]:
-        """Return (fen_after, played_move) for the highlight's primary half-move."""
-        md = self._move_data_for_number(highlight.move_number)
-        if md is None:
-            return None, None
+    def _fen_before_half_move(self, move_number: int, is_white: bool) -> str:
+        """FEN of the position the half-move was played from."""
+        return fen_before_half_move(self._latest_moves, move_number, is_white)
 
-        if highlight.is_white:
-            fen_after = (md.fen_white or "").strip() or None
-            san = (md.white_move or "").strip()
-            if highlight.move_number <= 1:
-                fen_before = chess.Board().fen()
-            else:
-                prev = self._move_data_for_number(highlight.move_number - 1)
-                fen_before = (prev.fen_black if prev and prev.fen_black else "") or chess.Board().fen()
-        else:
-            fen_after = (md.fen_black or "").strip() or None
-            san = (md.black_move or "").strip()
-            fen_before = (md.fen_white or "").strip() or None
+    def _fen_and_played_move(self, move_number: int, is_white: bool) -> Tuple[str, str]:
+        """FEN after the half-move, and UCI of the move that was played."""
+        return fen_and_played_uci(self._latest_moves, move_number, is_white)
 
-        move_obj: Optional[chess.Move] = None
-        if fen_before and san:
-            try:
-                board = chess.Board(fen_before)
-                move_obj = board.parse_san(san)
-            except Exception:
-                move_obj = None
-        return fen_after, move_obj
+    def _half_move_arrows(
+        self, move_number: int, is_white: bool
+    ) -> List[Tuple[chess.Move, List[int]]]:
+        """Played-move and best-alternative arrows in the tooltip theme colors."""
+        style = load_tooltip_style(self.config)
+        _fen, played_uci = self._fen_and_played_move(move_number, is_white)
+        best = ""
+        md = self._move_data_for_number(move_number)
+        if md is not None:
+            best = (md.best_white if is_white else md.best_black) or ""
+        return position_board_arrows(
+            played_uci=played_uci,
+            alternative_uci=uci_from_san(self._fen_before_half_move(move_number, is_white), best),
+            played_color=style.played_move_arrow_color,
+            alternative_color=style.best_alternative_arrow_color,
+            show_alternative=style.show_best_alternative_arrow,
+        )
 
     def _create_highlight_card(
         self,
@@ -3556,7 +3641,7 @@ class DetailSummaryView(QWidget):
         layout.setContentsMargins(8, 8, 10, 8)
         layout.setSpacing(10)
 
-        fen, move_obj = self._fen_and_move_for_highlight(highlight)
+        fen, _played_uci = self._fen_and_played_move(highlight.move_number, highlight.is_white)
         if fen:
             board = MiniChessBoardWidget(
                 self.config,
@@ -3565,11 +3650,10 @@ class DetailSummaryView(QWidget):
                 embedded=True,
                 size_override=mini_size,
             )
-            if show_arrows and move_obj is not None:
-                try:
-                    board.set_move(move_obj, True)
-                except Exception:
-                    pass
+            if show_arrows:
+                board.set_arrows(
+                    self._half_move_arrows(highlight.move_number, highlight.is_white)
+                )
             self._highlight_mini_boards.append(board)
             layout.addWidget(board, 0, Qt.AlignmentFlag.AlignTop)
         else:
@@ -3647,6 +3731,12 @@ class DetailSummaryView(QWidget):
             label.setStyleSheet(
                 f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); "
                 "border: none; background: transparent; padding: 0px; margin: 0px; text-decoration: underline;"
+            )
+            self._attach_half_move_tip(
+                label,
+                move_number,
+                is_white,
+                description=str(getattr(highlight, "description", "") or ""),
             )
             move_layout.addWidget(label)
 

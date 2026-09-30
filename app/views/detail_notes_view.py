@@ -18,11 +18,19 @@ from PyQt6.QtGui import (
     QTextCharFormat,
     QTextCursor,
 )
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import QEvent, Qt, QTimer, QPropertyAnimation, QEasingCurve
 
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.views.style.style_manager import StyleManager
 from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_SAVE
+from app.views.widgets.half_move_link import (
+    board_is_flipped,
+    build_half_move_link_tip,
+    half_move_from_ply,
+    resolve_linked_ply,
+)
+from app.views.widgets.move_link_hover import MoveLinkHover, text_edit_move_link
+from app.views.widgets.move_link_popup import MoveLinkPopup, MoveLinkTip
 
 if __name__ != "__main__":
     from app.models.game_model import GameModel
@@ -35,11 +43,43 @@ class NotesTextEdit(QTextEdit):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._link_click_handler = None
+        self._move_link_hover: Optional[MoveLinkHover] = None
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
+        self.viewport().installEventFilter(self)
 
     def set_link_click_handler(self, handler) -> None:
         self._link_click_handler = handler
 
+    def set_move_link_hover(self, hover: Optional[MoveLinkHover]) -> None:
+        self._move_link_hover = hover
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if obj is self.viewport() and self._move_link_hover is not None:
+            if event.type() == QEvent.Type.MouseMove:
+                found = text_edit_move_link(self, event.position().toPoint())
+                if found is None:
+                    self._move_link_hover.hide()
+                else:
+                    notation, rect = found
+                    self._move_link_hover.update(notation, rect)
+            elif event.type() == QEvent.Type.Leave:
+                self._move_link_hover.hide()
+                self.viewport().setCursor(Qt.CursorShape.IBeamCursor)
+        return super().eventFilter(obj, event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        super().mouseMoveEvent(event)
+        if self._move_link_hover is None:
+            return
+        over_link = text_edit_move_link(self, event.position().toPoint()) is not None
+        self.viewport().setCursor(
+            Qt.CursorShape.PointingHandCursor if over_link else Qt.CursorShape.IBeamCursor
+        )
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        if self._move_link_hover is not None:
+            self._move_link_hover.hide()
         if event.button() == Qt.MouseButton.LeftButton and self._link_click_handler:
             pos = event.position().toPoint()
             cursor = self.cursorForPosition(pos)
@@ -86,11 +126,13 @@ class DetailNotesView(QWidget):
         config: Dict[str, Any],
         game_model: Optional["GameModel"] = None,
         notes_controller: Optional["NotesController"] = None,
+        moves_list_model=None,
     ) -> None:
         super().__init__()
         self.config = config
         self._game_model = game_model
         self._notes_controller = notes_controller
+        self._moves_list_model = moves_list_model
         self._current_plain: str = ""
         self._updating_links = False
         self._format_toolbar_buttons: Dict[str, QPushButton] = {}
@@ -107,6 +149,16 @@ class DetailNotesView(QWidget):
             game_model.active_game_changed.connect(self._on_active_game_changed)
         if notes_controller:
             self._notes_edit.set_link_click_handler(self._on_move_link_clicked)
+        self._move_link_popup = MoveLinkPopup(config, self)
+        self._move_link_hover = MoveLinkHover(
+            self._notes_edit,
+            self._move_link_popup,
+            self._tip_for_notation,
+            self._is_board_flipped,
+        )
+        self._notes_edit.set_move_link_hover(self._move_link_hover)
+        self._notes_edit.verticalScrollBar().valueChanged.connect(self._move_link_hover.hide)
+        self._notes_edit.horizontalScrollBar().valueChanged.connect(self._move_link_hover.hide)
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -484,8 +536,33 @@ class DetailNotesView(QWidget):
         self._link_debounce_timer.stop()
         self._link_debounce_timer.start(400)
 
+    def _tip_for_notation(self, notation: str) -> Optional[MoveLinkTip]:
+        controller = self._notes_controller
+        if controller is None:
+            return None
+        ply = resolve_linked_ply(
+            notation,
+            controller.game_controller.get_move_notation_to_ply_map(),
+        )
+        if ply is None or ply < 1:
+            return None
+        move_number, is_white = half_move_from_ply(ply)
+        moves = self._moves_list_model.get_all_moves() if self._moves_list_model is not None else []
+        return build_half_move_link_tip(moves, move_number, is_white)
+
+    def _is_board_flipped(self) -> bool:
+        controller = self._notes_controller
+        if controller is None:
+            return False
+        return board_is_flipped(controller.game_controller)
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._move_link_hover.hide()
+        super().hideEvent(event)
+
     def _reapply_move_links(self) -> None:
         """Apply in-place formatting (move links + supported markdown)."""
+        self._move_link_hover.hide()
         if self._updating_links or not self._notes_controller:
             return
         edit = self._notes_edit
