@@ -178,12 +178,31 @@ class EngineConfigurationService:
         else:
             return {"threads": 1, "depth": 0, "movetime": 0}
     
-    def validate_parameters(self, task: TaskType, parameters: Dict[str, Any]) -> ValidationResult:
+    @staticmethod
+    def _is_uci_check_false(value: Any) -> bool:
+        """Return True when a UCI check option is explicitly disabled."""
+        if value is False:
+            return True
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return int(value) == 0
+        if isinstance(value, str):
+            return value.strip().lower() in ("false", "0", "no", "off")
+        return False
+
+    def validate_parameters(
+        self,
+        task: TaskType,
+        parameters: Dict[str, Any],
+        *,
+        show_wdl_probabilities: Optional[bool] = None,
+    ) -> ValidationResult:
         """Validate engine parameters against recommendations.
         
         Args:
             task: Task type.
             parameters: Dictionary with parameter values (threads, depth, movetime, and engine-specific options).
+            show_wdl_probabilities: When validating Manual Analysis, whether CARA's
+                Manual Analysis → Show W/D/L probabilities preference is enabled.
             
         Returns:
             ValidationResult with validation issues.
@@ -318,6 +337,24 @@ class EngineConfigurationService:
                     message=f"Manual Analysis is a continuous analysis mode. Move time should be 0 (unlimited). Current value: {movetime}ms",
                     recommended_value=0
                 ))
+
+            # CARA can show WDL bars when Manual Analysis "Show W/D/L probabilities"
+            # is on, but only if the engine actually emits WDL (UCI_ShowWDL=true).
+            # Explicit false (common Stockfish default after saving engine settings)
+            # disables WDL even though the menu preference stays enabled.
+            if show_wdl_probabilities:
+                show_wdl = parameters.get("UCI_ShowWDL", None)
+                if show_wdl is not None and self._is_uci_check_false(show_wdl):
+                    issues.append(ValidationIssue(
+                        severity=ValidationSeverity.WARNING,
+                        parameter="UCI_ShowWDL",
+                        message=(
+                            "Manual Analysis has \"Show W/D/L probabilities\" enabled, "
+                            "but UCI_ShowWDL is off on the Manual Analysis tab. "
+                            "Enable it there for WDL estimates."
+                        ),
+                        recommended_value=True,
+                    ))
         
         # Check for errors and warnings
         has_errors = any(issue.severity == ValidationSeverity.ERROR for issue in issues)
