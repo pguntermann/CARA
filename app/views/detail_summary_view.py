@@ -49,6 +49,11 @@ from app.views.widgets.move_link_popup import (
     position_board_arrows,
     uci_from_san,
 )
+from app.views.widgets.kpi_explain_popup import (
+    HoverableKpiValueLabel,
+    KpiExplainPopup,
+    build_kpi_tip,
+)
 
 if TYPE_CHECKING:
     from app.controllers.game_summary_controller import GameSummaryController
@@ -2015,6 +2020,7 @@ class DetailSummaryView(QWidget):
         self._highlight_mini_boards: List[MiniChessBoardWidget] = []
         self._highlights_mode_buttons: Dict[str, QToolButton] = {}
         self._move_link_popup: Optional[MoveLinkPopup] = None
+        self._kpi_explain_popup: Optional[KpiExplainPopup] = None
         highlights_cfg = (
             self.config.get("ui", {})
             .get("panels", {})
@@ -2111,6 +2117,8 @@ class DetailSummaryView(QWidget):
         scroll_area.setWidget(self.content_widget)
         scroll_area.verticalScrollBar().valueChanged.connect(self._hide_move_link_popup)
         scroll_area.horizontalScrollBar().valueChanged.connect(self._hide_move_link_popup)
+        scroll_area.verticalScrollBar().valueChanged.connect(self._hide_kpi_explain_popup)
+        scroll_area.horizontalScrollBar().valueChanged.connect(self._hide_kpi_explain_popup)
         splitter.addWidget(scroll_area)
         
         # Configure splitter sizes and stretch factors from config
@@ -2372,6 +2380,7 @@ class DetailSummaryView(QWidget):
     
     def hideEvent(self, event) -> None:  # noqa: N802
         self._hide_move_link_popup()
+        self._hide_kpi_explain_popup()
         super().hideEvent(event)
 
     def _ensure_move_link_popup(self) -> MoveLinkPopup:
@@ -2383,6 +2392,18 @@ class DetailSummaryView(QWidget):
 
     def _hide_move_link_popup(self, *_args) -> None:
         popup = self._move_link_popup
+        if popup is not None:
+            popup.hide()
+
+    def _ensure_kpi_explain_popup(self) -> KpiExplainPopup:
+        popup = self._kpi_explain_popup
+        if popup is None:
+            popup = KpiExplainPopup(self.config, self)
+            self._kpi_explain_popup = popup
+        return popup
+
+    def _hide_kpi_explain_popup(self, *_args) -> None:
+        popup = self._kpi_explain_popup
         if popup is not None:
             popup.hide()
 
@@ -2442,6 +2463,7 @@ class DetailSummaryView(QWidget):
     def _clear_content(self) -> None:
         """Clear all content widgets except placeholder."""
         self._hide_move_link_popup()
+        self._hide_kpi_explain_popup()
         self.accuracy_curve = None
         # Clear widgets safely to prevent accessing deleted widgets
         while self.content_layout.count() > 1:  # Keep placeholder
@@ -2904,16 +2926,25 @@ class DetailSummaryView(QWidget):
         
         # ACPL - defensive check for None/invalid values
         avg_cpl = stats.average_cpl if stats.average_cpl is not None else 0.0
-        self._add_stat_row(grid, 0, "Average CPL:", f"{avg_cpl:.1f}", label_font, value_font, text_color,
-                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_row(
+            grid, 0, "Average CPL:", f"{avg_cpl:.1f}", label_font, value_font, text_color,
+            value_alignment=Qt.AlignmentFlag.AlignRight,
+            kpi_id="average_cpl", kpi_value=float(avg_cpl),
+        )
         # Accuracy - defensive check for None/invalid values
         accuracy = stats.accuracy if stats.accuracy is not None else 0.0
-        self._add_stat_row(grid, 1, "Accuracy:", f"{accuracy:.1f}%", label_font, value_font, text_color,
-                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_row(
+            grid, 1, "Accuracy:", f"{accuracy:.1f}%", label_font, value_font, text_color,
+            value_alignment=Qt.AlignmentFlag.AlignRight,
+            kpi_id="accuracy", kpi_value=float(accuracy),
+        )
         # Estimated Elo - defensive check for None/invalid values
         est_elo = stats.estimated_elo if stats.estimated_elo is not None else 0
-        self._add_stat_row(grid, 2, "Est. Elo:", str(est_elo), label_font, value_font, text_color,
-                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_row(
+            grid, 2, "Est. Elo:", str(est_elo), label_font, value_font, text_color,
+            value_alignment=Qt.AlignmentFlag.AlignRight,
+            kpi_id="estimated_elo", kpi_value=float(est_elo),
+        )
         self._add_stat_separator(grid, 3, elo_separator_cfg, border_color)
         # Total Moves - defensive check for None/invalid values
         total_moves = stats.total_moves if stats.total_moves is not None else 0
@@ -2929,8 +2960,11 @@ class DetailSummaryView(QWidget):
                            value_alignment=Qt.AlignmentFlag.AlignRight)
         # Blunder Rate - defensive check for None/invalid values
         blunder_rate = stats.blunder_rate if stats.blunder_rate is not None else 0.0
-        self._add_stat_row(grid, 7, "Blunder Rate:", f"{blunder_rate:.1f}%", label_font, value_font, text_color,
-                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_row(
+            grid, 7, "Blunder Rate:", f"{blunder_rate:.1f}%", label_font, value_font, text_color,
+            value_alignment=Qt.AlignmentFlag.AlignRight,
+            kpi_id="blunder_rate", kpi_value=float(blunder_rate),
+        )
         
         layout.addLayout(grid)
         layout.addStretch()
@@ -2985,9 +3019,20 @@ class DetailSummaryView(QWidget):
         wrap_layout.addWidget(line)
         grid.addWidget(wrap, row, 0, 1, 2)
 
-    def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
-                     label_font: QFont, value_font: QFont, text_color: QColor,
-                     value_alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignLeft) -> None:
+    def _add_stat_row(
+        self,
+        grid: QGridLayout,
+        row: int,
+        label_text: str,
+        value_text: str,
+        label_font: QFont,
+        value_font: QFont,
+        text_color: QColor,
+        value_alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignLeft,
+        *,
+        kpi_id: Optional[str] = None,
+        kpi_value: Optional[float] = None,
+    ) -> None:
         """Add a statistics row to a grid.
         
         Args:
@@ -2999,13 +3044,22 @@ class DetailSummaryView(QWidget):
             value_font: Font for value.
             text_color: Text color.
             value_alignment: Horizontal alignment for the value label.
+            kpi_id: Optional KPI tip id for hover explanation popup.
+            kpi_value: Numeric value for the KPI scale marker.
         """
         label = QLabel(label_text)
         label.setFont(label_font)
         label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
         grid.addWidget(label, row, 0)
-        
-        value = QLabel(value_text)
+
+        tip = None
+        if kpi_id is not None and kpi_value is not None:
+            tip = build_kpi_tip(kpi_id, float(kpi_value), value_text, self.config)
+        if tip is not None:
+            value: QLabel = HoverableKpiValueLabel(value_text)
+            value.attach_kpi_tip(tip, self._ensure_kpi_explain_popup())
+        else:
+            value = QLabel(value_text)
         value.setFont(value_font)
         value.setAlignment(value_alignment | Qt.AlignmentFlag.AlignVCenter)
         value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")

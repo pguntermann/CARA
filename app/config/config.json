@@ -92,6 +92,71 @@
             "best_count": 3,
             "missed_tactics_count": 99,
             "missed_tactics_display_count": 99
+          },
+          "key_statistics": {
+            "kpi_tips": {
+              "average_cpl": {
+                "title": "Average CPL",
+                "explanation": "Average centipawns lost per move versus the engine's best move. Lower means the played moves stayed closer to engine recommendations.",
+                "note": "Approximate guide; depends on engine, depth, and classification settings.",
+                "scale_min": 0,
+                "scale_max": 80,
+                "higher_is_better": false,
+                "unit": "CPL",
+                "bands": [
+                  {"label": "GM / Elite", "end": 15, "description": "Near-engine precision; rare slips"},
+                  {"label": "Master", "end": 30, "description": "Strong tournament consistency"},
+                  {"label": "Club", "end": 50, "description": "Solid club play with occasional larger slips"},
+                  {"label": "Amateur", "end": 80, "description": "Amateur / beginner; bigger deviations common"}
+                ]
+              },
+              "accuracy": {
+                "title": "Accuracy",
+                "explanation": "CARA's accuracy score for the player's moves in this game (derived from move quality / CPL). Higher is better.",
+                "note": "Approximate guide; formula and thresholds are configurable.",
+                "scale_min": 50,
+                "scale_max": 100,
+                "higher_is_better": true,
+                "unit": "%",
+                "bands": [
+                  {"label": "Amateur", "end": 75, "description": "Developing play; many suboptimal choices"},
+                  {"label": "Club", "end": 88, "description": "Solid club-level move quality"},
+                  {"label": "Master", "end": 95, "description": "Very high conversion of chances"},
+                  {"label": "GM / Elite", "end": 100, "description": "Near-perfect engine alignment"}
+                ]
+              },
+              "estimated_elo": {
+                "title": "Estimated Elo",
+                "explanation": "A rough strength estimate inferred from this game's move quality. It is not an official rating.",
+                "note": "Approximate, single-game estimate — treat as a ballpark only.",
+                "scale_min": 800,
+                "scale_max": 2800,
+                "higher_is_better": true,
+                "unit": "Elo",
+                "bands": [
+                  {"label": "Amateur", "end": 1400, "description": "Amateur / beginner strength"},
+                  {"label": "Club", "end": 1800, "description": "Typical club and online intermediate"},
+                  {"label": "Expert", "end": 2200, "description": "Strong club / candidate-master territory"},
+                  {"label": "Master", "end": 2500, "description": "Master-level performance"},
+                  {"label": "GM / Elite", "end": 2800, "description": "Grandmaster-caliber play"}
+                ]
+              },
+              "blunder_rate": {
+                "title": "Blunder Rate",
+                "explanation": "Share of the player's moves classified as blunders. Lower means fewer severe mistakes.",
+                "note": "Approximate guide; classification thresholds are configurable.",
+                "scale_min": 0,
+                "scale_max": 25,
+                "higher_is_better": false,
+                "unit": "%",
+                "bands": [
+                  {"label": "GM / Elite", "end": 1, "description": "Essentially clean"},
+                  {"label": "Master", "end": 3, "description": "At most a rare severe slip"},
+                  {"label": "Club", "end": 8, "description": "Occasional severe errors"},
+                  {"label": "Amateur", "end": 25, "description": "Blunders more frequent"}
+                ]
+              }
+            }
           }
         },
         "player_stats": {

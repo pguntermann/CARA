@@ -1832,6 +1832,62 @@
                 6,
                 4
               ]
+            },
+            "kpi_tip": {
+              "wrap_width": 340,
+              "band_table_desc_wrap": 170,
+              "content_spacing": 6,
+              "value_hint": {
+                "underline_style": "dotted",
+                "underline_style_hover": "solid",
+                "underline_color": {
+                  "$ref": "$_COLOR_TEXT_4"
+                },
+                "underline_color_hover": {
+                  "$ref": "$_COLOR_TEXT_3"
+                }
+              },
+              "scale": {
+                "min_width": 260,
+                "preferred_height": 54,
+                "bar_height": 12,
+                "bar_top": 10,
+                "bar_corner_radius": 3,
+                "horizontal_inset": 4
+              },
+              "band_table": {
+                "horizontal_spacing": 8,
+                "vertical_spacing": 3,
+                "swatch_size": 10,
+                "header_color_delta": -25
+              },
+              "band_colors_cool_to_warm": [
+                [
+                  90,
+                  160,
+                  120
+                ],
+                [
+                  140,
+                  175,
+                  100
+                ],
+                [
+                  200,
+                  175,
+                  90
+                ],
+                [
+                  210,
+                  140,
+                  90
+                ],
+                [
+                  200,
+                  100,
+                  95
+                ]
+              ]
             }
           },
           "pdf_report": {
