@@ -1246,7 +1246,25 @@
               "style": "dash"
             },
             "divisions": [],
-            "animation_duration_ms": 300
+            "animation_duration_ms": 300,
+            "tooltip": {
+              "enabled": true,
+              "font_size": 22,
+              "font_weight": "bold",
+              "padding": 10,
+              "anchor_gap": 8,
+              "hover_delay_ms": 120,
+              "decimals": 2,
+              "text_color_positive": {
+                "$ref": "$_COLOR_LATTE_DOT"
+              },
+              "text_color_negative": {
+                "$ref": "$_COLOR_DEEP_TEAL"
+              },
+              "text_color_equal": {
+                "$ref": "$_COLOR_INK_BODY"
+              }
+            }
           },
           "material_widget": {
             "width": 120,
@@ -1717,6 +1735,49 @@
             "current_move_line_width": 2,
             "hover_circle_radius": 6
           },
+          "phase_accuracy_bar_chart": {
+            "enabled": true,
+            "height": 176,
+            "background_color": {
+              "$ref": "$_COLOR_WHEAT_CREAM"
+            },
+            "grid_color": {
+              "$ref": "$_COLOR_GRID_PUTTY"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_COCOA_BROWN"
+            },
+            "white_bar_color": {
+              "$ref": "$_COLOR_DEEP_TEAL"
+            },
+            "black_bar_color": [
+              170,
+              95,
+              85
+            ],
+            "padding": [
+              16,
+              8,
+              16,
+              8
+            ],
+            "meter_spacing": 14,
+            "ring_stroke": 7,
+            "ring_gap": 5,
+            "track_alpha": 0.2,
+            "delta_font_size": 13,
+            "show_legend": false,
+            "show_value_labels": true,
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "min_font_size": 8,
+            "white_legend_label": "White",
+            "black_legend_label": "Black"
+          },
           "colors": {
             "book_move": {
               "$ref": "$_COLOR_TAG_SLATE"
@@ -1817,6 +1878,62 @@
               "margins": [
                 6,
                 4
+              ]
+            },
+            "kpi_tip": {
+              "wrap_width": 340,
+              "band_table_desc_wrap": 170,
+              "content_spacing": 6,
+              "value_hint": {
+                "underline_style": "dotted",
+                "underline_style_hover": "solid",
+                "underline_color": {
+                  "$ref": "$_COLOR_TAN_MOCHA"
+                },
+                "underline_color_hover": {
+                  "$ref": "$_COLOR_INK_BODY"
+                }
+              },
+              "scale": {
+                "min_width": 260,
+                "preferred_height": 54,
+                "bar_height": 12,
+                "bar_top": 10,
+                "bar_corner_radius": 3,
+                "horizontal_inset": 4
+              },
+              "band_table": {
+                "horizontal_spacing": 8,
+                "vertical_spacing": 3,
+                "swatch_size": 10,
+                "header_color_delta": -25
+              },
+              "band_colors_cool_to_warm": [
+                [
+                  95,
+                  140,
+                  110
+                ],
+                [
+                  145,
+                  155,
+                  95
+                ],
+                [
+                  185,
+                  150,
+                  85
+                ],
+                [
+                  175,
+                  115,
+                  80
+                ],
+                [
+                  165,
+                  90,
+                  85
+                ]
               ]
             }
           },
@@ -1983,6 +2100,19 @@
               "$ref": "$_COLOR_OATMEAL_BEIGE"
             },
             "opponent_ring_border_width": 1
+          },
+          "move_classification_pie": {
+            "enabled": true,
+            "show_opponent_overlay": true,
+            "hover_overlay_animation_ms": 150,
+            "opponent_ring_width_fraction": 0.18,
+            "opponent_overlay_alpha": 0.65,
+            "opponent_overlay_saturation": 0.72,
+            "opponent_overlay_value_factor": 0.58,
+            "opponent_ring_darken": 135,
+            "min_size_for_overlay": 130,
+            "player_legend_label": "White",
+            "opponent_legend_label": "Black"
           },
           "widgets": {
             "border_radius": 5,
@@ -3395,6 +3525,18 @@
               "text_color": {
                 "$ref": "$_COLOR_DRIFTWOOD"
               }
+            },
+            "error": {
+              "background_color": [
+                232,
+                200,
+                190
+              ],
+              "text_color": [
+                110,
+                40,
+                35
+              ]
             }
           },
           "separator": {

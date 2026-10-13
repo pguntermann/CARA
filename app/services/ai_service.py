@@ -177,7 +177,9 @@ class AIService:
             if provider == AIProvider.OPENAI:
                 return self._send_openai_message(model, api_key, messages, system_prompt, token_limit, timeout_seconds=timeout_seconds)
             elif provider == AIProvider.ANTHROPIC:
-                return self._send_anthropic_message(model, api_key, messages, system_prompt, timeout_seconds=timeout_seconds)
+                return self._send_anthropic_message(
+                    model, api_key, messages, system_prompt, token_limit, timeout_seconds=timeout_seconds
+                )
             elif provider == AIProvider.CUSTOM and base_url_override:
                 chat_url = base_url_override.rstrip("/") + "/chat/completions"
                 return self._send_openai_message(
@@ -454,17 +456,15 @@ class AIService:
             content = message.get("content", "")
             finish_reason = choice.get("finish_reason", "")
             
-            # Check if response was truncated due to token limit
+            # Truncated / thinking-only empty reply (OpenAI and local OpenAI-compatible APIs)
             if finish_reason == "length" and not content:
                 usage = data.get("usage", {})
-                completion_tokens = usage.get("completion_tokens", 0)
-                completion_details = usage.get("completion_tokens_details", {})
-                reasoning_tokens = completion_details.get("reasoning_tokens", 0)
-                
-                return False, (
-                    f"Response was truncated - model used all {completion_tokens} tokens for reasoning "
-                    f"({reasoning_tokens} reasoning tokens) and reached the token limit before generating output. "
-                    f"Try asking a simpler question or the model may need more tokens allocated."
+                completion_tokens = usage.get("completion_tokens")
+                completion_details = usage.get("completion_tokens_details", {}) or {}
+                reasoning_tokens = completion_details.get("reasoning_tokens")
+                return False, self.output_token_limit_message(
+                    output_tokens=completion_tokens,
+                    reasoning_tokens=reasoning_tokens,
                 )
             
             if not content:
@@ -481,6 +481,7 @@ class AIService:
         api_key: str,
         messages: List[Dict[str, str]],
         system_prompt: Optional[str] = None,
+        token_limit: Optional[int] = None,
         timeout_seconds: int = 60
     ) -> Tuple[bool, str]:
         """Send message to Anthropic API.
@@ -490,6 +491,8 @@ class AIService:
             api_key: Anthropic API key.
             messages: List of message dicts.
             system_prompt: Optional system prompt.
+            token_limit: Optional max output tokens (defaults to 2000).
+            timeout_seconds: Request timeout in seconds.
             
         Returns:
             Tuple of (success: bool, response_text: str or error_message: str).
@@ -514,9 +517,10 @@ class AIService:
             "Content-Type": "application/json"
         }
         
+        limit = token_limit if token_limit is not None else 2000
         payload = {
             "model": model,
-            "max_tokens": 2000,
+            "max_tokens": limit,
             "messages": anthropic_messages
         }
         
@@ -566,9 +570,34 @@ class AIService:
         content = self.anthropic_message_text(data)
         
         if not content:
+            stop_reason = data.get("stop_reason", "")
+            if stop_reason == "max_tokens":
+                usage = data.get("usage", {}) or {}
+                return False, self.output_token_limit_message(
+                    output_tokens=usage.get("output_tokens"),
+                )
             return False, "Empty response from API"
         
         return True, content
+
+    @staticmethod
+    def output_token_limit_message(
+        output_tokens: Optional[int] = None,
+        reasoning_tokens: Optional[int] = None,
+    ) -> str:
+        """User-facing message when the model hit max output tokens with no visible reply."""
+        detail = ""
+        if output_tokens is not None and reasoning_tokens is not None and reasoning_tokens > 0:
+            detail = (
+                f" Thinking/reasoning used {reasoning_tokens} of {output_tokens} output tokens."
+            )
+        elif output_tokens is not None:
+            detail = f" The response used all {output_tokens} output tokens."
+        return (
+            "The model reached its output token limit before producing a reply"
+            f" (thinking/reasoning may have used the full budget).{detail}"
+            " Increase the max tokens setting, or choose a different model."
+        )
 
     @staticmethod
     def anthropic_message_text(data: Dict[str, Any]) -> str:
