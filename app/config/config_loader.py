@@ -1752,6 +1752,8 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.ai_chat.messages.ai.background_color",
     "ui.panels.detail.ai_chat.messages.ai.text_color",
     "ui.panels.detail.ai_chat.messages.border_radius",
+    "ui.panels.detail.ai_chat.messages.error.background_color",
+    "ui.panels.detail.ai_chat.messages.error.text_color",
     "ui.panels.detail.ai_chat.messages.margin",
     "ui.panels.detail.ai_chat.messages.padding",
     "ui.panels.detail.ai_chat.messages.system.background_color",

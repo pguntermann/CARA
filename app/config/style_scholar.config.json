@@ -3395,6 +3395,18 @@
               "text_color": {
                 "$ref": "$_COLOR_DRIFTWOOD"
               }
+            },
+            "error": {
+              "background_color": [
+                232,
+                200,
+                190
+              ],
+              "text_color": [
+                110,
+                40,
+                35
+              ]
             }
           },
           "separator": {

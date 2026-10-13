@@ -3457,6 +3457,18 @@
               "text_color": {
                 "$ref": "$_COLOR_TEXT_4"
               }
+            },
+            "error": {
+              "background_color": [
+                255,
+                220,
+                220
+              ],
+              "text_color": [
+                140,
+                30,
+                30
+              ]
             }
           },
           "separator": {
