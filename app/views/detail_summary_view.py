@@ -1270,8 +1270,8 @@ class PieChartWidget(QWidget):
         Args:
             config: Configuration dictionary.
             parent: Parent widget.
-            classification_pie_options: Optional ``player_stats.move_classification_pie`` block
-                (Player Stats only). When unset, behavior matches the legacy single pie.
+            classification_pie_options: Optional ``move_classification_pie`` overlay block
+                (Player Stats or Game Summary). When unset, behavior matches the legacy single pie.
         """
         super().__init__(parent)
         self.config = config
@@ -1414,13 +1414,18 @@ class PieChartWidget(QWidget):
         self.update()
 
     def set_opponent_data(self, data: Optional[Dict[str, int]]) -> None:
-        """Opponent move-classification counts (Player Stats hover overlay). Pass None to clear."""
+        """Comparison move-classification counts for the hover overlay. Pass None to clear."""
         if data:
             self._opponent_data = {k: int(v) for k, v in data.items()}
         else:
             self._opponent_data = None
         self._sync_mouse_tracking()
         self.update()
+
+    def set_comparison_labels(self, player_label: str, opponent_label: str) -> None:
+        """Set hover tooltip labels for this pie vs the comparison pie."""
+        self._player_label = str(player_label) if player_label else "Player"
+        self._opponent_label = str(opponent_label) if opponent_label else "Opponent"
 
     def _category_color(self, category: str) -> QColor:
         key = category.lower().replace(" ", "_")
@@ -1571,38 +1576,46 @@ class PieChartWidget(QWidget):
         self._ring_span_anim.setEndValue(t)
         self._ring_span_anim.start()
 
-    def _update_hover_from_pos(self, px: float, py: float) -> None:
+    def _update_hover_from_pos(self, px: float, py: float, global_pos: Optional[QPoint] = None) -> None:
         if not self._can_hover_slice():
-            self.setToolTip("")
+            QToolTip.hideText()
             self.unsetCursor()
             return
         cat = self._category_at_point(px, py)
         if cat != self._hover_category:
-            prev = self._hover_category
             self._hover_category = cat
             oc = int(self._opponent_data.get(cat, 0)) if cat and self._opponent_data else 0
             if cat:
                 self._opponent_ring_category = cat
-                self.setToolTip(self._hover_tooltip_text(cat))
                 target = self._opponent_span_deg_for_category(cat) if oc > 0 else 0.0
                 self._start_ring_span_anim(target)
             else:
-                self.setToolTip("")
+                QToolTip.hideText()
                 self.unsetCursor()
                 self._start_ring_span_anim(0.0)
-        elif cat:
-            self.setToolTip(self._hover_tooltip_text(cat))
+        if cat and global_pos is not None:
+            QToolTip.showText(
+                global_pos,
+                self._hover_tooltip_text(cat),
+                self,
+                QRect(),
+                4000,
+            )
+        elif not cat:
+            QToolTip.hideText()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if self._interaction_active():
             p = event.position()
-            self._update_hover_from_pos(p.x(), p.y())
+            self._update_hover_from_pos(
+                p.x(), p.y(), event.globalPosition().toPoint()
+            )
         super().mouseMoveEvent(event)
 
     def leaveEvent(self, event: QEvent) -> None:
         self._hover_category = None
         self._start_ring_span_anim(0.0)
-        self.setToolTip("")
+        QToolTip.hideText()
         self.unsetCursor()
         super().leaveEvent(event)
 
@@ -2267,8 +2280,9 @@ class DetailSummaryView(QWidget):
         self._add_section_header("Move Classification", header_font, header_text_color)
         classification_layout = QHBoxLayout()
         classification_layout.setSpacing(player_spacing)
-        
-        # White pie chart - defensive check for None stats
+
+        white_pie_data: Optional[Dict[str, int]] = None
+        black_pie_data: Optional[Dict[str, int]] = None
         if self.current_summary and self.current_summary.white_stats:
             white_pie_data = {
                 'Book Move': self.current_summary.white_stats.book_moves or 0,
@@ -2280,14 +2294,6 @@ class DetailSummaryView(QWidget):
                 'Miss': self.current_summary.white_stats.misses or 0,
                 'Blunder': self.current_summary.white_stats.blunders or 0,
             }
-            white_pie_widget = self._create_classification_widget(
-                white_name, white_pie_data, self.current_summary.white_stats,
-                text_color, label_font, section_bg_color, border_color,
-                is_white=True
-            )
-            classification_layout.addWidget(white_pie_widget, 1)
-        
-        # Black pie chart - defensive check for None stats
         if self.current_summary and self.current_summary.black_stats:
             black_pie_data = {
                 'Book Move': self.current_summary.black_stats.book_moves or 0,
@@ -2299,10 +2305,28 @@ class DetailSummaryView(QWidget):
                 'Miss': self.current_summary.black_stats.misses or 0,
                 'Blunder': self.current_summary.black_stats.blunders or 0,
             }
+
+        # White pie chart - defensive check for None stats
+        if white_pie_data is not None and self.current_summary and self.current_summary.white_stats:
+            white_pie_widget = self._create_classification_widget(
+                white_name, white_pie_data, self.current_summary.white_stats,
+                text_color, label_font, section_bg_color, border_color,
+                is_white=True,
+                opponent_pie_data=black_pie_data,
+                player_legend_label="White",
+                opponent_legend_label="Black",
+            )
+            classification_layout.addWidget(white_pie_widget, 1)
+
+        # Black pie chart - defensive check for None stats
+        if black_pie_data is not None and self.current_summary and self.current_summary.black_stats:
             black_pie_widget = self._create_classification_widget(
                 black_name, black_pie_data, self.current_summary.black_stats,
                 text_color, label_font, section_bg_color, border_color,
-                is_white=False
+                is_white=False,
+                opponent_pie_data=white_pie_data,
+                player_legend_label="Black",
+                opponent_legend_label="White",
             )
             classification_layout.addWidget(black_pie_widget, 1)
         
@@ -2672,10 +2696,20 @@ class DetailSummaryView(QWidget):
         value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
         grid.addWidget(value, row, 1)
     
-    def _create_classification_widget(self, player_name: str, pie_data: Dict[str, int], stats,
-                                     text_color: QColor, label_font: QFont,
-                                     bg_color: QColor, border_color: QColor,
-                                     is_white: bool = True) -> QWidget:
+    def _create_classification_widget(
+        self,
+        player_name: str,
+        pie_data: Dict[str, int],
+        stats,
+        text_color: QColor,
+        label_font: QFont,
+        bg_color: QColor,
+        border_color: QColor,
+        is_white: bool = True,
+        opponent_pie_data: Optional[Dict[str, int]] = None,
+        player_legend_label: str = "White",
+        opponent_legend_label: str = "Black",
+    ) -> QWidget:
         """Create a widget with pie chart and move counts.
         
         Args:
@@ -2686,6 +2720,9 @@ class DetailSummaryView(QWidget):
             label_font: Font for labels.
             bg_color: Background color.
             border_color: Border color.
+            opponent_pie_data: Other side's classification counts for hover comparison.
+            player_legend_label: Hover tooltip label for this pie.
+            opponent_legend_label: Hover tooltip label for the comparison pie.
             
         Returns:
             QWidget with pie chart and counts.
@@ -2748,9 +2785,16 @@ class DetailSummaryView(QWidget):
         """)
         layout.addWidget(name_label)
         
-        # Pie chart
-        pie_chart = PieChartWidget(self.config)
+        # Pie chart (optional White/Black comparison hover overlay)
+        mcp_opts = summary_config.get('move_classification_pie')
+        pie_chart = PieChartWidget(
+            self.config,
+            classification_pie_options=mcp_opts if isinstance(mcp_opts, dict) else None,
+        )
         pie_chart.set_data(pie_data)
+        if isinstance(mcp_opts, dict):
+            pie_chart.set_comparison_labels(player_legend_label, opponent_legend_label)
+            pie_chart.set_opponent_data(opponent_pie_data)
         layout.addWidget(pie_chart)
         
         # Move counts list

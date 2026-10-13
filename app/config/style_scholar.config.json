@@ -1984,6 +1984,19 @@
             },
             "opponent_ring_border_width": 1
           },
+          "move_classification_pie": {
+            "enabled": true,
+            "show_opponent_overlay": true,
+            "hover_overlay_animation_ms": 150,
+            "opponent_ring_width_fraction": 0.18,
+            "opponent_overlay_alpha": 0.65,
+            "opponent_overlay_saturation": 0.72,
+            "opponent_overlay_value_factor": 0.58,
+            "opponent_ring_darken": 135,
+            "min_size_for_overlay": 130,
+            "player_legend_label": "White",
+            "opponent_legend_label": "Black"
+          },
           "widgets": {
             "border_radius": 5,
             "section_margins": [
