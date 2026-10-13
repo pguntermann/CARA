@@ -1,5 +1,5 @@
 {
-  "version": "2.9.1",
+  "version": "2.9.2",
   "default_style_config": "app/config/style_default.config.json",
   "ui": {
     "welcome_dialog": {
@@ -104,10 +104,26 @@
                 "higher_is_better": false,
                 "unit": "CPL",
                 "bands": [
-                  {"label": "GM / Elite", "end": 15, "description": "Near-engine precision; rare slips"},
-                  {"label": "Master", "end": 30, "description": "Strong tournament consistency"},
-                  {"label": "Club", "end": 50, "description": "Solid club play with occasional larger slips"},
-                  {"label": "Amateur", "end": 80, "description": "Amateur / beginner; bigger deviations common"}
+                  {
+                    "label": "GM / Elite",
+                    "end": 15,
+                    "description": "Near-engine precision; rare slips"
+                  },
+                  {
+                    "label": "Master",
+                    "end": 30,
+                    "description": "Strong tournament consistency"
+                  },
+                  {
+                    "label": "Club",
+                    "end": 50,
+                    "description": "Solid club play with occasional larger slips"
+                  },
+                  {
+                    "label": "Amateur",
+                    "end": 80,
+                    "description": "Amateur / beginner; bigger deviations common"
+                  }
                 ]
               },
               "accuracy": {
@@ -119,10 +135,26 @@
                 "higher_is_better": true,
                 "unit": "%",
                 "bands": [
-                  {"label": "Amateur", "end": 75, "description": "Developing play; many suboptimal choices"},
-                  {"label": "Club", "end": 88, "description": "Solid club-level move quality"},
-                  {"label": "Master", "end": 95, "description": "Very high conversion of chances"},
-                  {"label": "GM / Elite", "end": 100, "description": "Near-perfect engine alignment"}
+                  {
+                    "label": "Amateur",
+                    "end": 75,
+                    "description": "Developing play; many suboptimal choices"
+                  },
+                  {
+                    "label": "Club",
+                    "end": 88,
+                    "description": "Solid club-level move quality"
+                  },
+                  {
+                    "label": "Master",
+                    "end": 95,
+                    "description": "Very high conversion of chances"
+                  },
+                  {
+                    "label": "GM / Elite",
+                    "end": 100,
+                    "description": "Near-perfect engine alignment"
+                  }
                 ]
               },
               "estimated_elo": {
@@ -134,11 +166,31 @@
                 "higher_is_better": true,
                 "unit": "Elo",
                 "bands": [
-                  {"label": "Amateur", "end": 1400, "description": "Amateur / beginner strength"},
-                  {"label": "Club", "end": 1800, "description": "Typical club and online intermediate"},
-                  {"label": "Expert", "end": 2200, "description": "Strong club / candidate-master territory"},
-                  {"label": "Master", "end": 2500, "description": "Master-level performance"},
-                  {"label": "GM / Elite", "end": 2800, "description": "Grandmaster-caliber play"}
+                  {
+                    "label": "Amateur",
+                    "end": 1400,
+                    "description": "Amateur / beginner strength"
+                  },
+                  {
+                    "label": "Club",
+                    "end": 1800,
+                    "description": "Typical club and online intermediate"
+                  },
+                  {
+                    "label": "Expert",
+                    "end": 2200,
+                    "description": "Strong club / candidate-master territory"
+                  },
+                  {
+                    "label": "Master",
+                    "end": 2500,
+                    "description": "Master-level performance"
+                  },
+                  {
+                    "label": "GM / Elite",
+                    "end": 2800,
+                    "description": "Grandmaster-caliber play"
+                  }
                 ]
               },
               "blunder_rate": {
@@ -150,10 +202,26 @@
                 "higher_is_better": false,
                 "unit": "%",
                 "bands": [
-                  {"label": "GM / Elite", "end": 1, "description": "Essentially clean"},
-                  {"label": "Master", "end": 3, "description": "At most a rare severe slip"},
-                  {"label": "Club", "end": 8, "description": "Occasional severe errors"},
-                  {"label": "Amateur", "end": 25, "description": "Blunders more frequent"}
+                  {
+                    "label": "GM / Elite",
+                    "end": 1,
+                    "description": "Essentially clean"
+                  },
+                  {
+                    "label": "Master",
+                    "end": 3,
+                    "description": "At most a rare severe slip"
+                  },
+                  {
+                    "label": "Club",
+                    "end": 8,
+                    "description": "Occasional severe errors"
+                  },
+                  {
+                    "label": "Amateur",
+                    "end": 25,
+                    "description": "Blunders more frequent"
+                  }
                 ]
               }
             }

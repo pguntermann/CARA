@@ -1,5 +1,25 @@
 # Release Notes
 
+# CARA v2.9.2 - Game Summary improvements & better AI chat error handling
+
+**Release Date:** 13.10.2026
+
+This release further improves the **Game Summary** with **phase accuracy rings**, **White/Black pie comparison** on hover, and **KPI explanation tips** with skill-range guides. It also adds a large-font **evaluation bar** hover tip, clearer **AI Chat** messages when replies hit the output token limit, and a warning when Manual Analysis WDL display is on but `UCI_ShowWDL` is off.
+
+## New Features
+
+- **Phase accuracy meters:** Game Summary shows dual-ring Opening / Middlegame / Endgame accuracy meters for White and Black.
+- **Classification pie comparison:** Hovering a move-classification pie overlays the other side’s shares for a quick White/Black comparison.
+- **KPI hover tips:** Key statistics values show a themed explanation popup with a skill-range scale for the hovered metric.
+- **Evaluation bar tip:** Hovering the evaluation bar shows the current score in a large, easy-to-read tip.
+
+## Enhancements
+
+- **AI Chat errors:** When the model hits its output token limit (or returns an empty truncated reply), CARA shows a clearer message—including reasoning-token usage when available—instead of a generic empty-response error.
+- **Engine settings / WDL:** Saving engine parameters warns if Manual Analysis “Show W/D/L probabilities” is enabled but `UCI_ShowWDL` is still off on the Manual Analysis tab.
+
+---
+
 # CARA v2.9.1 - Move-link previews & integrated miniature board settings
 
 **Release Date:** 30.09.2026
