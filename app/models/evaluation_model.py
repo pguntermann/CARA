@@ -4,6 +4,27 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from typing import Optional
 
 
+def format_evaluation_display(
+    centipawns: float,
+    is_mate: bool,
+    mate_moves: int,
+    *,
+    decimals: int = 2,
+) -> str:
+    """Format an evaluation score for display (``+1.23``, ``M3``, ``-M0``)."""
+    if is_mate:
+        if mate_moves > 0:
+            return f"M{mate_moves}"
+        if mate_moves < 0:
+            return f"-M{abs(mate_moves)}"
+        return "M0" if centipawns >= 0 else "-M0"
+    pawns = float(centipawns) / 100.0
+    digits = max(0, int(decimals))
+    if pawns > 0:
+        return f"+{pawns:.{digits}f}"
+    return f"{pawns:.{digits}f}"
+
+
 class EvaluationModel(QObject):
     """Model representing position evaluation state.
     
@@ -123,6 +144,15 @@ class EvaluationModel(QObject):
         if self._is_evaluating != value:
             self._is_evaluating = value
     
+    def format_display(self, decimals: int = 2) -> str:
+        """Format the current evaluation for UI display (``+1.23``, ``M3``, ``-M0``)."""
+        return format_evaluation_display(
+            self._centipawns,
+            self._is_mate,
+            self._mate_moves,
+            decimals=decimals,
+        )
+
     def get_evaluation_value(self, scale_max: float = 10.0) -> float:
         """Get evaluation value normalized to scale.
         

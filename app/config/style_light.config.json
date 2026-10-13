@@ -1178,7 +1178,29 @@
               5,
               10
             ],
-            "animation_duration_ms": 300
+            "animation_duration_ms": 300,
+            "tooltip": {
+              "enabled": true,
+              "font_size": 22,
+              "font_weight": "bold",
+              "padding": 10,
+              "anchor_gap": 8,
+              "hover_delay_ms": 120,
+              "decimals": 2,
+              "text_color_positive": [
+                35,
+                45,
+                60
+              ],
+              "text_color_negative": [
+                55,
+                85,
+                135
+              ],
+              "text_color_equal": {
+                "$ref": "$_COLOR_TEXT_3"
+              }
+            }
           },
           "material_widget": {
             "width": 110,
