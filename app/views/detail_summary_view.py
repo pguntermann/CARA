@@ -1254,6 +1254,292 @@ PIE_CLASSIFICATION_CATEGORY_ORDER: Tuple[str, ...] = (
     "Blunder",
 )
 
+PHASE_ACCURACY_BAR_ORDER: Tuple[str, ...] = ("Opening", "Middlegame", "Endgame")
+
+
+class PhaseAccuracyBarChartWidget(QWidget):
+    """Dual-ring phase meters: Opening / Middlegame / Endgame with White (outer) & Black (inner)."""
+
+    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.config = config
+        ui_config = config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        summary_config = panel_config.get("summary", {})
+        chart_config = summary_config.get("phase_accuracy_bar_chart", {})
+        curve_config = summary_config.get("accuracy_curve", {})
+
+        self._height = int(chart_config.get("height", 176))
+        self.background_color = QColor(
+            *chart_config.get(
+                "background_color",
+                curve_config.get("background_color", [30, 30, 35]),
+            )
+        )
+        self.grid_color = QColor(
+            *chart_config.get("grid_color", curve_config.get("grid_color", [60, 60, 65]))
+        )
+        self.text_color = QColor(
+            *chart_config.get("text_color", curve_config.get("text_color", [200, 200, 200]))
+        )
+        self.white_ring_color = QColor(
+            *chart_config.get(
+                "white_bar_color",
+                curve_config.get("white_line_color", [255, 255, 255]),
+            )
+        )
+        self.black_ring_color = QColor(
+            *chart_config.get(
+                "black_bar_color",
+                curve_config.get("black_line_color", [200, 130, 130]),
+            )
+        )
+        self.padding = chart_config.get("padding", [16, 8, 16, 8])
+        self.meter_spacing = int(chart_config.get("meter_spacing", 14))
+        self.ring_stroke = float(chart_config.get("ring_stroke", 7.0))
+        self.ring_gap = float(chart_config.get("ring_gap", 5.0))
+        self.track_alpha = float(chart_config.get("track_alpha", 0.2))
+        self.track_alpha = max(0.05, min(0.5, self.track_alpha))
+        self.show_legend = bool(chart_config.get("show_legend", False))
+        self.show_value_labels = bool(chart_config.get("show_value_labels", True))
+        self.font_family = resolve_font_family(
+            chart_config.get("font_family", curve_config.get("font_family", "Helvetica Neue"))
+        )
+        self.font_size = int(
+            scale_font_size(chart_config.get("font_size", curve_config.get("font_size", 10)))
+        )
+        self.min_font_size = int(
+            scale_font_size(chart_config.get("min_font_size", curve_config.get("min_font_size", 8)))
+        )
+        self._delta_font_size = int(
+            scale_font_size(chart_config.get("delta_font_size", self.font_size + 3))
+        )
+        self._white_label = str(chart_config.get("white_legend_label", "White"))
+        self._black_label = str(chart_config.get("black_legend_label", "Black"))
+
+        self._white: Dict[str, float] = {}
+        self._black: Dict[str, float] = {}
+        self._meter_hits: List[Dict[str, Any]] = []
+        self._hover_phase: Optional[str] = None
+
+        self.setMinimumHeight(self._height)
+        self.setFixedHeight(self._height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMouseTracking(True)
+
+    def set_data(self, white: Dict[str, float], black: Dict[str, float]) -> None:
+        self._white = {k: float(v) for k, v in (white or {}).items()}
+        self._black = {k: float(v) for k, v in (black or {}).items()}
+        self.update()
+
+    def _hover_tooltip_text(self, phase: str) -> str:
+        wa = float(self._white.get(phase, 0.0))
+        ba = float(self._black.get(phase, 0.0))
+        delta = wa - ba
+        sign = "+" if delta >= 0 else ""
+        return (
+            f"{phase}\n"
+            f"{self._white_label}: {wa:.1f}%\n"
+            f"{self._black_label}: {ba:.1f}%\n"
+            f"Difference: {sign}{delta:.1f} pp"
+        )
+
+    def _phase_at(self, px: float, py: float) -> Optional[str]:
+        for hit in self._meter_hits:
+            dx = px - float(hit["cx"])
+            dy = py - float(hit["cy"])
+            if math.hypot(dx, dy) <= float(hit["radius"]):
+                return str(hit["phase"])
+        return None
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        phase = self._phase_at(event.position().x(), event.position().y())
+        changed = phase != self._hover_phase
+        self._hover_phase = phase
+        if phase:
+            QToolTip.showText(
+                event.globalPosition().toPoint(),
+                self._hover_tooltip_text(phase),
+                self,
+                QRect(),
+                4000,
+            )
+        else:
+            QToolTip.hideText()
+        if changed:
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:
+        self._hover_phase = None
+        QToolTip.hideText()
+        self.update()
+        super().leaveEvent(event)
+
+    @staticmethod
+    def _draw_ring_arc(
+        painter: QPainter,
+        cx: float,
+        cy: float,
+        radius: float,
+        stroke: float,
+        color: QColor,
+        accuracy: float,
+        track_color: QColor,
+    ) -> None:
+        rect = QRectF(cx - radius, cy - radius, 2.0 * radius, 2.0 * radius)
+        track_pen = QPen(track_color, stroke)
+        track_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(track_pen)
+        painter.drawEllipse(rect)
+
+        span = max(0.0, min(100.0, accuracy)) / 100.0 * 360.0
+        if span <= 0.05:
+            return
+        arc_pen = QPen(color, stroke)
+        arc_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(arc_pen)
+        # Qt: 0° at 3 o'clock, positive counter-clockwise. Start at 12 o'clock, sweep clockwise.
+        painter.drawArc(rect, 90 * 16, int(-span * 16))
+
+    def paintEvent(self, event) -> None:  # noqa: ARG002
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        width = self.width()
+        height = self.height()
+        painter.fillRect(0, 0, width, height, self.background_color)
+
+        phases = [p for p in PHASE_ACCURACY_BAR_ORDER if p in self._white or p in self._black]
+        if not phases:
+            painter.setPen(self.text_color)
+            painter.setFont(QFont(self.font_family, self.font_size))
+            painter.drawText(QRectF(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, "No data")
+            return
+
+        pad_l = float(self.padding[0] if len(self.padding) > 0 else 16)
+        pad_t = float(self.padding[1] if len(self.padding) > 1 else 8)
+        pad_r = float(self.padding[2] if len(self.padding) > 2 else 16)
+        pad_b = float(self.padding[3] if len(self.padding) > 3 else 8)
+
+        font = QFont(self.font_family, self.font_size)
+        small = QFont(self.font_family, self.min_font_size)
+        delta_font = QFont(self.font_family, self._delta_font_size)
+        delta_font.setBold(True)
+        fm = QFontMetrics(font)
+        sfm = QFontMetrics(small)
+
+        legend_h = float(self.font_size + 12) if self.show_legend else 0.0
+        caption_h = float(fm.height() + sfm.height() + 10)
+        body_top = pad_t + legend_h
+        body_h = max(40.0, height - body_top - pad_b - caption_h)
+        body_w = max(1.0, width - pad_l - pad_r)
+        n = len(phases)
+        cell_w = (body_w - self.meter_spacing * max(0, n - 1)) / max(1, n)
+        self._meter_hits = []
+
+        if self.show_legend:
+            painter.setFont(font)
+            lx = pad_l
+            ly = pad_t + 2
+            for label, color in (
+                (f"{self._white_label} (outer)", self.white_ring_color),
+                (f"{self._black_label} (inner)", self.black_ring_color),
+            ):
+                painter.setPen(QPen(color, 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+                painter.drawLine(QPointF(lx, ly + 7), QPointF(lx + 14, ly + 7))
+                painter.setPen(self.text_color)
+                painter.drawText(int(lx + 18), int(ly + 11), label)
+                lx += 18 + fm.horizontalAdvance(label) + 18
+
+        for i, phase in enumerate(phases):
+            cell_x = pad_l + i * (cell_w + self.meter_spacing)
+            hovered = self._hover_phase == phase
+            dimmed = self._hover_phase is not None and not hovered
+
+            cx = cell_x + cell_w / 2.0
+            cy = body_top + body_h / 2.0
+            max_r = min(cell_w, body_h) / 2.0 - 2.0
+            stroke = self.ring_stroke
+            outer_r = max_r - stroke / 2.0
+            inner_r = outer_r - stroke - self.ring_gap
+            if inner_r < stroke:
+                inner_r = max(stroke, outer_r * 0.62)
+                stroke = min(stroke, (outer_r - inner_r) * 0.45)
+            # Hit only the ring disc (not gaps/captions between meters).
+            self._meter_hits.append(
+                {
+                    "phase": phase,
+                    "cx": cx,
+                    "cy": cy,
+                    "radius": outer_r + stroke / 2.0,
+                }
+            )
+            if hovered:
+                outer_r *= 1.04
+                inner_r *= 1.04
+
+            wa = max(0.0, min(100.0, float(self._white.get(phase, 0.0))))
+            ba = max(0.0, min(100.0, float(self._black.get(phase, 0.0))))
+            delta = wa - ba
+
+            white_c = QColor(self.white_ring_color)
+            black_c = QColor(self.black_ring_color)
+            if dimmed:
+                white_c.setAlpha(90)
+                black_c.setAlpha(90)
+
+            track = QColor(self.grid_color)
+            track.setAlphaF(self.track_alpha * (0.45 if dimmed else 1.0))
+
+            self._draw_ring_arc(painter, cx, cy, outer_r, stroke, white_c, wa, track)
+            self._draw_ring_arc(painter, cx, cy, inner_r, stroke, black_c, ba, track)
+
+            # Center delta
+            sign = "+" if delta >= 0 else ""
+            delta_text = f"{sign}{delta:.0f}"
+            dcolor = QColor(self.white_ring_color if delta >= 0 else self.black_ring_color)
+            if dimmed:
+                dcolor.setAlpha(110)
+            painter.setFont(delta_font)
+            painter.setPen(dcolor)
+            dfm = QFontMetrics(delta_font)
+            painter.drawText(
+                QRectF(cx - 40, cy - dfm.height() / 2.0 - 2, 80, dfm.height() + 4),
+                int(Qt.AlignmentFlag.AlignCenter),
+                delta_text,
+            )
+            painter.setFont(small)
+            muted = QColor(self.text_color)
+            muted.setAlpha(160 if not dimmed else 90)
+            painter.setPen(muted)
+            painter.drawText(
+                QRectF(cx - 40, cy + dfm.height() / 2.0 - 2, 80, sfm.height() + 2),
+                int(Qt.AlignmentFlag.AlignCenter),
+                "pp",
+            )
+
+            # Captions under meter
+            label_color = QColor(self.text_color)
+            if dimmed:
+                label_color.setAlpha(120)
+            caption_y = body_top + body_h + 2
+            painter.setFont(font)
+            painter.setPen(label_color)
+            painter.drawText(
+                QRectF(cell_x, caption_y, cell_w, fm.height()),
+                int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop),
+                phase,
+            )
+            if self.show_value_labels:
+                painter.setFont(small)
+                painter.setPen(muted)
+                painter.drawText(
+                    QRectF(cell_x, caption_y + fm.height(), cell_w, sfm.height() + 2),
+                    int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop),
+                    f"{self._white_label[0]} {wa:.0f}%  ·  {self._black_label[0]} {ba:.0f}%",
+                )
+
 
 class PieChartWidget(QWidget):
     """Widget for displaying a pie chart."""
@@ -2365,6 +2651,35 @@ class DetailSummaryView(QWidget):
             self.content_layout.addSpacing(max(6, int(player_spacing)))
         else:
             self.accuracy_curve = None
+
+        # Grouped White/Black accuracy bars by phase (between curve and tables)
+        bar_cfg = summary_config.get("phase_accuracy_bar_chart", {})
+        can_show_phase_bars = (
+            bool(bar_cfg.get("enabled", True))
+            and self.current_summary is not None
+            and self.current_summary.white_opening
+            and self.current_summary.white_middlegame
+            and self.current_summary.white_endgame
+            and self.current_summary.black_opening
+            and self.current_summary.black_middlegame
+            and self.current_summary.black_endgame
+        )
+        if can_show_phase_bars:
+            phase_bars = PhaseAccuracyBarChartWidget(self.config)
+            phase_bars.set_data(
+                {
+                    "Opening": float(self.current_summary.white_opening.accuracy or 0.0),
+                    "Middlegame": float(self.current_summary.white_middlegame.accuracy or 0.0),
+                    "Endgame": float(self.current_summary.white_endgame.accuracy or 0.0),
+                },
+                {
+                    "Opening": float(self.current_summary.black_opening.accuracy or 0.0),
+                    "Middlegame": float(self.current_summary.black_middlegame.accuracy or 0.0),
+                    "Endgame": float(self.current_summary.black_endgame.accuracy or 0.0),
+                },
+            )
+            self.content_layout.addWidget(phase_bars)
+            self.content_layout.addSpacing(max(6, int(player_spacing)))
 
         phase_layout = QHBoxLayout()
         phase_layout.setSpacing(player_spacing)

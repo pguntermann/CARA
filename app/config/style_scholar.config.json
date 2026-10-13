@@ -1717,6 +1717,49 @@
             "current_move_line_width": 2,
             "hover_circle_radius": 6
           },
+          "phase_accuracy_bar_chart": {
+            "enabled": true,
+            "height": 176,
+            "background_color": {
+              "$ref": "$_COLOR_WHEAT_CREAM"
+            },
+            "grid_color": {
+              "$ref": "$_COLOR_GRID_PUTTY"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_COCOA_BROWN"
+            },
+            "white_bar_color": {
+              "$ref": "$_COLOR_DEEP_TEAL"
+            },
+            "black_bar_color": [
+              170,
+              95,
+              85
+            ],
+            "padding": [
+              16,
+              8,
+              16,
+              8
+            ],
+            "meter_spacing": 14,
+            "ring_stroke": 7,
+            "ring_gap": 5,
+            "track_alpha": 0.2,
+            "delta_font_size": 13,
+            "show_legend": false,
+            "show_value_labels": true,
+            "font_family": {
+              "$ref": "$_FONT_FAMILY_PRIMARY"
+            },
+            "font_size": {
+              "$ref": "$_FONT_SIZE_BASE_SMALL"
+            },
+            "min_font_size": 8,
+            "white_legend_label": "White",
+            "black_legend_label": "Black"
+          },
           "colors": {
             "book_move": {
               "$ref": "$_COLOR_TAG_SLATE"
