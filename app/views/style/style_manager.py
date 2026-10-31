@@ -136,7 +136,8 @@ class StyleManager:
         font_size: float,
         bg_color: List[int],
         border_color: List[int],
-        checkmark_path: Path
+        checkmark_path: Path,
+        font_weight: int | None = None,
     ) -> None:
         """Apply checkbox styling to a list of checkboxes.
         
@@ -152,7 +153,7 @@ class StyleManager:
         """
         apply_checkbox_styling(
             checkboxes, config, text_color, font_family, font_size,
-            bg_color, border_color, checkmark_path
+            bg_color, border_color, checkmark_path, font_weight=font_weight,
         )
     
     @staticmethod

@@ -8,9 +8,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import Qt, QPoint, QSize, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import (
+    QAction,
     QColor,
     QFont,
     QFontMetrics,
+    QIcon,
     QMouseEvent,
     QPalette,
     QShowEvent,
@@ -38,6 +40,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app.controllers.regex_editor_controller import RegexEditorController
 from app.controllers.bulk_operations_controller import (
     MODE_ADD_TAG,
     MODE_CLEAN,
@@ -69,7 +72,10 @@ from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.external_open import open_user_manual
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 from app.utils.path_resolver import get_app_resource_path
-from app.utils.themed_icon import SVG_MENU_INFO, themed_icon_from_svg
+from app.utils.themed_icon import SVG_MENU_INFO, SVG_REGEX, themed_icon_from_svg
+from app.views.dialogs.regex_editor_dialog import edit_regex
+from app.views.style.line_edit import generate_line_edit_stylesheet
+from app.views.widgets.regex_syntax import RegexPatternLine, regex_token_colors
 from app.views.delegates.combobox_separator_delegate import (
     apply_combobox_separator_delegate,
 )
@@ -427,6 +433,10 @@ class _OperationEditorOverlay(QWidget):
         self.mode_spacing = int(overlay_cfg.get("mode_spacing", 22))
         self.buttons_top_spacing = int(overlay_cfg.get("buttons_top_spacing", 8))
         self.label_min_width = int(overlay_cfg.get("label_min_width", 88))
+        regex_option = overlay_cfg.get("regex_option", {})
+        if not isinstance(regex_option, dict):
+            regex_option = {}
+        self.regex_option_font_weight = int(regex_option.get("font_weight", 700))
 
         labels_config = dialog_config.get("labels", {})
         self.label_font_family = resolve_font_family(labels_config.get("font_family", "Helvetica Neue"))
@@ -522,10 +532,17 @@ class _OperationEditorOverlay(QWidget):
         self._source_row = self._make_field_row(self.source_label, self.source_combo)
 
         self.find_label = QLabel("Find")
-        self.find_input = QLineEdit()
+        self._pattern_classifier = RegexEditorController(
+            self.config,
+            case_sensitive=False,
+            show_replace=False,
+            replacement="",
+        )
+        self.find_input = RegexPatternLine(regex_token_colors(self.config), self._pattern_classifier.classify)
         self.find_input.setPlaceholderText("Text to find")
         self.find_input.returnPressed.connect(self._on_save)
         self.find_input.textEdited.connect(self._on_find_replace_edited)
+        self._install_regex_editor_action()
         self._find_row = self._make_field_row(self.find_label, self.find_input)
 
         self.replace_label = QLabel("Replace")
@@ -554,11 +571,12 @@ class _OperationEditorOverlay(QWidget):
         options_layout = QHBoxLayout(options_wrap)
         options_layout.setContentsMargins(0, 0, 0, 0)
         options_layout.setSpacing(22)
-        self.case_check = QCheckBox("Case sensitive")
         self.regex_check = QCheckBox("Use regex")
+        self.regex_check.setToolTip("Match with a regular expression, and open the editor from the Find field.")
         self.regex_check.toggled.connect(self._on_regex_toggled)
-        options_layout.addWidget(self.case_check)
-        options_layout.addWidget(self.regex_check)
+        self.case_check = QCheckBox("Case sensitive")
+        options_layout.addWidget(self.regex_check, 0, Qt.AlignmentFlag.AlignVCenter)
+        options_layout.addWidget(self.case_check, 0, Qt.AlignmentFlag.AlignVCenter)
         options_layout.addStretch(1)
         self._options_row = self._make_field_row(self.options_label, options_wrap)
 
@@ -756,8 +774,49 @@ class _OperationEditorOverlay(QWidget):
         if not checked:
             self._reset_regex_preset_to_custom()
         self._update_find_replace_placeholders()
+        self._sync_regex_editor_action()
         if self._current_mode() == MODE_FIND_REPLACE:
             self._relayout_field_rows()
+
+    def _install_regex_editor_action(self) -> None:
+        dialogs = self.config.get("ui", {}).get("dialogs", {})
+        editor_cfg = dialogs.get("regex_editor", {})
+        if not isinstance(editor_cfg, dict):
+            editor_cfg = {}
+        action_cfg = editor_cfg.get("find_action", {})
+        icon_svg = str(action_cfg.get("icon_svg") or SVG_REGEX)
+        tint = action_cfg.get("icon_tint", [200, 200, 200])
+        if not isinstance(tint, (list, tuple)) or len(tint) < 3:
+            tint = [200, 200, 200]
+        px = max(1, int(action_cfg.get("icon_px", 16)))
+        source = themed_icon_from_svg(icon_svg, tint)
+        icon = QIcon()
+        icon.addPixmap(source.pixmap(px, px))
+        self._regex_edit_action = QAction(self.find_input)
+        self._regex_edit_action.setIcon(icon)
+        self._regex_edit_action.setToolTip(str(editor_cfg.get("open_tooltip", "")))
+        self._regex_edit_action.triggered.connect(self._open_regex_editor)
+        self._regex_edit_action.setVisible(False)
+        self.find_input.set_editor_action(self._regex_edit_action, px)
+
+    def _sync_regex_editor_action(self) -> None:
+        show = self.regex_check.isChecked() and self._current_mode() == MODE_FIND_REPLACE
+        self._regex_edit_action.setVisible(show)
+        self.find_input.set_highlighting(show)
+
+    def _open_regex_editor(self) -> None:
+        result = edit_regex(
+            self.config,
+            pattern=self.find_input.text(),
+            replacement=self.replace_input.text(),
+            case_sensitive=self.case_check.isChecked(),
+            parent=self,
+        )
+        if result is None:
+            return
+        self.find_input.setText(result.pattern)
+        self.replace_input.setText(result.replacement)
+        self._on_find_replace_edited()
 
     def _reset_regex_preset_to_custom(self) -> None:
         self._applying_regex_preset = True
@@ -1016,6 +1075,41 @@ class _OperationEditorOverlay(QWidget):
         self.hide()
         self.saved.emit((self._edit_index, operation))
 
+    def _style_find_field(self) -> None:
+        """Match the shared line-edit look. Padding is applied as viewport margins."""
+        line_edit = self.config.get("ui", {}).get("styles", {}).get("line_edit", {})
+        if not isinstance(line_edit, dict):
+            line_edit = {}
+        text_color = line_edit.get("text_color", [200, 200, 200])
+        bg_color = line_edit.get("background_color", [45, 45, 50])
+        border_color = line_edit.get("border_color", [60, 60, 65])
+        focus_border = line_edit.get("focus_border_color", [70, 90, 130])
+        family = resolve_font_family(str(line_edit.get("font_family", "Helvetica Neue")))
+        size = scale_font_size(line_edit.get("font_size", 11))
+        padding = line_edit.get("padding", [8, 4])
+        pad_h = int(padding[0]) if isinstance(padding, list) and padding else 8
+        border_width = int(line_edit.get("border_width", 1))
+        sheet = generate_line_edit_stylesheet(
+            self.config,
+            text_color,
+            family,
+            size,
+            bg_color,
+            border_color,
+            focus_border,
+            border_width=border_width,
+            border_radius=int(line_edit.get("border_radius", 3)),
+            padding=[0, 0],
+            hover_border_offset=int(line_edit.get("hover_border_offset", 20)),
+            disabled_brightness_factor=float(line_edit.get("disabled_brightness_factor", 0.5)),
+        ).replace("QLineEdit", "QPlainTextEdit#bulkFindPattern")
+        font = self.find_input.font()
+        font.setFamily(family)
+        font.setPointSizeF(float(size))
+        self.find_input.set_line_style(sheet, font)
+        self._find_pad_h = pad_h
+        self._find_border_width = border_width
+
     def _apply_styling(self) -> None:
         from app.views.style import StyleManager
 
@@ -1060,15 +1154,17 @@ class _OperationEditorOverlay(QWidget):
         padding = self.input_padding if isinstance(self.input_padding, list) and len(self.input_padding) == 2 else [8, 6]
 
         StyleManager.style_line_edits(
-            [self.find_input, self.replace_input],
+            [self.replace_input],
             self.config,
             font_family=self.input_font_family,
             font_size=self.input_font_size,
             bg_color=bg,
             padding=padding,
         )
+        self._style_find_field()
         for edit in (self.find_input, self.replace_input):
             edit.setFixedHeight(self.input_min_height)
+        self.find_input.set_line_metrics(pad_h=self._find_pad_h, border_width=self._find_border_width)
 
         StyleManager.style_comboboxes(
             [self.mode_combo, self.source_combo, self.value_source_combo, self.preset_combo],
@@ -1159,7 +1255,6 @@ class _OperationEditorOverlay(QWidget):
         StyleManager.style_checkboxes(
             [
                 self.case_check,
-                self.regex_check,
                 self.clean_comments_check,
                 self.clean_variations_check,
                 self.clean_nonstd_check,
@@ -1177,12 +1272,27 @@ class _OperationEditorOverlay(QWidget):
             border,
             get_app_resource_path("app/resources/icons/checkmark.svg"),
         )
+        StyleManager.style_checkboxes(
+            [self.regex_check],
+            self.config,
+            [
+                self.label_text_color.red(),
+                self.label_text_color.green(),
+                self.label_text_color.blue(),
+            ],
+            self.label_font_family,
+            self.label_font_size,
+            bg,
+            border,
+            get_app_resource_path("app/resources/icons/checkmark.svg"),
+            font_weight=self.regex_option_font_weight,
+        )
         self._lock_card_height_to_full_form()
         self._on_mode_changed()
         QWidget.setTabOrder(self.mode_combo, self.tags_picker_btn)
-        QWidget.setTabOrder(self.tags_picker_btn, self.case_check)
-        QWidget.setTabOrder(self.case_check, self.regex_check)
-        QWidget.setTabOrder(self.regex_check, self.preset_combo)
+        QWidget.setTabOrder(self.tags_picker_btn, self.regex_check)
+        QWidget.setTabOrder(self.regex_check, self.case_check)
+        QWidget.setTabOrder(self.case_check, self.preset_combo)
         QWidget.setTabOrder(self.preset_combo, self.find_input)
         QWidget.setTabOrder(self.find_input, self.replace_input)
         QWidget.setTabOrder(self.replace_input, self.cancel_btn)

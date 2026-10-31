@@ -5150,6 +5150,162 @@
           "top_offset": 0
         }
       },
+      "regex_editor": {
+        "width": 640,
+        "minimum_width": 640,
+        "minimum_height": 480,
+        "background_color": { "$ref": "$_COLOR_PAPYRUS_PANEL" },
+        "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
+        "text_color": { "$ref": "$_COLOR_COCOA_BROWN" },
+        "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+        "font_family": { "$ref": "$_FONT_FAMILY_PRIMARY" },
+        "bottom_button_top_padding": 12,
+        "border_width": 1,
+        "layout": {
+          "margins": [24, 20, 24, 20],
+          "spacing": 8
+        },
+        "labels": {
+          "font_family": { "$ref": "$_FONT_FAMILY_PRIMARY" },
+          "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "text_color": { "$ref": "$_COLOR_COCOA_BROWN" }
+        },
+        "status": {
+          "font_size": { "$ref": "$_FONT_SIZE_BASE_SMALL" },
+          "error_color": [148, 42, 36],
+          "note_color": { "$ref": "$_COLOR_COCOA_BROWN" }
+        },
+        "pattern": {
+          "min_height": 52,
+          "font_family": { "$ref": "$_FONT_FAMILY_MONO" },
+          "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "background_color": { "$ref": "$_COLOR_WHEAT_CREAM" },
+          "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
+          "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
+          "focus_border_color": { "$ref": "$_COLOR_DEEP_TEAL" },
+          "border_radius": 3,
+          "padding": [8, 6],
+          "selection_background_color": { "$ref": "$_COLOR_SAGE_PAPER" },
+          "selection_text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+        },
+        "sample": {
+          "min_height": 64,
+          "font_family": { "$ref": "$_FONT_FAMILY_MONO" },
+          "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "background_color": { "$ref": "$_COLOR_WHEAT_CREAM" },
+          "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
+          "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
+          "focus_border_color": { "$ref": "$_COLOR_DEEP_TEAL" },
+          "border_radius": 3,
+          "padding": [8, 6],
+          "selection_background_color": { "$ref": "$_COLOR_SAGE_PAPER" },
+          "selection_text_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
+          "match_background_color": { "$ref": "$_COLOR_SAGE_PAPER" },
+          "match_text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+        },
+        "library_buttons": {
+          "size": 30,
+          "icon_px": 18,
+          "icon_tint": { "$ref": "$_COLOR_COCOA_BROWN" },
+          "blocks_icon_svg": "app/resources/icons/regex.svg",
+          "examples_icon_svg": "app/resources/icons/menu_book.svg",
+          "save_icon_svg": "app/resources/icons/save_database.svg",
+          "load_icon_svg": "app/resources/icons/folder_open.svg",
+          "separator_width": 1,
+          "separator_margin": [6, 4, 6, 4]
+        },
+        "blocks_menu": {
+          "code_gap": 14
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" }
+        },
+        "find_action": {
+          "icon_svg": "app/resources/icons/regex.svg",
+          "icon_px": 16,
+          "icon_tint": { "$ref": "$_COLOR_COCOA_BROWN" }
+        },
+        "explain_style": {
+          "min_height": 168,
+          "padding": 8,
+          "spacing": 4,
+          "indent": 12,
+          "border_radius": 4,
+          "border_width": 1,
+          "background_color": { "$ref": "$_COLOR_PAPYRUS_WHITE" },
+          "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
+          "token_min_width": 36,
+          "token_font_family": { "$ref": "$_FONT_FAMILY_MONO" },
+          "token_font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "text_font_family": { "$ref": "$_FONT_FAMILY_PRIMARY" },
+          "text_font_size": { "$ref": "$_FONT_SIZE_BASE_SMALL" },
+          "kinds": {
+            "group": {
+              "background_color": { "$ref": "$_COLOR_SAGE_PAPER" },
+              "border_color": { "$ref": "$_COLOR_DEEP_TEAL" },
+              "token_color": { "$ref": "$_COLOR_DEEP_TEAL" },
+              "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+            },
+            "set": {
+              "background_color": [244, 232, 196],
+              "border_color": [176, 132, 64],
+              "token_color": [120, 78, 24],
+              "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+            },
+            "range": {
+              "background_color": { "$ref": "$_COLOR_PARCHMENT_WHITE" },
+              "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
+              "token_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
+              "text_color": { "$ref": "$_COLOR_COCOA_BROWN" }
+            },
+            "escape": {
+              "background_color": { "$ref": "$_COLOR_WHEAT_CREAM" },
+              "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
+              "token_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
+              "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+            },
+            "quantifier": {
+              "background_color": [226, 236, 232],
+              "border_color": { "$ref": "$_COLOR_DEEP_TEAL" },
+              "token_color": { "$ref": "$_COLOR_DEEP_TEAL" },
+              "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+            },
+            "anchor": {
+              "background_color": [236, 226, 220],
+              "border_color": [122, 62, 78],
+              "token_color": [122, 62, 78],
+              "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+            },
+            "literal": {
+              "background_color": { "$ref": "$_COLOR_PARCHMENT_WHITE" },
+              "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
+              "token_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
+              "text_color": { "$ref": "$_COLOR_COCOA_BROWN" }
+            },
+            "alternation": {
+              "background_color": [244, 232, 196],
+              "border_color": [176, 132, 64],
+              "token_color": [120, 78, 24],
+              "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+            },
+            "any": {
+              "background_color": { "$ref": "$_COLOR_WHEAT_CREAM" },
+              "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
+              "token_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
+              "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+            },
+            "error": {
+              "background_color": [244, 220, 214],
+              "border_color": [148, 42, 36],
+              "token_color": [148, 42, 36],
+              "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" }
+            }
+          }
+        }
+      },
       "bulk_operations": {
         "width": 640,
         "scroll_area_height": 150,
@@ -5327,7 +5483,10 @@
           "form_horizontal_spacing": 16,
           "mode_spacing": 22,
           "buttons_top_spacing": 8,
-          "label_min_width": 88
+          "label_min_width": 88,
+          "regex_option": {
+            "font_weight": 700
+          }
         },
 
                         "progress": {

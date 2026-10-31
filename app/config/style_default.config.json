@@ -5261,6 +5261,162 @@
           "top_offset": 0
         }
       },
+      "regex_editor": {
+        "width": 640,
+        "minimum_width": 640,
+        "minimum_height": 480,
+        "background_color": { "$ref": "$_COLOR_BACKGROUND_PRIMARY" },
+        "border_color": { "$ref": "$_COLOR_BUTTON_BORDER" },
+        "text_color": { "$ref": "$_COLOR_TEXT_SECONDARY" },
+        "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+        "font_family": { "$ref": "$_FONT_FAMILY_PRIMARY" },
+        "bottom_button_top_padding": 12,
+        "border_width": 1,
+        "layout": {
+          "margins": [24, 20, 24, 20],
+          "spacing": 8
+        },
+        "labels": {
+          "font_family": { "$ref": "$_FONT_FAMILY_PRIMARY" },
+          "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "text_color": { "$ref": "$_COLOR_TEXT_SECONDARY" }
+        },
+        "status": {
+          "font_size": { "$ref": "$_FONT_SIZE_BASE_SMALL" },
+          "error_color": [232, 104, 104],
+          "note_color": { "$ref": "$_COLOR_TEXT_SECONDARY" }
+        },
+        "pattern": {
+          "min_height": 52,
+          "font_family": { "$ref": "$_FONT_FAMILY_MONO" },
+          "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "background_color": { "$ref": "$_COLOR_BACKGROUND_SECONDARY" },
+          "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" },
+          "border_color": { "$ref": "$_COLOR_BUTTON_BORDER" },
+          "focus_border_color": { "$ref": "$_COLOR_INPUT_FOCUS_BORDER" },
+          "border_radius": 3,
+          "padding": [8, 6],
+          "selection_background_color": { "$ref": "$_COLOR_BACKGROUND_ACTIVE" },
+          "selection_text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+        },
+        "sample": {
+          "min_height": 64,
+          "font_family": { "$ref": "$_FONT_FAMILY_MONO" },
+          "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "background_color": { "$ref": "$_COLOR_BACKGROUND_SECONDARY" },
+          "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" },
+          "border_color": { "$ref": "$_COLOR_BUTTON_BORDER" },
+          "focus_border_color": { "$ref": "$_COLOR_INPUT_FOCUS_BORDER" },
+          "border_radius": 3,
+          "padding": [8, 6],
+          "selection_background_color": { "$ref": "$_COLOR_BACKGROUND_ACTIVE" },
+          "selection_text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" },
+          "match_background_color": [48, 96, 68],
+          "match_text_color": [232, 244, 232]
+        },
+        "library_buttons": {
+          "size": 30,
+          "icon_px": 18,
+          "icon_tint": { "$ref": "$_COLOR_TEXT_SECONDARY" },
+          "blocks_icon_svg": "app/resources/icons/regex.svg",
+          "examples_icon_svg": "app/resources/icons/menu_book.svg",
+          "save_icon_svg": "app/resources/icons/save_database.svg",
+          "load_icon_svg": "app/resources/icons/folder_open.svg",
+          "separator_width": 1,
+          "separator_margin": [6, 4, 6, 4]
+        },
+        "blocks_menu": {
+          "code_gap": 14
+        },
+        "buttons": {
+          "spacing": 10,
+          "width": 120,
+          "height": 30,
+          "border_color": { "$ref": "$_COLOR_BUTTON_BORDER" }
+        },
+        "find_action": {
+          "icon_svg": "app/resources/icons/regex.svg",
+          "icon_px": 16,
+          "icon_tint": { "$ref": "$_COLOR_TEXT_SECONDARY" }
+        },
+        "explain_style": {
+          "min_height": 168,
+          "padding": 8,
+          "spacing": 4,
+          "indent": 12,
+          "border_radius": 4,
+          "border_width": 1,
+          "background_color": { "$ref": "$_COLOR_BACKGROUND_SECONDARY" },
+          "border_color": { "$ref": "$_COLOR_BUTTON_BORDER" },
+          "token_min_width": 36,
+          "token_font_family": { "$ref": "$_FONT_FAMILY_MONO" },
+          "token_font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
+          "text_font_family": { "$ref": "$_FONT_FAMILY_PRIMARY" },
+          "text_font_size": { "$ref": "$_FONT_SIZE_BASE_SMALL" },
+          "kinds": {
+            "group": {
+              "background_color": [28, 58, 42],
+              "border_color": [90, 170, 110],
+              "token_color": [170, 230, 180],
+              "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+            },
+            "set": {
+              "background_color": [70, 58, 24],
+              "border_color": [210, 170, 70],
+              "token_color": [240, 210, 120],
+              "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+            },
+            "range": {
+              "background_color": [48, 48, 52],
+              "border_color": [120, 120, 128],
+              "token_color": { "$ref": "$_COLOR_TEXT_PRIMARY" },
+              "text_color": { "$ref": "$_COLOR_TEXT_SECONDARY" }
+            },
+            "escape": {
+              "background_color": [42, 46, 52],
+              "border_color": [110, 120, 140],
+              "token_color": [170, 200, 230],
+              "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+            },
+            "quantifier": {
+              "background_color": [28, 48, 72],
+              "border_color": [90, 150, 210],
+              "token_color": [160, 200, 245],
+              "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+            },
+            "anchor": {
+              "background_color": [52, 36, 64],
+              "border_color": [170, 120, 190],
+              "token_color": [220, 180, 235],
+              "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+            },
+            "literal": {
+              "background_color": [40, 40, 44],
+              "border_color": [100, 100, 108],
+              "token_color": { "$ref": "$_COLOR_TEXT_PRIMARY" },
+              "text_color": { "$ref": "$_COLOR_TEXT_SECONDARY" }
+            },
+            "alternation": {
+              "background_color": [64, 46, 24],
+              "border_color": [200, 140, 60],
+              "token_color": [240, 190, 120],
+              "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+            },
+            "any": {
+              "background_color": [42, 46, 52],
+              "border_color": [110, 120, 140],
+              "token_color": [170, 200, 230],
+              "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+            },
+            "error": {
+              "background_color": [72, 32, 32],
+              "border_color": [200, 90, 90],
+              "token_color": [255, 180, 180],
+              "text_color": { "$ref": "$_COLOR_TEXT_PRIMARY" }
+            }
+          }
+        }
+      },
       "bulk_operations": {
         "width": 640,
         "scroll_area_height": 150,
@@ -5438,7 +5594,10 @@
           "form_horizontal_spacing": 16,
           "mode_spacing": 22,
           "buttons_top_spacing": 8,
-          "label_min_width": 88
+          "label_min_width": 88,
+          "regex_option": {
+            "font_weight": 700
+          }
         },
 
                         "progress": {
