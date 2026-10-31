@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QToolButton,
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QColor, QPalette, QFocusEvent
+from PyQt6.QtGui import QColor, QFont, QPalette, QFocusEvent
 from typing import Dict, Any, List, Optional, Set
 
 from app.models.column_profile_model import (
@@ -1214,6 +1214,18 @@ class MovesListProfileSetupDialog(QDialog):
         table_border_radius = table_config.get('border_radius', 3)
         table_header_bg = table_config.get('header_background_color', [45, 45, 50])
         table_header_text = table_config.get('header_text_color', [200, 200, 200])
+        table_header_font_size = scale_font_size(
+            table_config.get('header_font_size', font_size)
+        )
+        table_selection_bg = table_config.get(
+            'selection_background_color',
+            [
+                bg_color[0] + button_bg_offset,
+                bg_color[1] + button_bg_offset,
+                bg_color[2] + button_bg_offset,
+            ],
+        )
+        table_selection_text = table_config.get('selection_text_color', table_text_color)
         table_item_padding = table_config.get('item_padding', 5)
         table_header_padding = table_config.get('header_padding', 5)
         _hb = table_config.get('header_section_border', True)
@@ -1235,19 +1247,24 @@ class MovesListProfileSetupDialog(QDialog):
             f"border-radius: {table_border_radius}px;"
             f"font-size: {font_size}pt;"
             f"gridline-color: rgb({table_border_color[0]}, {table_border_color[1]}, {table_border_color[2]});"
+            f"outline: none;"
             f"}}"
             f"QTableWidget::item {{"
             f"padding: {table_item_padding}px;"
+            f"border: none;"
+            f"outline: none;"
             f"}}"
             f"QTableWidget::item:selected {{"
-            f"background-color: rgb({bg_color[0] + button_bg_offset}, {bg_color[1] + button_bg_offset}, {bg_color[2] + button_bg_offset});"
+            f"background-color: rgb({table_selection_bg[0]}, {table_selection_bg[1]}, {table_selection_bg[2]});"
+            f"color: rgb({table_selection_text[0]}, {table_selection_text[1]}, {table_selection_text[2]});"
             f"}}"
             f"QHeaderView::section {{"
             f"background-color: rgb({table_header_bg[0]}, {table_header_bg[1]}, {table_header_bg[2]});"
             f"color: rgb({table_header_text[0]}, {table_header_text[1]}, {table_header_text[2]});"
             f"{header_border_qss}"
             f"padding: {table_header_padding}px;"
-            f"font-size: {font_size}pt;"
+            f"font-size: {table_header_font_size}pt;"
+            f"font-weight: 500;"
             f"}}"
         )
         
@@ -1277,6 +1294,11 @@ class MovesListProfileSetupDialog(QDialog):
         # Set palette on table header to prevent macOS override
         header = self.visible_table.horizontalHeader()
         if header:
+            from app.utils.font_utils import resolve_font_family
+            header_font_family = resolve_font_family(
+                dialog_config.get('labels', {}).get('font_family', 'Helvetica Neue')
+            )
+            header.setFont(QFont(header_font_family, int(table_header_font_size)))
             header_palette = header.palette()
             header_palette.setColor(header.backgroundRole(), QColor(*table_header_bg))
             header_palette.setColor(header.foregroundRole(), QColor(*table_header_text))

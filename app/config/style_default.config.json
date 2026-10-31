@@ -4558,6 +4558,9 @@
           "header_text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
           },
@@ -6946,6 +6949,9 @@
           "header_text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
           },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
           },
@@ -7090,6 +7096,9 @@
           },
           "header_text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "selection_background_color": {
             "$ref": "$_COLOR_BACKGROUND_ACTIVE"
@@ -7808,6 +7817,15 @@
           },
           "header_text_color": {
             "$ref": "$_COLOR_TEXT_SECONDARY"
+          },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_BACKGROUND_ACTIVE"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
           },
           "item_padding": 5,
           "header_padding": 5,

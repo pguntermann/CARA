@@ -4457,6 +4457,9 @@
           "header_text_color": {
             "$ref": "$_COLOR_COCOA_BROWN"
           },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
           "selection_background_color": {
             "$ref": "$_COLOR_APRICOT_SELECTION"
           },
@@ -6835,6 +6838,9 @@
           "header_text_color": {
             "$ref": "$_COLOR_COCOA_BROWN"
           },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
           "selection_background_color": {
             "$ref": "$_COLOR_APRICOT_SELECTION"
           },
@@ -6979,6 +6985,9 @@
           },
           "header_text_color": {
             "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
           },
           "selection_background_color": {
             "$ref": "$_COLOR_APRICOT_SELECTION"
@@ -7693,6 +7702,15 @@
           },
           "header_text_color": {
             "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "header_font_size": {
+            "$ref": "$_FONT_SIZE_BASE_SMALL"
+          },
+          "selection_background_color": {
+            "$ref": "$_COLOR_APRICOT_SELECTION"
+          },
+          "selection_text_color": {
+            "$ref": "$_COLOR_INK_BODY"
           },
           "item_padding": 5,
           "header_padding": 5,

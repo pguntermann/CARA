@@ -35,6 +35,15 @@ class TestSearchCriteriaRegex(unittest.TestCase):
         cls._qt = _app()
         cls.config = ConfigLoader().load()
 
+    def test_value_input_height_matches_dropdowns(self) -> None:
+        parent = QWidget()
+        row = CriteriaRowWidget(self.config, parent=parent)
+        row.show()
+        _app().processEvents()
+        self.assertEqual(row.value_input.height(), row.field_combo.height())
+        self.assertEqual(row.value_input.height(), row.operator_combo.height())
+        parent.close()
+
     def test_operator_is_offered_on_text_fields_only(self) -> None:
         parent = QWidget()
         row = CriteriaRowWidget(self.config, parent=parent)

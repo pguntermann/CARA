@@ -715,35 +715,42 @@ class CriteriaRowWidget(QWidget):
         )
         self._style_regex_value()
         
-        # Set Remove button height to match input field height
-        # Use the smallest non-zero input height so the icon button never ends up taller
-        # than the other controls in the row (Qt style differences can make buttons taller).
-        for w in (self.field_combo, self.operator_combo, self.value_input, self.position_input):
+        # Lock every control in the row to the dropdown height so text inputs
+        # and comboboxes stay aligned (Windows especially can size them differently).
+        for w in (
+            self.field_combo,
+            self.operator_combo,
+            self.logic_combo,
+            self.value_input,
+            self.position_input,
+            self.custom_tag_input,
+        ):
             try:
                 w.updateGeometry()
             except Exception:
                 pass
-        height_candidates = [
+        combo_heights = [
             int(self.field_combo.sizeHint().height() or 0),
             int(self.operator_combo.sizeHint().height() or 0),
-            int(self.value_input.sizeHint().height() or 0),
+            int(self.logic_combo.sizeHint().height() or 0),
         ]
-        if self.position_input.isVisible():
-            height_candidates.append(int(self.position_input.sizeHint().height() or 0))
-        target_h = min([h for h in height_candidates if h > 0], default=0)
+        target_h = max([h for h in combo_heights if h > 0], default=0)
         if target_h <= 0:
-            # Fallback: calculate from font metrics
             from PyQt6.QtGui import QFontMetrics, QFont
-            font = QFont(self.input_font_family, self.input_font_size)
+            font = QFont(self.input_font_family, int(self.input_font_size))
             fm = QFontMetrics(font)
-            text_height = fm.height()
-            target_h = text_height + (self.input_padding[1] * 2) + 2
+            pad_v = self.input_padding[1] if isinstance(self.input_padding, list) and len(self.input_padding) > 1 else 4
+            target_h = fm.height() + (int(pad_v) * 2) + 2
 
-        self.remove_btn.setFixedSize(int(target_h), int(target_h))
-        self.tags_picker_btn.setFixedHeight(int(target_h))
         if target_h > 0:
+            for combo in (self.field_combo, self.operator_combo, self.logic_combo):
+                combo.setFixedHeight(int(target_h))
             self.value_input.setFixedHeight(int(target_h))
             self.value_input.set_line_metrics(pad_h=self._regex_pad_h, border_width=self._regex_border_width)
+            self.position_input.setFixedHeight(int(target_h))
+            self.custom_tag_input.setFixedHeight(int(target_h))
+            self.remove_btn.setFixedSize(int(target_h), int(target_h))
+            self.tags_picker_btn.setFixedHeight(int(target_h))
 
     def _style_regex_value(self) -> None:
         """Match the shared line-edit look. Padding is applied as viewport margins."""
