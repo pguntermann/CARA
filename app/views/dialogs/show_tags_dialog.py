@@ -941,13 +941,24 @@ class ShowTagsDialog(QDialog):
             scroll.setMaximumHeight(max_h)
             root.addWidget(scroll)
 
-        # Button bar: [Export to PDF]  stretch  Cancel | Save
+        # Button bar: [Copy to clipboard] [Export to PDF]  stretch  Cancel | Save
         btn_row = QHBoxLayout()
+
+        has_rows = bool(self._rows_data)
+
+        self._copy_clipboard_btn = QPushButton("Copy to clipboard")
+        self._copy_clipboard_btn.setAutoDefault(False)
+        self._copy_clipboard_btn.setFixedHeight(self._button_height)
+        self._copy_clipboard_btn.setEnabled(has_rows)
+        self._copy_clipboard_btn.clicked.connect(self._on_copy_to_clipboard)
+        btn_row.addWidget(self._copy_clipboard_btn)
+
+        btn_row.addSpacing(6)
 
         self._export_pdf_btn = QPushButton("Export to PDF")
         self._export_pdf_btn.setAutoDefault(False)
         self._export_pdf_btn.setFixedHeight(self._button_height)
-        self._export_pdf_btn.setEnabled(bool(self._rows_data))
+        self._export_pdf_btn.setEnabled(has_rows)
         self._export_pdf_btn.clicked.connect(self._on_export_pdf)
         btn_row.addWidget(self._export_pdf_btn)
 
@@ -970,7 +981,7 @@ class ShowTagsDialog(QDialog):
         root.addLayout(btn_row)
 
         StyleManager.style_buttons(
-            [self._export_pdf_btn, self._cancel_btn, self._save_btn],
+            [self._copy_clipboard_btn, self._export_pdf_btn, self._cancel_btn, self._save_btn],
             self.config,
             self._bg_rgb,
             self._border_rgb,
@@ -1001,26 +1012,23 @@ class ShowTagsDialog(QDialog):
             self._controller.save_games(affected_games)
         self.accept()
 
-    def _on_export_pdf(self) -> None:
-        from pathlib import Path
-        from PyQt6.QtWidgets import QFileDialog
-        from app.services.chess_log_pdf_service import (
-            ChessLogPDFService,
-            default_chess_log_tags_pdf_filename,
-        )
-        suggested = default_chess_log_tags_pdf_filename()
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export to PDF", suggested, "PDF Files (*.pdf)"
-        )
-        if not path:
-            return
+    def _on_copy_to_clipboard(self) -> None:
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QMimeData
+        from app.services.chess_log_html_service import ChessLogHTMLService
+        tag_groups = self._build_tag_groups()
+        svc = ChessLogHTMLService(self.config)
+        mime = QMimeData()
+        mime.setHtml(svc.logged_moments_html(tag_groups))
+        mime.setText(svc.logged_moments_plain(tag_groups))
+        QApplication.clipboard().setMimeData(mime)
 
-        # Group row widgets by game, preserving display order.
+    def _build_tag_groups(self):
+        """Build game-grouped TagRowSnapshot lists from current widget state."""
         tag_groups = []
         current_game = None
         current_rows = []
-        current_header: Optional[str] = None
-
+        current_header = None
         for i, row_widget in enumerate(self._row_widgets):
             game = self._row_games[i]
             if game is not current_game:
@@ -1035,8 +1043,22 @@ class ShowTagsDialog(QDialog):
                 moves = getattr(game, "moves", 0) or 0
                 current_header = f"{white} - {black} {result} ({date} - {moves} moves)"
             current_rows.append(row_widget.snapshot())
-
         if current_rows:
             tag_groups.append({"header": current_header, "rows": current_rows})
+        return tag_groups
 
-        ChessLogPDFService(self.config).export_tags(Path(path), tag_groups)
+    def _on_export_pdf(self) -> None:
+        from pathlib import Path
+        from PyQt6.QtWidgets import QFileDialog
+        from app.services.chess_log_pdf_service import (
+            ChessLogPDFService,
+            default_chess_log_tags_pdf_filename,
+        )
+        suggested = default_chess_log_tags_pdf_filename()
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export to PDF", suggested, "PDF Files (*.pdf)"
+        )
+        if not path:
+            return
+
+        ChessLogPDFService(self.config).export_tags(Path(path), self._build_tag_groups())
