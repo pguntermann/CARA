@@ -229,12 +229,88 @@
             height: 22px;
         }
         
+        /* Fixed chip: current top-level chapter (color matches section markers) */
+        .chapter-chip {
+            --chapter-color: #3498db;
+            position: fixed;
+            bottom: 28px;
+            left: 28px;
+            z-index: 1000;
+            max-width: min(320px, calc(100vw - 100px));
+            height: 46px;
+            padding: 0 14px 0 12px;
+            border: 1px solid rgb(80, 80, 90);
+            border-left: 4px solid var(--chapter-color);
+            border-radius: 23px;
+            background-color: rgb(55, 55, 60);
+            color: rgb(230, 230, 230);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+            font-family: inherit;
+            font-size: 0.92em;
+            font-weight: 600;
+            line-height: 1.2;
+            text-align: left;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translateY(8px);
+            transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease,
+                background-color 0.15s, border-color 0.15s, color 0.15s;
+        }
+        
+        .chapter-chip.chapter-chip--visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+        
+        .chapter-chip:hover {
+            background-color: rgb(65, 65, 70);
+            border-color: rgb(100, 100, 110);
+            border-left-color: var(--chapter-color);
+            color: rgb(250, 250, 250);
+        }
+        
+        .chapter-chip:focus-visible {
+            outline: 2px solid rgb(100, 150, 255);
+            outline-offset: 2px;
+        }
+        
+        .chapter-chip-swatch {
+            flex: 0 0 auto;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            background-color: var(--chapter-color);
+        }
+        
+        .chapter-chip-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .chapter-chip[data-section="introduction"] { --chapter-color: #3498db; }
+        .chapter-chip[data-section="attributions"] { --chapter-color: #8e44ad; }
+        .chapter-chip[data-section="installation"] { --chapter-color: #2ecc71; }
+        .chapter-chip[data-section="getting-started"] { --chapter-color: #e67e22; }
+        .chapter-chip[data-section="tasks"] { --chapter-color: #1abc9c; }
+        .chapter-chip[data-section="reference"] { --chapter-color: #e74c3c; }
+        .chapter-chip[data-section="advanced-topics"] { --chapter-color: #f1c40f; }
+        
         @media (prefers-reduced-motion: reduce) {
-            .toc-back-btn {
+            .toc-back-btn,
+            .chapter-chip {
                 transition: background-color 0.15s, border-color 0.15s, color 0.15s;
             }
             
-            .toc-back-btn.toc-back-btn--visible {
+            .toc-back-btn.toc-back-btn--visible,
+            .chapter-chip.chapter-chip--visible {
                 transform: none;
             }
         }
@@ -796,5 +872,14 @@
             .toc-back-btn-icon {
                 width: 20px;
                 height: 20px;
+            }
+            
+            .chapter-chip {
+                bottom: 18px;
+                left: 18px;
+                height: 42px;
+                padding: 0 12px 0 10px;
+                max-width: calc(100vw - 88px);
+                font-size: 0.85em;
             }
         }

@@ -3802,6 +3802,10 @@
             <p>For questions or inquiries, contact: <a href="mailto:pguntermann@me.com" style="color: rgb(100, 150, 255);">pguntermann@me.com</a></p>
         </footer>
     </div>
+    <button type="button" id="chapter-chip" class="chapter-chip" title="Current chapter" aria-label="Current chapter" aria-hidden="true" tabindex="-1">
+        <span class="chapter-chip-swatch" aria-hidden="true"></span>
+        <span class="chapter-chip-label"></span>
+    </button>
     <button type="button" id="toc-back-btn" class="toc-back-btn" title="Back to table of contents" aria-label="Back to table of contents" aria-hidden="true" tabindex="-1">
         <svg class="toc-back-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/></svg>
     </button>
@@ -3835,20 +3839,61 @@
         (function() {
             var tocNav = document.getElementById('toc-nav');
             var backBtn = document.getElementById('toc-back-btn');
+            var chapterChip = document.getElementById('chapter-chip');
+            var chapterLabel = chapterChip ? chapterChip.querySelector('.chapter-chip-label') : null;
             if (!tocNav || !backBtn) return;
+            var sections = Array.prototype.slice.call(document.querySelectorAll('.container > section[id]'));
             var reduceMotion = false;
+            var activeSection = null;
             try {
                 reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             } catch (e) {}
+            function setFloatingVisible(el, show, visibleClass) {
+                el.classList.toggle(visibleClass, show);
+                el.setAttribute('aria-hidden', show ? 'false' : 'true');
+                el.tabIndex = show ? 0 : -1;
+            }
+            function findActiveSection() {
+                var threshold = 120;
+                var current = sections[0] || null;
+                for (var i = 0; i < sections.length; i++) {
+                    if (sections[i].getBoundingClientRect().top <= threshold) {
+                        current = sections[i];
+                    } else {
+                        break;
+                    }
+                }
+                return current;
+            }
+            function syncChapterChip() {
+                if (!chapterChip || !chapterLabel || !sections.length) return;
+                var section = findActiveSection();
+                if (!section || section === activeSection) return;
+                activeSection = section;
+                var heading = section.querySelector('h2');
+                var title = heading ? heading.textContent.replace(/\s+/g, ' ').trim() : section.id;
+                chapterLabel.textContent = title;
+                chapterChip.setAttribute('data-section', section.id);
+                chapterChip.title = title;
+                chapterChip.setAttribute('aria-label', 'Current chapter: ' + title);
+            }
             function syncVisibility() {
                 var show = tocNav.getBoundingClientRect().bottom < 0;
-                backBtn.classList.toggle('toc-back-btn--visible', show);
-                backBtn.setAttribute('aria-hidden', show ? 'false' : 'true');
-                backBtn.tabIndex = show ? 0 : -1;
+                setFloatingVisible(backBtn, show, 'toc-back-btn--visible');
+                if (chapterChip) {
+                    setFloatingVisible(chapterChip, show, 'chapter-chip--visible');
+                    if (show) syncChapterChip();
+                }
             }
             backBtn.addEventListener('click', function() {
                 tocNav.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
             });
+            if (chapterChip) {
+                chapterChip.addEventListener('click', function() {
+                    if (!activeSection) return;
+                    activeSection.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+                });
+            }
             window.addEventListener('scroll', syncVisibility, { passive: true });
             window.addEventListener('resize', syncVisibility);
             syncVisibility();
