@@ -376,5 +376,123 @@ class TestShowShallowTagsDialogCopyButton(unittest.TestCase):
         self.assertNotIn("<h2>", plain)
 
 
+# ---------------------------------------------------------------------------
+# Test 5: Copy log — CLAMP chip lookup via real classifier parse step
+# ---------------------------------------------------------------------------
+
+@requires_qt
+class TestCopyLogShallowChipCLAMP(unittest.TestCase):
+    """Build shallow_keys the same way classify_notes() does, then verify
+    the Shallow chip appears on the flagged CLAMP moment and that an unflagged
+    game is not shown at all in the HTML output."""
+
+    def setUp(self):
+        from app.services.chess_log_shallow_service import _parse_verdicts
+
+        # Two games: only game1's moment is classified SHALLOW.
+        self._game1 = GameData(game_number=1, white="White1", black="Black1")
+        self._game2 = GameData(game_number=2, white="White2", black="Black2")
+
+        # Build shallow_keys through the real parse step (same as classify_notes).
+        notes = [(0, self._game1, "0", "CLAMP", "I attacked too early")]
+        parsed = _parse_verdicts("0: SHALLOW", len(notes))
+        shallow_keys = frozenset(
+            (notes[i][1], notes[i][2], notes[i][3], "")
+            for i, verdict in parsed.items()
+            if verdict == "SHALLOW"
+        )
+
+        chess_log_ctrl = MagicMock()
+        chess_log_ctrl.get_tags_for_game.side_effect = lambda g: (
+            {"0": [{"preset": "CLAMP", "cat": "C", "why": "I attacked too early"}]}
+            if g is self._game1
+            else {"0": [{"preset": "CLAMP", "cat": "M", "why": "I played too fast"}]}
+        )
+
+        self._view = DetailChessLogChartsView({})
+        ctrl = _make_charts_stub_controller()
+        ctrl.get_chess_log_controller.return_value = chess_log_ctrl
+        ctrl.resolve_games.return_value = [self._game1, self._game2]
+        self._view.set_controller(ctrl)
+        self._view._last_shallow_keys = shallow_keys
+        self._view._last_vague_keys = frozenset()
+
+    def test_shallow_chip_appears_for_flagged_clamp_moment(self):
+        self._view._copy_log_to_clipboard()
+        h = QApplication.clipboard().mimeData().html()
+        self.assertIn("#9a4400", h)
+
+    def test_unflagged_game_absent_from_output(self):
+        # game2 is not in shallow_keys → filtered out; its White player isn't shown
+        self._view._copy_log_to_clipboard()
+        h = QApplication.clipboard().mimeData().html()
+        self.assertNotIn("White2", h)
+
+
+# ---------------------------------------------------------------------------
+# Test 6: Copy log — 3x3 chip lookup via real classifier parse step
+# ---------------------------------------------------------------------------
+
+@requires_qt
+class TestCopyLogShallowChip3x3(unittest.TestCase):
+    """Build shallow_keys and vague_keys the same way classify_notes_3x3() does,
+    then verify Why2 gets the Shallow chip and Why4 gets the Vague chip."""
+
+    def setUp(self):
+        from app.services.chess_log_shallow_service import _parse_3x3_verdicts
+
+        self._game = GameData(game_number=1, white="W", black="B")
+
+        # Build shallow_keys and vague_keys through the real parse step.
+        notes = [(0, self._game, "0", "3x3",
+                  "I wanted a pawn", "I missed the fork", "Nf3 was better", "Calculate next time")]
+        reply = "0: WHY1=SPECIFIC WHY2=GENERIC WHY3=SPECIFIC LESSON=FILLER"
+        parsed = _parse_3x3_verdicts(reply, len(notes))
+
+        s_keys = []
+        v_keys = []
+        for i, (why1, why2, why3, lesson) in parsed.items():
+            game, pk = notes[i][1], notes[i][2]
+            for cat, verdict in (("Why1", why1), ("Why2", why2), ("Why3", why3)):
+                if verdict == "GENERIC":
+                    s_keys.append((game, pk, "3x3", cat))
+            if lesson == "FILLER":
+                v_keys.append((game, pk, "3x3", "Why4"))
+
+        chess_log_ctrl = MagicMock()
+        chess_log_ctrl.get_tags_for_game.return_value = {"0": [
+            {"preset": "3x3", "cat": "Why1", "why": "I wanted a pawn"},
+            {"preset": "3x3", "cat": "Why2", "why": "I missed the fork"},
+            {"preset": "3x3", "cat": "Why3", "why": "Nf3 was better"},
+            {"preset": "3x3", "cat": "Why4", "why": "Calculate next time"},
+        ]}
+
+        self._view = DetailChessLogChartsView({})
+        ctrl = _make_charts_stub_controller()
+        ctrl.get_chess_log_controller.return_value = chess_log_ctrl
+        ctrl.resolve_games.return_value = [self._game]
+        self._view.set_controller(ctrl)
+        self._view._last_shallow_keys = frozenset(s_keys)
+        self._view._last_vague_keys = frozenset(v_keys)
+
+    def test_shallow_chip_on_why2(self):
+        self._view._copy_log_to_clipboard()
+        h = QApplication.clipboard().mimeData().html()
+        self.assertIn("#9a4400", h)
+
+    def test_vague_chip_on_why4(self):
+        self._view._copy_log_to_clipboard()
+        h = QApplication.clipboard().mimeData().html()
+        self.assertIn("#1d4ed8", h)
+
+    def test_why1_not_shallow(self):
+        # Why1 is SPECIFIC → not in shallow_keys → no extra chip
+        self._view._copy_log_to_clipboard()
+        h = QApplication.clipboard().mimeData().html()
+        # Both chips are present overall; count chip spans: shallow chip for Why2,
+        # vague chip for Why4 — exactly two chip spans in total.
+        self.assertEqual(h.count("#9a4400"), 1, "Expected exactly one Shallow chip (Why2 only)")
+
+
 if __name__ == "__main__":
     unittest.main()
