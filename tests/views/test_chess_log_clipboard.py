@@ -196,7 +196,7 @@ class TestChartsCopyLog(unittest.TestCase):
     def test_html_has_h2_header(self):
         self._view._copy_log_to_clipboard()
         h = _get_clipboard_html()
-        self.assertIn("<h2>", h)
+        self.assertIn("<h2 ", h)
 
     def test_html_and_plain_text_differ(self):
         self._view._copy_log_to_clipboard()

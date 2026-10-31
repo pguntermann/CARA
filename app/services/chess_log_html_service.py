@@ -34,6 +34,16 @@ _CHIP_BASE_STYLE = (
 _SHALLOW_BG = "#9a4400"
 _VAGUE_BG = "#1d4ed8"
 
+# ---------------------------------------------------------------------------
+# Table styles — match PDF proportions ([20,40,40] for 3-col Tactical Breakdown)
+# ---------------------------------------------------------------------------
+_TABLE_STYLE = "table-layout:fixed;width:100%;border-collapse:collapse"
+_CELL_STYLE = (
+    "white-space:normal;overflow-wrap:break-word;word-wrap:break-word;"
+    "border:1px solid #888;padding:4px 8px"
+)
+_TABLE_3COL_PCT = [20, 40, 40]
+
 
 class ChessLogHTMLService:
     """Produces HTML and plain-text strings for Chess Log clipboard copy actions."""
@@ -74,7 +84,7 @@ class ChessLogHTMLService:
         ]
         if narrative_text:
             parts.append(_narrative_body_html(narrative_text))
-        return "".join(parts)
+        return _wrap_html_document("".join(parts))
 
     # ------------------------------------------------------------------
     # Public: Charts log
@@ -111,17 +121,17 @@ class ChessLogHTMLService:
         if check_log_groups:
             parts.append("<h2>Check Logs</h2>")
             parts.append(self._tag_groups_html(check_log_groups))
-        return "".join(parts)
+        return _wrap_html_document("".join(parts))
 
     # ------------------------------------------------------------------
     # Public: Show Logged Moments (ShowTagsDialog)
     # ------------------------------------------------------------------
 
     def logged_moments_html(self, tag_groups: List[Dict]) -> str:
-        return "".join([
+        return _wrap_html_document("".join([
             "<h2>Chess Log — Logged Moments</h2><hr>",
             self._tag_groups_html(tag_groups),
-        ])
+        ]))
 
     def logged_moments_plain(self, tag_groups: List[Dict]) -> str:
         lines = ["Chess Log — Logged Moments", ""]
@@ -144,7 +154,7 @@ class ChessLogHTMLService:
     ) -> str:
         parts = [self._check_logs_header_html(source_label, model_label, generated_at)]
         parts.append(self._tag_groups_html(tag_groups))
-        return "".join(parts)
+        return _wrap_html_document("".join(parts))
 
     def check_logs_plain(
         self,
@@ -419,7 +429,11 @@ def _split_narrative_blocks(md: str) -> List[Tuple[bool, str]]:
 
 
 def _gfm_table_to_html(table_text: str) -> str:
-    """Convert a GFM pipe table block to an HTML <table> element."""
+    """Convert a GFM pipe table block to an HTML <table> element.
+
+    Column widths match PDF defaults: 20/40/40 % for 3-column tables
+    (Skill / Observed Issue / Strategic Impact), equal split otherwise.
+    """
     lines = [ln for ln in table_text.strip().split("\n") if ln.strip()]
     if not lines:
         return ""
@@ -437,14 +451,30 @@ def _gfm_table_to_html(table_text: str) -> str:
         return bool(stripped) and all(c in "-:" for c in stripped)
 
     has_header = len(lines) >= 2 and _is_separator(lines[1])
+    header_cells = _parse_cells(lines[0]) if has_header else []
+    n_cols = len(header_cells) if has_header else max(
+        (len(_parse_cells(ln)) for ln in lines if not _is_separator(ln.replace("|", ""))),
+        default=1,
+    )
 
-    out: List[str] = ["<table>"]
+    if n_cols == 3:
+        col_pcts: List[int] = _TABLE_3COL_PCT
+    else:
+        each = round(100 / max(1, n_cols), 2)
+        col_pcts = [each] * n_cols
+
+    out: List[str] = [f'<table style="{_TABLE_STYLE}">']
+    out.append("<colgroup>")
+    for pct in col_pcts:
+        out.append(f'<col style="width:{pct}%">')
+    out.append("</colgroup>")
+
     if has_header:
         out.append("<thead><tr>")
-        for cell in _parse_cells(lines[0]):
-            out.append(
-                f'<th style="text-align:left;">{_table_cell_html(cell)}</th>'
-            )
+        for i, cell in enumerate(header_cells):
+            w = col_pcts[i] if i < len(col_pcts) else col_pcts[-1]
+            th_style = f"text-align:left;width:{w}%;{_CELL_STYLE}"
+            out.append(f'<th style="{th_style}">{_table_cell_html(cell)}</th>')
         out.append("</tr></thead>")
         data_lines = lines[2:]
     else:
@@ -456,16 +486,38 @@ def _gfm_table_to_html(table_text: str) -> str:
             continue
         out.append("<tr>")
         for cell in _parse_cells(line):
-            out.append(f"<td>{_table_cell_html(cell)}</td>")
+            out.append(f'<td style="{_CELL_STYLE}">{_table_cell_html(cell)}</td>')
         out.append("</tr>")
     out.append("</tbody></table>")
     return "".join(out)
 
 
 def _table_cell_html(cell: str) -> str:
-    """Escape HTML and handle **bold** inline in a table cell."""
+    """Escape HTML and handle **bold** inline in a table cell.
+
+    Non-breaking spaces (U+00A0) are replaced with regular spaces so the
+    browser can wrap long cell text.
+    """
+    cell = cell.replace("\xa0", " ")
     escaped = html.escape(cell, quote=False)
     return re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
+
+
+def _wrap_html_document(body: str) -> str:
+    """Wrap body HTML in a complete UTF-8 document, adding heading margins.
+
+    1. Adds margin-top:1.2em to bare <h2> and <h3> tags.
+    2. Encodes every non-ASCII character as a decimal numeric character
+       reference so the HTML is pure ASCII and safe regardless of the
+       receiver's assumed encoding.
+    3. Wraps in <!DOCTYPE html> with <meta charset="utf-8">.
+    """
+    body = re.sub(r"<(h[23])(>|\s)", r'<\1 style="margin-top:1.2em"\2', body)
+    body = body.encode("ascii", "xmlcharrefreplace").decode("ascii")
+    return (
+        '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
+        f"<body>{body}</body></html>"
+    )
 
 
 def _narrative_body_html(narrative_text: str) -> str:

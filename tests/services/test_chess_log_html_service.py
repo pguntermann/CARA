@@ -102,20 +102,29 @@ class TestEscaping(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestFigurinesAndDashes(unittest.TestCase):
-    def test_figurines_pass_through_in_note(self):
+    def test_figurines_encoded_as_ncr_in_html(self):
+        # ♘ (U+2658) must appear as the numeric character reference in HTML
         snap = _clamp_snap(why="Knight ♘ on f3")
         h = _svc().logged_moments_html(_groups([snap]))
-        self.assertIn("♘", h)
+        self.assertIn("&#9816;", h)
+        self.assertNotIn("♘", h)
 
-    def test_en_dash_passes_through(self):
+    def test_en_dash_encoded_as_ncr_in_html(self):
         snap = _clamp_snap(why="moves 10–20")
         h = _svc().logged_moments_html(_groups([snap]))
-        self.assertIn("–", h)
+        self.assertIn("&#8211;", h)
+        self.assertNotIn("–", h)
 
-    def test_em_dash_passes_through(self):
+    def test_em_dash_encoded_as_ncr_in_html(self):
         snap = _clamp_snap(why="idea — but")
         h = _svc().logged_moments_html(_groups([snap]))
-        self.assertIn("—", h)
+        self.assertIn("&#8212;", h)
+        self.assertNotIn("—", h)
+
+    def test_non_ascii_in_plain_text_is_real_character(self):
+        snap = _clamp_snap(why="Knight ♘ on f3")
+        plain = _svc().logged_moments_plain(_groups([snap]))
+        self.assertIn("♘", plain)
 
 # ---------------------------------------------------------------------------
 # 7: Blank 3x3 answers
@@ -235,7 +244,8 @@ class TestGameHeaderAndHr(unittest.TestCase):
         header = "Alice - Bob 1-0 (2026.01.01 - 30 moves)"
         groups = [{"header": header, "rows": [_clamp_snap()]}]
         h = _svc().logged_moments_html(groups)
-        self.assertIn(f"<h3>{header}</h3>", h)
+        self.assertIn(header, h)
+        self.assertIn("<h3 ", h)
 
     def test_no_hr_at_start(self):
         # logged_moments_html puts a report-header <hr> before any game group;
@@ -264,7 +274,7 @@ class TestGameHeaderAndHr(unittest.TestCase):
         # Multiple moments in one game: no <hr> after the first <h3>
         snaps = [_clamp_snap("1. e4"), _clamp_snap("3. Bb5")]
         h = _svc().logged_moments_html(_groups(snaps))
-        idx_h3 = h.index("<h3>")
+        idx_h3 = h.index("<h3 ")
         self.assertNotIn("<hr>", h[idx_h3:])
 
 # ---------------------------------------------------------------------------
@@ -320,9 +330,9 @@ class TestNarrativeTable(unittest.TestCase):
 
     def test_table_converted_to_html_table(self):
         h = _narrative_body_html(self._NARRATIVE)
-        self.assertIn("<table>", h)
-        self.assertIn("<th", h)
-        self.assertIn("<td>", h)
+        self.assertIn("<table ", h)
+        self.assertIn("<th ", h)
+        self.assertIn("<td ", h)
 
     def test_headers_become_h3_due_to_offset(self):
         h = _narrative_body_html(self._NARRATIVE)
@@ -337,7 +347,7 @@ class TestNarrativeTable(unittest.TestCase):
     def test_narrative_order_preserved(self):
         h = _narrative_body_html(self._NARRATIVE)
         idx_ul = h.index("<ul>")
-        idx_table = h.index("<table>")
+        idx_table = h.index("<table ")
         idx_takeaways = h.rindex("<h3")
         self.assertLess(idx_ul, idx_table)
         self.assertLess(idx_table, idx_takeaways)
@@ -372,7 +382,7 @@ class TestNarrativeHeaderLines(unittest.TestCase):
             generated_at="2026-10-31 14:22",
             model_label="claude-sonnet-4-6",
         )
-        self.assertIn("Chess Log — Narrative Summary", h)
+        self.assertIn("Chess Log &#8212; Narrative Summary", h)
         self.assertIn("Player: Paul", h)
         self.assertIn("Source: 62-game CLAMP", h)
         self.assertIn("62 games", h)
@@ -389,14 +399,14 @@ class TestNarrativeHeaderLines(unittest.TestCase):
             model_label="claude-haiku-4-5",
             generated_at="2026-10-31 10:00",
         )
-        self.assertIn("Chess Log — Check Logs", h)
+        self.assertIn("Chess Log &#8212; Check Logs", h)
         self.assertIn("Source: my-library", h)
         self.assertIn("AI model: claude-haiku-4-5", h)
         self.assertIn("Generated: 2026-10-31 10:00", h)
 
     def test_logged_moments_html_title(self):
         h = _svc().logged_moments_html(_groups([_clamp_snap()]))
-        self.assertIn("Chess Log — Logged Moments", h)
+        self.assertIn("Chess Log &#8212; Logged Moments", h)
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +489,7 @@ class TestGfmTableToHtml(unittest.TestCase):
 
     def test_has_table_tag(self):
         h = _gfm_table_to_html(self._TABLE)
-        self.assertIn("<table>", h)
+        self.assertIn("<table ", h)
         self.assertIn("</table>", h)
 
     def test_header_cells_as_th(self):
@@ -491,7 +501,7 @@ class TestGfmTableToHtml(unittest.TestCase):
 
     def test_data_cells_as_td(self):
         h = _gfm_table_to_html(self._TABLE)
-        self.assertIn("<td>", h)
+        self.assertIn("<td ", h)
         self.assertIn("Missing forks", h)
 
     def test_cell_content_escaped(self):
@@ -574,6 +584,134 @@ class TestGameHeaderText(unittest.TestCase):
         from app.models.database_model import GameData
         g = GameData(game_number=1, white=None, black=None, result=None, date=None, moves=None)
         self.assertEqual(game_header_text(g), self._old_fmt(g))
+
+
+# ---------------------------------------------------------------------------
+# 19: HTML document wrapper — charset, ASCII-only, NCR encoding
+# ---------------------------------------------------------------------------
+
+class TestHtmlDocumentWrapper(unittest.TestCase):
+    """_wrap_html_document wraps body in a full UTF-8 document and NCR-encodes non-ASCII."""
+
+    def _html(self, why="ok"):
+        snap = _clamp_snap(why=why)
+        return _svc().logged_moments_html(_groups([snap]))
+
+    def test_html_is_complete_document(self):
+        h = self._html()
+        self.assertIn("<!DOCTYPE html>", h)
+        self.assertIn('<meta charset="utf-8">', h)
+        self.assertTrue(h.strip().endswith("</html>"))
+
+    def test_html_is_ascii_only(self):
+        # Notes with figurine, em dash, and middle dot — all converted to NCR
+        snap = _clamp_snap(why="♘ — ·")
+        h = _svc().logged_moments_html(_groups([snap]))
+        h.encode("ascii")  # raises UnicodeEncodeError if any non-ASCII survives
+
+    def test_em_dash_in_note_is_ncr_in_html(self):
+        h = self._html(why="idea &#x2014; but")  # literal HTML entity — ASCII already
+        h2 = self._html(why="idea — but")
+        self.assertIn("&#8212;", h2)
+
+    def test_middle_dot_in_counts_is_ncr(self):
+        # The counts line in narrative_html uses · as separator
+        h = _svc().narrative_html(
+            "Paul", "src", "## H\n\nBody.",
+            n_games=5, g_games=3, m_moments=10, k_unflagged=8,
+        )
+        self.assertIn("&#183;", h)   # middle dot (U+00B7)
+        self.assertNotIn("·", h)
+
+    def test_figurine_in_note_is_ncr(self):
+        h = self._html(why="Knight ♘ on f3")
+        self.assertIn("&#9816;", h)
+        self.assertNotIn("♘", h)
+
+    def test_non_ascii_in_plain_text_stays_real(self):
+        snap = _clamp_snap(why="Knight ♘")
+        plain = _svc().logged_moments_plain(_groups([snap]))
+        self.assertIn("♘", plain)
+
+    def test_check_logs_html_has_meta_charset(self):
+        h = _svc().check_logs_html(_groups([_clamp_snap()]))
+        self.assertIn('<meta charset="utf-8">', h)
+
+    def test_charts_log_html_has_meta_charset(self):
+        h = _svc().charts_log_html("Player", "src", [], "", [])
+        self.assertIn('<meta charset="utf-8">', h)
+
+
+# ---------------------------------------------------------------------------
+# 20: Table styles — layout, wrapping, borders, column widths, NBSP
+# ---------------------------------------------------------------------------
+
+class TestTableStyles(unittest.TestCase):
+    _TABLE = (
+        "| Skill | Observed Issue | Strategic Impact |\n"
+        "| --- | --- | --- |\n"
+        "| Piece Coordination | Knights unprotected | Material loss |\n"
+    )
+
+    def _h(self):
+        return _gfm_table_to_html(self._TABLE)
+
+    def test_table_layout_fixed(self):
+        self.assertIn("table-layout:fixed", self._h())
+
+    def test_table_width_100(self):
+        self.assertIn("width:100%", self._h())
+
+    def test_cell_overflow_wrap(self):
+        self.assertIn("overflow-wrap:break-word", self._h())
+
+    def test_cell_border(self):
+        self.assertIn("border:1px solid #888", self._h())
+
+    def test_no_background_color_on_table_or_cells(self):
+        self.assertNotIn("background-color", self._h())
+
+    def test_3col_widths_are_pdf_proportions(self):
+        h = self._h()
+        # 20% on first header cell (Skill), 40% on second and third
+        self.assertIn("width:20%", h)
+        self.assertIn("width:40%", h)
+
+    def test_colgroup_present(self):
+        self.assertIn("<colgroup>", self._h())
+
+    def test_nbsp_in_cell_becomes_normal_space(self):
+        table = "| A | B |\n| --- | --- |\n| word\xa0word | ok |\n"
+        h = _gfm_table_to_html(table)
+        # U+00A0 must not survive into the HTML output
+        self.assertNotIn("\xa0", h)
+        self.assertNotIn("&#160;", h)
+
+    def test_equal_col_widths_for_2col_table(self):
+        table = "| A | B |\n| --- | --- |\n| x | y |\n"
+        h = _gfm_table_to_html(table)
+        self.assertIn("width:50.0%", h)
+
+
+# ---------------------------------------------------------------------------
+# 21: Section heading margins
+# ---------------------------------------------------------------------------
+
+class TestHeadingMargins(unittest.TestCase):
+    def test_game_header_h3_has_margin_top(self):
+        groups = [{"header": "Game header", "rows": [_clamp_snap()]}]
+        h = _svc().logged_moments_html(groups)
+        self.assertIn('<h3 style="margin-top:1.2em">', h)
+
+    def test_narrative_section_h3_has_margin_top(self):
+        h = _svc().narrative_html(
+            "P", "src", "## Section Heading\n\nBody text.",
+        )
+        self.assertIn('<h3 style="margin-top:1.2em"', h)
+
+    def test_report_title_h2_has_margin_top(self):
+        h = _svc().logged_moments_html(_groups([_clamp_snap()]))
+        self.assertIn('<h2 style="margin-top:1.2em">', h)
 
 
 if __name__ == "__main__":
