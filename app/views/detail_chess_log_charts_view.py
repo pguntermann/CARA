@@ -822,15 +822,47 @@ class DetailChessLogChartsView(QWidget):
 
     def _copy_section_to_clipboard(self, section_name: str) -> None:
         from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QMimeData
         if section_name.startswith("chart_"):
             preset = section_name[len("chart_"):]
             text = f"Category chart — {preset}: see Chess Log Charts tab in CARA."
+            if text:
+                QApplication.clipboard().setText(text)
         elif section_name == "narrative":
             text = self._last_narrative.strip() or "(no narrative yet)"
+            html_text = self._narrative_html_for_copy()
+            mime = QMimeData()
+            mime.setHtml(html_text)
+            mime.setText(text)
+            QApplication.clipboard().setMimeData(mime)
         else:
             text = ""
-        if text:
-            QApplication.clipboard().setText(text)
+            if text:
+                QApplication.clipboard().setText(text)
+
+    def _narrative_html_for_copy(self) -> str:
+        """Build HTML for the Narrative Summary clipboard action."""
+        from app.services.chess_log_html_service import ChessLogHTMLService
+        narrative = sanitize_narrative_markdown(self._last_narrative)
+        player_name = self._player_combo.itemData(self._player_combo.currentIndex()) or ""
+        label = self._source_combo.currentText()
+        files = self._controller.get_current_source_filenames() if self._controller else []
+        source_label = f"{label}: {', '.join(files)}" if files else label
+        generated_at = model_label = ""
+        n = g = m = k = 0
+        if self._controller:
+            generated_at, model_label, n, g, m, k = self._controller.get_last_narrative_metadata()
+        return ChessLogHTMLService(self._config).narrative_html(
+            player_name,
+            source_label,
+            narrative,
+            n_games=n,
+            g_games=g,
+            m_moments=m,
+            k_unflagged=k,
+            generated_at=generated_at,
+            model_label=model_label,
+        )
 
     def _moment_in_last_shallow(self, game, path_key: str, preset: str) -> bool:
         """Return True if this game/path_key/preset moment is in shallow_keys or vague_keys."""
@@ -850,6 +882,8 @@ class DetailChessLogChartsView(QWidget):
 
     def _copy_log_to_clipboard(self) -> None:
         from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QMimeData
+        # Plain text: keep today's format exactly (decision 9).
         lines: List[str] = []
         player_text = self._player_combo.currentText()
         source_text = self._source_combo.currentText()
@@ -893,7 +927,144 @@ class DetailChessLogChartsView(QWidget):
                             lines.append(
                                 f"  {white}–{black}  |  {path_key}  |  {preset}  |  {cat}  |  {why}"
                             )
-        QApplication.clipboard().setText("\n".join(lines))
+        plain_text = "\n".join(lines)
+
+        html_text = self._charts_log_html_for_copy()
+        mime = QMimeData()
+        mime.setHtml(html_text)
+        mime.setText(plain_text)
+        QApplication.clipboard().setMimeData(mime)
+
+    def _charts_log_html_for_copy(self) -> str:
+        """Build HTML for the Charts log clipboard action."""
+        from io import StringIO
+        import chess.pgn as _chess_pgn
+        from app.models.chess_log_snapshot import TagRowSnapshot
+        from app.services.chess_log_html_service import ChessLogHTMLService
+        from app.views.dialogs._tag_row_helpers import node_info as _node_info
+
+        player_name = self._player_combo.itemData(self._player_combo.currentIndex()) or ""
+        label = self._source_combo.currentText()
+        files = self._controller.get_current_source_filenames() if self._controller else []
+        source_label = f"{label}: {', '.join(files)}" if files else label
+        narrative = sanitize_narrative_markdown(self._last_narrative)
+        generated_at = model_label = ""
+        n = g = m = k = 0
+        if self._controller and narrative:
+            generated_at, model_label, n, g, m, k = self._controller.get_last_narrative_metadata()
+
+        chart_preset_names = [
+            (w.property("section_name") or "").replace("chart_", "")
+            for w in self._chart_widgets
+        ]
+
+        check_log_groups = self._build_check_log_tag_groups()
+
+        return ChessLogHTMLService(self._config).charts_log_html(
+            player_name,
+            source_label,
+            chart_preset_names,
+            narrative,
+            check_log_groups,
+            n_games=n,
+            g_games=g,
+            m_moments=m,
+            k_unflagged=k,
+            generated_at=generated_at,
+            model_label=model_label,
+        )
+
+    def _build_check_log_tag_groups(self) -> List[Dict]:
+        """Build game-grouped TagRowSnapshot lists for shallow/vague moments."""
+        from io import StringIO
+        import chess.pgn as _chess_pgn
+        from app.models.chess_log_snapshot import TagRowSnapshot
+        from app.views.dialogs._tag_row_helpers import node_info as _node_info
+
+        if not (self._last_shallow_keys and self._controller):
+            return []
+        chess_log_ctrl = self._controller.get_chess_log_controller()
+        if not chess_log_ctrl:
+            return []
+
+        groups: List[Dict] = []
+        games = self._controller.resolve_games()
+        for game in games:
+            pgn_game = None
+            try:
+                pgn = getattr(game, "pgn", None)
+                if pgn:
+                    pgn_game = _chess_pgn.read_game(StringIO(pgn))
+            except Exception:
+                pass
+
+            white = str(getattr(game, "white", "") or "").strip() or "Unknown"
+            black = str(getattr(game, "black", "") or "").strip() or "Unknown"
+            result = str(getattr(game, "result", "") or "").strip() or "*"
+            date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
+            moves = getattr(game, "moves", 0) or 0
+            header = f"{white} - {black} {result} ({date} - {moves} moves)"
+
+            rows: List[TagRowSnapshot] = []
+            seen: Set[Tuple] = set()
+            tags = chess_log_ctrl.get_tags_for_game(game)
+            for path_key, all_entries in tags.items():
+                if not all_entries:
+                    continue
+                by_preset: Dict[str, List] = {}
+                for e in all_entries:
+                    by_preset.setdefault(e.get("preset", ""), []).append(e)
+                for preset, entries in by_preset.items():
+                    dedup_key: Tuple = (game, path_key, preset)
+                    if not self._moment_in_last_shallow(game, path_key, preset):
+                        continue
+                    if dedup_key in seen:
+                        continue
+                    seen.add(dedup_key)
+                    fen, played_move, move_label, mover_is_black = _node_info(pgn_game, path_key)
+
+                    shallow_cats: FrozenSet = frozenset()
+                    vague_cats: FrozenSet = frozenset()
+                    is_shallow = False
+                    is_vague = False
+                    if preset == "3x3":
+                        shallow_cats = frozenset(
+                            cat for cat in ("Why1", "Why2", "Why3")
+                            if self._last_shallow_keys
+                            and (game, path_key, "3x3", cat) in self._last_shallow_keys
+                        )
+                        vague_cats = frozenset(
+                            cat for cat in ("Why4",)
+                            if self._last_vague_keys
+                            and (game, path_key, "3x3", cat) in self._last_vague_keys
+                        )
+                    else:
+                        is_shallow = bool(
+                            self._last_shallow_keys
+                            and (game, path_key, preset, "") in self._last_shallow_keys
+                        )
+                        is_vague = bool(
+                            self._last_vague_keys
+                            and (game, path_key, preset, "") in self._last_vague_keys
+                        )
+
+                    rows.append(TagRowSnapshot(
+                        move_label=move_label,
+                        preset=preset,
+                        entries=entries,
+                        fen=fen or None,
+                        played_move=played_move,
+                        show_ignore=True,
+                        is_flipped=mover_is_black,
+                        is_shallow=is_shallow,
+                        is_vague=is_vague,
+                        shallow_cats=shallow_cats,
+                        vague_cats=vague_cats,
+                    ))
+
+            if rows:
+                groups.append({"header": header, "rows": rows})
+        return groups
 
     def _export_pdf_report(self) -> None:
         from io import StringIO
