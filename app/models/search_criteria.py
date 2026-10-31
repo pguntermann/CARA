@@ -34,6 +34,7 @@ class SearchOperator(Enum):
     NOT_EQUALS = "not_equals"
     STARTS_WITH = "starts_with"
     ENDS_WITH = "ends_with"
+    MATCHES_REGEX = "matches_regex"
     IS_EMPTY = "is_empty"
     IS_NOT_EMPTY = "is_not_empty"
     

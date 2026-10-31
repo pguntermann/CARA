@@ -64,6 +64,8 @@ class RegexPatternLine(QWidget):
         colors: Dict[str, QColor],
         classify: Callable[[str], List[Tuple[int, int, str]]],
         parent: QWidget | None = None,
+        *,
+        object_name: str = "bulkFindPattern",
     ) -> None:
         super().__init__(parent)
         self._pad_h = 8
@@ -74,7 +76,7 @@ class RegexPatternLine(QWidget):
         self._icon_px = 16
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._edit = QPlainTextEdit(self)
-        self._edit.setObjectName("bulkFindPattern")
+        self._edit.setObjectName(object_name)
         self._edit.setFrameShape(QFrame.Shape.NoFrame)
         self._edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self._edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -167,6 +169,13 @@ class RegexPatternLine(QWidget):
 
     def textCursor(self) -> QTextCursor:  # noqa: N802
         return self._edit.textCursor()
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        metrics = QFontMetrics(self._edit.font())
+        return QSize(160, max(24, metrics.height() + 10))
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return QSize(80, self.sizeHint().height())
 
     def setFocus(self, reason: Qt.FocusReason = Qt.FocusReason.OtherFocusReason) -> None:  # noqa: N802
         self._edit.setFocus(reason)
