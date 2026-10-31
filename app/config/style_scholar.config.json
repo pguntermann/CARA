@@ -5241,7 +5241,7 @@
           "indent": 12,
           "border_radius": 4,
           "border_width": 0,
-          "background_color": { "$ref": "$_COLOR_PAPYRUS_WHITE" },
+          "background_color": { "$ref": "$_COLOR_WHEAT_CREAM" },
           "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
           "token_min_width": 36,
           "token_font_family": { "$ref": "$_FONT_FAMILY_MONO" },
@@ -6214,7 +6214,7 @@
             "$ref": "$_COLOR_INK_BODY"
           },
           "background_color": {
-            "$ref": "$_COLOR_PAPYRUS_FIELD"
+            "$ref": "$_COLOR_WHEAT_CREAM"
           },
           "border_color": {
             "$ref": "$_COLOR_PEACH_OUTLINE"
