@@ -294,6 +294,11 @@ class RegexEditorDialog(QDialog):
         self._refresh()
         self._pattern_focus_pending = True
         self._fit_to_contents()
+        from app.views.widgets.themed_dialog_size_grip import (
+            install_themed_dialog_resize_grip,
+        )
+
+        install_themed_dialog_resize_grip(self, self._app_config)
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
