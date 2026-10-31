@@ -275,12 +275,14 @@ Non-narrative chart sections (e.g. "Copy section → chart_CLAMP") keep plain-te
 Stateless service instantiated with `config` (the merged application config). Constructor reads chip label strings from `config.ui.dialogs.shallow.labels`.
 
 **Public methods**:
-- `narrative_html(player_name, source_label, narrative_body, n_games, g_with_moments, m_moments, k_not_flagged, generated_at, model_label)` → full HTML string
-- `charts_log_html(player_name, source_label, tag_groups, generated_at, model_label)` → full HTML string
+- `narrative_html(player_name, source_label, narrative_text, *, n_games=0, g_games=0, m_moments=0, k_unflagged=0, generated_at="", model_label="")` → full HTML string
+- `charts_log_html(player_name, source_label, chart_preset_names, narrative_text, check_log_groups, *, n_games=0, g_games=0, m_moments=0, k_unflagged=0, generated_at="", model_label="")` → full HTML string
 - `logged_moments_html(tag_groups)` → full HTML string (prefixed `<h2>Chess Log — Logged Moments</h2><hr>`)
 - `logged_moments_plain(tag_groups)` → plain-text string matching existing PDF format
-- `check_logs_html(source_label, model_label, generated_at, tag_groups)` → full HTML string
-- `check_logs_plain(source_label, model_label, generated_at, tag_groups)` → plain-text string matching existing PDF format
+- `check_logs_html(tag_groups, *, source_label="", model_label="", generated_at="")` → full HTML string
+- `check_logs_plain(tag_groups, *, source_label="", model_label="", generated_at="")` → plain-text string matching existing PDF format
+
+The dialog copy buttons copy the dialog's current state, including unsaved edits, the same as Export to PDF — both call the same `_build_tag_groups()` which reads from `row_widget.snapshot()`.
 
 **Tag row layout**:
 - **3x3**: `<p><strong>move</strong></p>` then for each Why: `<p><strong>question</strong> [chip]</p>` + optional `<p>answer</p>` (stacked paragraphs — no table).
@@ -305,9 +307,9 @@ Both exceed the WCAG AA threshold of 4.5:1. All `html.escape()` calls in the ser
 
 ### Tests
 
-End-to-end clipboard tests: `tests/views/test_chess_log_clipboard.py` (32 tests, 4 classes — one per copy action). These verify actual `QMimeData` HTML and plain-text contents, not just the generator in isolation.
+End-to-end clipboard tests: `tests/views/test_chess_log_clipboard.py` (6 classes — one per copy action, plus chip-lookup verification for CLAMP and 3x3). These verify actual `QMimeData` HTML and plain-text contents, not just the generator in isolation. The chip-lookup tests build `shallow_keys`/`vague_keys` through the classifier's real parse step (`_parse_verdicts` / `_parse_3x3_verdicts`) rather than hand-written tuples.
 
-Unit tests for the HTML service: `tests/services/test_chess_log_html_service.py` (54 tests).
+Unit tests for the HTML service: `tests/services/test_chess_log_html_service.py`. Includes `TestGameHeaderText`, which compares `game_header_text()` output byte-for-byte against the original inline format for a game with all fields and one with missing fields.
 
 ## Multi-game cache and save-all
 
@@ -387,27 +389,29 @@ Multi-line prompt strings are stored as single JSON string values with `\n` esca
 
 ### What Paul can test before the PR
 
-1. **HTML clipboard — Charts narrative copy**: generate a narrative, right-click → "Copy section" (narrative section). Paste into a rich-text app (Notion, Mail, Pages). Confirm: headings render as headings, bullets as bullets, the Tactical Breakdown table renders as a table. Paste into a plain-text app (TextEdit plain mode): confirm raw markdown, no `<h` tags.
+1. **HTML clipboard — Charts narrative copy**: generate a narrative, right-click → "Copy section" (narrative section). Paste into Notion or Mail: the section heading renders as a bold heading, bullet points render as a bulleted list, and the Tactical Breakdown renders as a formatted table with column headers. Paste into TextEdit (plain-text mode): the raw markdown appears — `##` prefix on the heading, `|` pipes in the table — with no HTML tags.
 
-2. **HTML clipboard — Charts "Copy log"**: right-click → "Copy log to clipboard". Paste rich: confirm `<h2>` header and rows. Paste plain: confirm "Chess Log —" prefix, no HTML tags.
+2. **HTML clipboard — Charts "Copy log"**: right-click → "Copy log to clipboard". Paste into Notion: a large bold "Chess Log — [player]" heading appears at the top, followed by one line per chart section and any narrative. Paste into a plain-text editor: the text starts with "Chess Log —", no HTML markup visible.
 
-3. **HTML clipboard — Logged Moments**: open Show Logged Moments (Chess Log menu or context menu). Click "Copy to clipboard". Paste rich: confirm game header (White − Black), move labels, category chips. Paste plain: confirm no `<h2>` or `<p>` tags.
+3. **HTML clipboard — Logged Moments**: open Show Logged Moments. Click "Copy to clipboard". Paste into Notion: the game line (White − Black, result, date) appears bold, followed by each moment as a bold move number and category, with any note below it; if a moment was flagged by Check Logs, a colored "Shallow" or "Vague" badge appears inline. Paste into a plain-text editor: no bold formatting markers, no HTML, just the move and note text.
 
-4. **HTML clipboard — Check Logs**: after a Check Logs run, open Show Shallow/Vague Logs. Click "Copy to clipboard". Paste rich: confirm "Check Logs" title, source label, model name, shallow/vague chips. Paste plain: confirm `Chess Log — Check Logs` header, source label.
+4. **HTML clipboard — Check Logs**: after a Check Logs run, open Show Shallow/Vague Logs. Click "Copy to clipboard". Paste into Notion: a bold "Check Logs" heading appears, followed by the source filename and model name, then each flagged moment with its colored "Shallow" or "Vague" badge. Paste into a plain-text editor: the "Chess Log — Check Logs" line appears first, then source, then the moment lines — no HTML markup.
 
-5. **Copy buttons enabled/disabled state**: open Show Logged Moments on a game with no moments — "Copy to clipboard" button must be disabled. Same for Show Shallow/Vague Logs with no flagged notes.
+5. **Copy buttons enabled/disabled state**: open Show Logged Moments on a game with no moments — "Copy to clipboard" button is greyed out and unclickable. Same for Show Shallow/Vague Logs opened with no flagged notes.
 
-6. **Narrative Summary** — run on the logged-game library and compare output quality with the pre-change baseline. The golden fixture tests in `tests/services/test_chess_log_prompts_config_roundtrip.py` prove prompt assembly is byte-identical before and after the config move; the comparison is a spot-check for quality, not a byte diff.
+6. **Unsaved edits**: in Show Logged Moments, edit a why-note in a row without saving. Click "Copy to clipboard". Paste into Notion — the edited text appears, not the last-saved text. Same behavior as Export to PDF.
 
-2. **AI Chat** — run a normal analysis session. The golden fixture tests in `tests/services/test_ai_chat_prompts_golden.py` prove system_prompt assembly is byte-identical.
+7. **Narrative Summary** — run on the logged-game library and compare output quality with the pre-change baseline. The golden fixture tests in `tests/services/test_chess_log_prompts_config_roundtrip.py` prove prompt assembly is byte-identical before and after the config move; the comparison is a spot-check for quality, not a byte diff.
 
-3. **Prompt editing** — open `app/config/config.json`, append a visible marker to `prompts.chess_log.narrative_system` (e.g. `" [TEST]"` at the end). Restart CARA, run Narrative Summary, verify the marker appears in the AI's reply or in the logs. Revert the change. Repeat for `prompts.ai_chat.system_preamble`.
+8. **AI Chat** — run a normal analysis session. The golden fixture tests in `tests/services/test_ai_chat_prompts_golden.py` prove system_prompt assembly is byte-identical.
 
-4. **Token labels** — confirm `Tokens: N in / M out` appears below the narrative and near the Check Logs button after each run. Confirm both labels clear when a new run starts and when a run fails. Export the narrative to PDF and confirm no "Tokens:" text appears in the exported file.
+9. **Prompt editing** — open `app/config/config.json`, append a visible marker to `prompts.chess_log.narrative_system` (e.g. `" [TEST]"` at the end). Restart CARA, run Narrative Summary, verify the marker appears in the AI's reply or in the logs. Revert the change. Repeat for `prompts.ai_chat.system_preamble`.
 
-5. **Placeholder validator** — edit `narrative_preamble` in `config.json` to remove one of the four required placeholders (e.g. delete `{glossary_section}`). Restart CARA — it should fail at startup with a clear error naming the missing placeholder. Restore the file.
+10. **Token labels** — confirm `Tokens: N in / M out` appears below the narrative and near the Check Logs button after each run. Confirm both labels clear when a new run starts and when a run fails. Export the narrative to PDF and confirm no "Tokens:" text appears in the exported file.
 
-6. **Failure notice** — close the network connection or use a bad API key; confirm the failure message ("Couldn't reach …" or "API key missing …") appears in the UI rather than a blank panel.
+11. **Placeholder validator** — edit `narrative_preamble` in `config.json` to remove one of the four required placeholders (e.g. delete `{glossary_section}`). Restart CARA — it should fail at startup with a clear error naming the missing placeholder. Restore the file.
+
+12. **Failure notice** — close the network connection or use a bad API key; confirm the failure message ("Couldn't reach …" or "API key missing …") appears in the UI rather than a blank panel.
 
 ### What's left for Philipp at PR review
 
@@ -433,7 +437,7 @@ Multi-line prompt strings are stored as single JSON string values with `\n` esca
 - `app/views/widgets/chess_log_category_chart_widget.py`
 - `app/views/widgets/busy_spinner.py`
 - `app/views/menus/chess_log_charts_context_menu.py`
-- `app/views/dialogs/_tag_row_helpers.py` — holds `node_info` / `ply_for_path`; `_TagRowWidget` itself lives in `show_tags_dialog.py`
+- `app/views/dialogs/_tag_row_helpers.py` — holds `game_header_text`, `node_info`, `ply_for_path`; `_TagRowWidget` itself lives in `show_tags_dialog.py`
 - `app/views/dialogs/show_tags_dialog.py`
 - `app/views/dialogs/show_shallow_tags_dialog.py`
 - `app/utils/ai_provider_config.py`
