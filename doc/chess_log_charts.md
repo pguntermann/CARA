@@ -389,7 +389,7 @@ Multi-line prompt strings are stored as single JSON string values with `\n` esca
 
 ### What Paul can test before the PR
 
-1. **HTML clipboard — Charts narrative copy**: generate a narrative, right-click → "Copy section" (narrative section). Paste into Notion or Mail: the section heading renders as a bold heading, bullet points render as a bulleted list, and the Tactical Breakdown renders as a formatted table with column headers. Paste into TextEdit (plain-text mode): the raw markdown appears — `##` prefix on the heading, `|` pipes in the table — with no HTML tags.
+1. **HTML clipboard — Charts narrative copy**: generate a narrative, right-click → "Copy section" (narrative section). Paste into Notion or Mail: the section heading renders as a bold heading, bullet points render as a bulleted list, and the Tactical Breakdown renders as a formatted table with column headers. Paste into TextEdit (plain-text mode): the raw markdown appears — `##` prefix on the heading, `|` pipes in the table — with no HTML tags. For chess.com: use the forum's normal post editor (not its HTML source view) — paste there and the heading/table should render.
 
 2. **HTML clipboard — Charts "Copy log"**: right-click → "Copy log to clipboard". Paste into Notion: a large bold "Chess Log — [player]" heading appears at the top, followed by one line per chart section and any narrative. Paste into a plain-text editor: the text starts with "Chess Log —", no HTML markup visible.
 
