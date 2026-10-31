@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
     QWidgetAction,
@@ -44,8 +45,9 @@ from app.controllers.regex_editor_controller import (
     RegexExample,
     RegexExplanation,
 )
+from app.utils.external_open import open_user_manual
 from app.utils.font_utils import resolve_font_family, scale_font_size
-from app.utils.themed_icon import themed_icon_from_svg
+from app.utils.themed_icon import SVG_MENU_INFO, themed_icon_from_svg
 from app.views.style import StyleManager
 from app.views.style.scrollbar import generate_scrollbar_stylesheet
 from app.views.widgets.regex_syntax import RegexSyntaxHighlighter, regex_token_colors
@@ -202,6 +204,15 @@ class RegexEditorDialog(QDialog):
         self._replacement = replacement
         self.result: Optional[RegexEditorValues] = None
         self._pattern_focus_pending = True
+        help_config = self._cfg.get("help", {})
+        if not isinstance(help_config, dict):
+            help_config = {}
+        self.help_enabled = bool(help_config.get("enabled", True))
+        self.help_manual_anchor = str(help_config.get("manual_anchor", "regex-editor"))
+        self.help_tooltip = str(help_config.get("tooltip", "Open user manual"))
+        self.help_button_size = int(help_config.get("button_size", 22))
+        self.help_column_spacing = int(help_config.get("column_spacing", 8))
+        self.help_top_offset = int(help_config.get("top_offset", 0))
         self._build(pattern, sample)
 
     def _build(self, pattern: str, sample: str) -> None:
@@ -257,6 +268,9 @@ class RegexEditorDialog(QDialog):
         self._load_button.clicked.connect(self._on_load)
         pattern_row.addWidget(self._save_button, 0, Qt.AlignmentFlag.AlignVCenter)
         pattern_row.addWidget(self._load_button, 0, Qt.AlignmentFlag.AlignVCenter)
+        if self.help_enabled:
+            pattern_row.addSpacing(max(0, self.help_column_spacing))
+            pattern_row.addWidget(self._build_help_button(), 0, Qt.AlignmentFlag.AlignVCenter)
         root.addLayout(pattern_row)
 
         self.pattern_edit = self._make_editor(cfg.get("pattern", {}), placeholder=str(cfg.get("pattern_placeholder", "")))
@@ -337,6 +351,37 @@ class RegexEditorDialog(QDialog):
         height = max(int(self._cfg.get("minimum_height", 0)), hint_h)
         self.setMinimumHeight(height)
         self.resize(width, height)
+
+    def _build_help_button(self) -> QToolButton:
+        """Themed manual help button for the toolbar row."""
+        btn_size = max(16, self.help_button_size)
+        icon_size = max(12, btn_size - 6)
+        labels = self._cfg.get("labels", {})
+        if not isinstance(labels, dict):
+            labels = {}
+        tint = _rgb(labels.get("text_color"), (200, 200, 200))
+        self.help_button = QToolButton()
+        self.help_button.setToolTip(self.help_tooltip)
+        self.help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.help_button.setAutoRaise(True)
+        self.help_button.setFixedSize(btn_size, btn_size)
+        self.help_button.setIconSize(QSize(icon_size, icon_size))
+        self.help_button.setAccessibleName(self.help_tooltip)
+        self.help_button.setIcon(themed_icon_from_svg(SVG_MENU_INFO, tint))
+        self.help_button.setStyleSheet(
+            f"QToolButton {{"
+            f"background: transparent; border: none; padding: 0px;"
+            f"margin-top: {self.help_top_offset}px;"
+            f"}}"
+        )
+        self.help_button.clicked.connect(self._on_help_clicked)
+        return self.help_button
+
+    def _on_help_clicked(self) -> None:
+        open_user_manual(
+            anchor=self.help_manual_anchor,
+            context="regex_editor.help",
+        )
 
     def _on_blocks(self) -> None:
         menu = self._blocks_menu()

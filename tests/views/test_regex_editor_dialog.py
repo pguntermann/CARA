@@ -82,6 +82,8 @@ class TestRegexEditorConfig(unittest.TestCase):
             self.assertEqual(len(section["explain_style"]["kinds"]["escape"]["token_color"]), 3)
             self.assertNotIn("syntax", section["pattern"])
             self.assertEqual(len(section["find_action"]["icon_tint"]), 3)
+            self.assertEqual(section["help"]["manual_anchor"], "regex-editor")
+            self.assertTrue(section["help"]["enabled"])
             self.assertIsInstance(section["block_groups"], list)
             self.assertIsInstance(section["library_buttons"], dict)
             self.assertGreaterEqual(len(section["examples"]), 1)

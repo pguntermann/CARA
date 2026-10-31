@@ -221,6 +221,7 @@
                                 <li><a href="#copying-pasting-positions">5.9.5 Copying and Pasting Board Positions</a></li>
                             </ul>
                         </li>
+                        <li><a href="#regex-editor">5.10 Regex Editor</a></li>
                     </ul>
                 </li>
                 <li><a href="#reference">6. Complete Reference</a>
@@ -1418,7 +1419,7 @@
 
                 <p>Available operation types:</p>
                 <ul>
-                    <li><strong>Replace PGN header tag values:</strong> Find and replace text in one or more tags (for example White, Black, Event, or Site). Use <strong>Case sensitive</strong> and <strong>Use regex</strong> when you need stricter or pattern-based matching. With <strong>Use regex</strong> enabled, the <strong>Preset</strong> list offers starting patterns for common tasks (for example <em>Remove matched text</em> or <em>Keep text before "-"</em>); choose <em>Custom…</em> to enter your own pattern.
+                    <li><strong>Replace PGN header tag values:</strong> Find and replace text in one or more tags (for example White, Black, Event, or Site). Use <strong>Case sensitive</strong> and <strong>Use regex</strong> when you need stricter or pattern-based matching. With <strong>Use regex</strong> enabled, the <strong>Preset</strong> list offers starting patterns for common tasks (for example <em>Remove matched text</em> or <em>Keep text before "-"</em>); choose <em>Custom…</em> to enter your own pattern. A small <strong>.*</strong> control on the <strong>Find</strong> field opens the <a href="#regex-editor">Regex Editor</a> so you can build and test the pattern before applying it.
                         <img src="screenshots/bulk_operations_regex.png" alt="CARA Bulk Operations - Replace PGN header tag values with Use regex enabled, showing Preset, Find, and Replace fields" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65); display: block;" />
                     </li>
                     <li><strong>Overwrite PGN header tag values:</strong> Set the selected tags to a fixed <strong>Value</strong>, replacing whatever was there before.</li>
@@ -1432,7 +1433,7 @@
                     <strong>Quick Tip:</strong> You can save the current operations list as a named plan with the save toolbar button, then load it later from the load button. The load menu also includes <strong>Delete plan…</strong> if you want to remove a saved plan. Plans store only the operations list—not Target Games or Smart Update.
                 </div>
 
-                <p>If you enable <strong>Use regex</strong> on a <strong>Replace PGN header tag values</strong> operation, the <strong>Find</strong> field is treated as a regular expression. Here are a few practical examples you can try:</p>
+                <p>If you enable <strong>Use regex</strong> on a <strong>Replace PGN header tag values</strong> operation, the <strong>Find</strong> field is treated as a regular expression. For a guided walkthrough of the editor (explanation, sample text, building blocks, and saved patterns), see <a href="#regex-editor">section 5.10 Regex Editor</a>. Here are a few practical examples you can try:</p>
                 <div class="regex-examples-desktop column-table-wrapper">
                 <table class="column-table">
                     <thead>
@@ -1524,14 +1525,15 @@
                     <li><strong>Field:</strong> The game property to search (e.g., White, Black, WhiteElo, BlackElo, Result, Date, Event, Site, ECO, Analyzed, Annotated, or Custom PGN Tag).</li>
                     <li><strong>Operator:</strong> How to compare the field value. Available operators depend on the field type:
                         <ul>
-                            <li><strong>Text fields</strong> (White, Black, Event, Site, ECO): contains, equals, not equals, starts with, ends with, is empty, is not empty</li>
+                            <li><strong>Text fields</strong> (White, Black, Event, Site, ECO, and similar): contains, not contains, equals, not equals, starts with, ends with, is empty, is not empty, <strong>matches regex</strong></li>
                             <li><strong>Numeric fields</strong> (WhiteElo, BlackElo): equals, not equals, greater than, less than, greater than or equal, less than or equal</li>
-                            <li><strong>Date field:</strong> equals, not equals, before, after, contains (for partial date matching, e.g., "2025" matches "2025.11.09")</li>
+                            <li><strong>Date field:</strong> equals, not equals, before, after, contains (for partial date matching, e.g., "2025" matches "2025.11.09"), <strong>matches regex</strong></li>
                             <li><strong>Boolean fields</strong> (Analyzed, Annotated): is, is not</li>
                         </ul>
                     </li>
                     <li><strong>Value:</strong> The value to search for (not required for "is empty", "is not empty", or boolean fields).</li>
                 </ul>
+                <p>When you choose <strong>matches regex</strong>, the value is treated as a regular expression. A small <strong>.*</strong> control appears on the value field so you can open the <a href="#regex-editor">Regex Editor</a> to build and test the pattern. Search matching is case-insensitive.</p>
                 <p>For "Custom PGN Tag", you must also specify the tag name in an additional field that appears when this option is selected.</p>
 
                 <p>CARA also supports <strong>position-based search</strong> criteria:</p>
@@ -1846,6 +1848,7 @@
                     <li><strong>Selected games (All Open Databases)</strong> — selected rows across all tabs.</li>
                 </ul>
                 <p><strong>Player dropdown.</strong> Each entry shows analyzed and total game counts (for example, “15 analyzed, 20 total”). Pick a player to display their statistics.</p>
+                <p><strong>Regex player filter.</strong> Tick <strong>Regex</strong> next to the player control to match names with a regular expression instead of picking one entry from the list. Enter the pattern in the field that appears, then press Enter to apply it. Use the small <strong>.*</strong> control to open the <a href="#regex-editor">Regex Editor</a> when you want help building or testing the pattern (for example several spellings of a last name). Invalid patterns are not applied; fix the expression and try again.</p>
                 <p><strong>Dates in PGN.</strong> Some sections (activity heatmap, date-based progression charts) use the game dates stored in the PGN headers. If dates are missing or incomplete, those sections may be hidden and a short notice will be shown on the top of view.</p>
 
                 <h5 id="ps-sections-visibility">5.7.2 Showing and hiding sections</h5>
@@ -2177,6 +2180,37 @@
                     
                     <li><strong>Paste FEN:</strong> Use <span class="menu-item">Edit → Paste FEN to Board</span> (<code>Ctrl+F</code> / <code>⌘+F</code>) to paste a FEN position from your clipboard and update the chessboard to that position. When a FEN is pasted, the active game is cleared (set to None) since the board position is no longer part of a game sequence.</li>
                 </ul>
+            </div>
+
+            <div class="outline-item">
+                <h4 id="regex-editor">5.10 Regex Editor</h4>
+                <p>CARA includes a shared <strong>Regex Editor</strong> for building and testing regular expressions. You open it with the small <strong>.*</strong> control on a pattern field. It is available from:</p>
+                <ul>
+                    <li><strong>Bulk Operations</strong> — when <strong>Use regex</strong> is enabled on a <strong>Replace PGN header tag values</strong> step (see <a href="#bulk-operations">section 5.3.3</a>)</li>
+                    <li><strong>Search Games</strong> — when a criterion uses the <strong>matches regex</strong> operator (see <a href="#search-criteria">section 5.4.2</a>)</li>
+                    <li><strong>Player Stats</strong> — when the <strong>Regex</strong> checkbox next to the player control is enabled (see <a href="#ps-prerequisites">section 5.7.1</a>)</li>
+                </ul>
+                <p>The editor helps you understand what a pattern does, try it on sample text, and reuse useful patterns later.</p>
+                <img src="screenshots/regex_editor.png" alt="CARA Regex Editor — pattern field, explanation, sample text, and toolbar for building blocks, examples, and save/load" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65); display: block;" />
+
+                <p>Main parts of the dialog:</p>
+                <ul>
+                    <li><strong>Pattern:</strong> The regular expression you are editing. Type here, or insert ready-made pieces from the toolbar above the field.</li>
+                    <li><strong>Explanation:</strong> A plain-language breakdown of the current pattern, updated as you edit. Use this to check that the expression means what you intended.</li>
+                    <li><strong>Sample text:</strong> Paste or type example text (for example a player name or event string). Matches against your pattern are highlighted so you can see the effect immediately.</li>
+                </ul>
+
+                <p>Toolbar actions above the pattern field:</p>
+                <ul>
+                    <li><strong>Building blocks:</strong> Insert common pattern pieces at the cursor (for example “any digit” or “start of text”) without memorizing syntax.</li>
+                    <li><strong>Example regular expressions:</strong> Load a ready-made pattern for a typical chess-database task (player name variants, online sites, titles, and similar). You can edit the example after it is inserted.</li>
+                    <li><strong>Save / Load:</strong> Store patterns you want to reuse, or open and manage previously saved ones.</li>
+                </ul>
+
+                <p>When you click <strong>OK</strong>, the regular expression is applied to the field the editor was opened from. <strong>Cancel</strong> closes the dialog without changing that field.</p>
+                <div class="tip-box">
+                    <strong>Quick Tip:</strong> Start from an <strong>Example regular expression</strong> close to your goal, then adjust the highlighted parts in the pattern. Keep a short sample that looks like the values you search or edit (a player name, site, or event) to test your regex.
+                </div>
             </div>
         </section>
 

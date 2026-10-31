@@ -5234,6 +5234,14 @@
           "icon_px": 16,
           "icon_tint": { "$ref": "$_COLOR_COCOA_BROWN" }
         },
+        "help": {
+          "enabled": true,
+          "manual_anchor": "regex-editor",
+          "tooltip": "Open user manual",
+          "button_size": 22,
+          "column_spacing": 8,
+          "top_offset": 0
+        },
         "explain_style": {
           "min_height": 168,
           "padding": 8,
