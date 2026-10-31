@@ -471,6 +471,16 @@ class ShowShallowTagsDialog(QDialog):
         btn_row = QHBoxLayout()
 
         has_rows = bool(self._rows)
+
+        self._copy_clipboard_btn = QPushButton("Copy to clipboard")
+        self._copy_clipboard_btn.setAutoDefault(False)
+        self._copy_clipboard_btn.setFixedHeight(self._button_height)
+        self._copy_clipboard_btn.setEnabled(has_rows)
+        self._copy_clipboard_btn.clicked.connect(self._on_copy_to_clipboard)
+        btn_row.addWidget(self._copy_clipboard_btn)
+
+        btn_row.addSpacing(6)
+
         self._export_pdf_btn = QPushButton("Export to PDF")
         self._export_pdf_btn.setAutoDefault(False)
         self._export_pdf_btn.setFixedHeight(self._button_height)
@@ -496,7 +506,7 @@ class ShowShallowTagsDialog(QDialog):
         root.addLayout(btn_row)
 
         StyleManager.style_buttons(
-            [self._export_pdf_btn, self._cancel_btn, self._save_btn],
+            [self._copy_clipboard_btn, self._export_pdf_btn, self._cancel_btn, self._save_btn],
             self._config,
             self._bg_rgb,
             self._border_rgb,
@@ -506,25 +516,12 @@ class ShowShallowTagsDialog(QDialog):
         from app.views.widgets.themed_dialog_size_grip import install_themed_dialog_resize_grip
         install_themed_dialog_resize_grip(self, self._config)
 
-    def _on_export_pdf(self) -> None:
-        from pathlib import Path
-        from PyQt6.QtWidgets import QFileDialog
-        from app.services.chess_log_pdf_service import (
-            ChessLogPDFService,
-            default_chess_log_tags_pdf_filename,
-        )
-        suggested = default_chess_log_tags_pdf_filename(is_shallow_only=True)
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export to PDF", suggested, "PDF Files (*.pdf)"
-        )
-        if not path:
-            return
-
+    def _build_tag_groups(self):
+        """Build game-grouped TagRowSnapshot lists from current widget state."""
         tag_groups = []
         current_game = None
         current_rows = []
         current_header = None
-
         for i, row_widget in enumerate(self._row_widgets):
             game = self._row_games[i]
             if game is not current_game:
@@ -539,25 +536,24 @@ class ShowShallowTagsDialog(QDialog):
                 moves = getattr(game, "moves", 0) or 0
                 current_header = f"{white} - {black} {result} ({date} - {moves} moves)"
             current_rows.append(row_widget.snapshot())
-
         if current_rows:
             tag_groups.append({"header": current_header, "rows": current_rows})
+        return tag_groups
 
-        # Build Generated / AI model strings for the PDF header.
-        # Live Check Logs: use check_run_info from this session.
-        # Saved mode (check_run_info=None): read _check_run from shown games:
-        #   - No run info in any game → model "Saved Check Logs results", no date
-        #   - All games same model+date → show that model and date
-        #   - Mixed runs → most recent run's model + " (mixed runs)", most recent date
-        pdf_generated_at = ""
-        pdf_model_label = self._model_label
+    def _resolve_model_generated(self):
+        """Return (model_label, generated_at) for the PDF/clipboard header.
+
+        Live run: from check_run_info. Saved mode: from stored _check_run on games.
+        """
+        generated_at = ""
+        model_label = self._model_label
         if self._check_run_info:
-            pdf_model_label = self._check_run_info.get("model", self._model_label)
+            model_label = self._check_run_info.get("model", self._model_label)
             raw_ts = self._check_run_info.get("date", "")
-            pdf_generated_at = _format_check_run_date(raw_ts)
+            generated_at = _format_check_run_date(raw_ts)
         else:
             seen_game_ids: set = set()
-            seen_runs: list = []  # (model, date) pairs for games that have _check_run
+            seen_runs: list = []
             for game in self._row_games:
                 if id(game) in seen_game_ids:
                     continue
@@ -566,22 +562,58 @@ class ShowShallowTagsDialog(QDialog):
                 if cr and cr.get("model") and cr.get("date"):
                     seen_runs.append((cr["model"], cr["date"]))
             if not seen_runs:
-                pdf_model_label = "Saved Check Logs results"
+                model_label = "Saved Check Logs results"
             elif len(set(seen_runs)) == 1:
-                # Single run: same model and date across all shown games
-                pdf_model_label = seen_runs[0][0]
-                pdf_generated_at = _format_check_run_date(seen_runs[0][1])
+                model_label = seen_runs[0][0]
+                generated_at = _format_check_run_date(seen_runs[0][1])
             else:
-                # Mixed runs: show most recent run's model + suffix and date
                 latest_model, latest_date = max(seen_runs, key=lambda r: r[1])
-                pdf_model_label = f"{latest_model} (mixed runs)"
-                pdf_generated_at = _format_check_run_date(latest_date)
+                model_label = f"{latest_model} (mixed runs)"
+                generated_at = _format_check_run_date(latest_date)
+        return model_label, generated_at
+
+    def _on_copy_to_clipboard(self) -> None:
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QMimeData
+        from app.services.chess_log_html_service import ChessLogHTMLService
+        tag_groups = self._build_tag_groups()
+        model_label, generated_at = self._resolve_model_generated()
+        svc = ChessLogHTMLService(self._config)
+        mime = QMimeData()
+        mime.setHtml(svc.check_logs_html(
+            tag_groups,
+            source_label=self._source_label,
+            model_label=model_label,
+            generated_at=generated_at,
+        ))
+        mime.setText(svc.check_logs_plain(
+            tag_groups,
+            source_label=self._source_label,
+            model_label=model_label,
+            generated_at=generated_at,
+        ))
+        QApplication.clipboard().setMimeData(mime)
+
+    def _on_export_pdf(self) -> None:
+        from pathlib import Path
+        from PyQt6.QtWidgets import QFileDialog
+        from app.services.chess_log_pdf_service import (
+            ChessLogPDFService,
+            default_chess_log_tags_pdf_filename,
+        )
+        suggested = default_chess_log_tags_pdf_filename(is_shallow_only=True)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export to PDF", suggested, "PDF Files (*.pdf)"
+        )
+        if not path:
+            return
+        model_label, generated_at = self._resolve_model_generated()
         ChessLogPDFService(self._config).export_tags(
-            Path(path), tag_groups,
+            Path(path), self._build_tag_groups(),
             is_shallow_only=True,
             source_label=self._source_label,
-            model_label=pdf_model_label,
-            generated_at=pdf_generated_at,
+            model_label=model_label,
+            generated_at=generated_at,
         )
 
     def _on_save(self) -> None:
