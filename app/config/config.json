@@ -1212,16 +1212,34 @@
                 "tooltip": "A digit (0–9)."
               },
               {
+                "id": "not_digit",
+                "label": "Not digit",
+                "insert": "\\D",
+                "tooltip": "Any character that is not a digit."
+              },
+              {
                 "id": "word",
                 "label": "Word",
                 "insert": "\\w",
                 "tooltip": "A letter, digit, or underscore."
               },
               {
+                "id": "not_word",
+                "label": "Not word",
+                "insert": "\\W",
+                "tooltip": "Any character that is not a letter, digit, or underscore."
+              },
+              {
                 "id": "space",
                 "label": "Space",
                 "insert": "\\s",
                 "tooltip": "Whitespace."
+              },
+              {
+                "id": "not_space",
+                "label": "Not space",
+                "insert": "\\S",
+                "tooltip": "Any character that is not whitespace."
               },
               {
                 "id": "any",
@@ -1279,6 +1297,27 @@
                 "insert": "(?:text)*",
                 "select_text": "text",
                 "tooltip": "Zero or more of the placeholder. A selection is wrapped."
+              },
+              {
+                "id": "exact_count",
+                "label": "Exactly n",
+                "insert": "(?:text){2}",
+                "select_text": "text",
+                "tooltip": "Exactly this many of the placeholder. Edit the number. A selection is wrapped."
+              },
+              {
+                "id": "at_least_count",
+                "label": "n or more",
+                "insert": "(?:text){2,}",
+                "select_text": "text",
+                "tooltip": "At least this many of the placeholder. Edit the number. A selection is wrapped."
+              },
+              {
+                "id": "between_count",
+                "label": "n to m",
+                "insert": "(?:text){2,4}",
+                "select_text": "text",
+                "tooltip": "Between these many of the placeholder. Edit the numbers. A selection is wrapped."
               }
             ]
           },
@@ -1292,6 +1331,13 @@
                 "insert": "(text)",
                 "select_text": "text",
                 "tooltip": "A capturing group. Use \\1 in the replacement to refer to it."
+              },
+              {
+                "id": "noncapturing",
+                "label": "Non-capturing",
+                "insert": "(?:text)",
+                "select_text": "text",
+                "tooltip": "Groups without creating a capture. A selection is wrapped."
               },
               {
                 "id": "or",
@@ -1355,6 +1401,20 @@
                 "insert": "[^abc]",
                 "select_text": "abc",
                 "tooltip": "Any character except these."
+              },
+              {
+                "id": "letters",
+                "label": "Letters",
+                "insert": "[a-zA-Z]",
+                "select_text": "a-zA-Z",
+                "tooltip": "Any ASCII letter."
+              },
+              {
+                "id": "digits_range",
+                "label": "Digits",
+                "insert": "[0-9]",
+                "select_text": "0-9",
+                "tooltip": "Any digit from 0 to 9. Same as \\d for ASCII digits."
               }
             ]
           }
