@@ -5348,7 +5348,7 @@
           "spacing": 4,
           "indent": 12,
           "border_radius": 4,
-          "border_width": 1,
+          "border_width": 0,
           "background_color": { "$ref": "$_COLOR_BACKGROUND_SECONDARY" },
           "border_color": { "$ref": "$_COLOR_BUTTON_BORDER" },
           "token_min_width": 36,

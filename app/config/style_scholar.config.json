@@ -5240,7 +5240,7 @@
           "spacing": 4,
           "indent": 12,
           "border_radius": 4,
-          "border_width": 1,
+          "border_width": 0,
           "background_color": { "$ref": "$_COLOR_PAPYRUS_WHITE" },
           "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
           "token_min_width": 36,
