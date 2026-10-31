@@ -871,6 +871,42 @@
             "tooltip": "Matches any of these last names. Use on White or Black. For either color, add the same pattern on both rows and join them with OR. Edit the highlighted names."
           },
           {
+            "id": "find_last_name",
+            "group": "Players",
+            "label": "A last name",
+            "pattern": "^Carlsen,",
+            "sample": "Carlsen, Magnus",
+            "select_text": "Carlsen",
+            "tooltip": "Matches every player with this last name, such as Carlsen, Magnus. Use on the player selection, or on White or Black. Edit the highlighted name."
+          },
+          {
+            "id": "find_first_name",
+            "group": "Players",
+            "label": "A first name",
+            "pattern": ",\\s*Paul\\b",
+            "sample": "Morphy, Paul",
+            "select_text": "Paul",
+            "tooltip": "Matches a given name after the comma, such as Morphy, Paul. Pauline is left out. Use on the player selection, or on White or Black. Edit the highlighted name."
+          },
+          {
+            "id": "last_name_initial",
+            "group": "Players",
+            "label": "Last name starts with",
+            "pattern": "^M\\w*,",
+            "sample": "Murphy, Paul",
+            "select_text": "M",
+            "tooltip": "Matches last names that start with this letter, such as Murphy, Paul. Use on the player selection, or on White or Black. Edit the highlighted letter."
+          },
+          {
+            "id": "last_name_particle",
+            "group": "Players",
+            "label": "Last name with van, von, or de",
+            "pattern": "\\b(?:van|von|de)\\s+\\S+,",
+            "sample": "van Foreest, Jorden",
+            "select_text": "van|von|de",
+            "tooltip": "Matches a particle before the last name, such as van Foreest, Jorden. Use on the player selection, or on White or Black. Edit the highlighted words."
+          },
+          {
             "id": "remove_titles",
             "group": "Players",
             "label": "Player titles (GM/IM/FM/…)",

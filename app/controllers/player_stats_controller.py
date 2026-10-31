@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from app.models.database_panel_model import DatabasePanelModel
 from app.models.game_model import GameModel
 from app.services.player_stats_activity_heatmap_layout import effective_ordinal_for_heatmap
+from app.services.player_name_match import game_includes_player, player_is_white
 from app.services.player_stats_service import PlayerStatsService, AggregatedPlayerStats
 from app.services.error_pattern_service import ErrorPatternService, ErrorPattern
 from app.services.game_summary_service import GameSummaryService, GameSummary
@@ -164,6 +165,7 @@ class PlayerStatsCalculationWorker(QThread):
         use_all_databases: bool,
         player_games: Optional[List["GameData"]] = None,
         time_series_user_settings: Optional[Dict[str, Any]] = None,
+        name_is_regex: bool = False,
     ) -> None:
         """Initialize the stats calculation worker.
 
@@ -179,6 +181,7 @@ class PlayerStatsCalculationWorker(QThread):
         self.player_name = player_name
         self.use_all_databases = use_all_databases
         self.player_games = player_games  # Optional; when set, already filtered to this player
+        self.name_is_regex = bool(name_is_regex)
         self._time_series_user_settings: Dict[str, Any] = (
             dict(time_series_user_settings) if time_series_user_settings else {}
         )
@@ -233,7 +236,7 @@ class PlayerStatsCalculationWorker(QThread):
                 self.progress_update.emit(10, "Finding player games...")
 
                 player_games, total_count = self.stats_controller.player_stats_service.get_player_games(
-                    self.player_name, databases, only_analyzed=False
+                    self.player_name, databases, only_analyzed=False, name_is_regex=self.name_is_regex
                 )
 
                 if self._is_cancelled():
@@ -273,6 +276,7 @@ class PlayerStatsCalculationWorker(QThread):
                 progress_callback,
                 cancellation_check,
                 time_series_user_settings=self._time_series_user_settings,
+                name_is_regex=self.name_is_regex,
             )
             
             if self._is_cancelled():
@@ -316,12 +320,14 @@ class PlayerStatsCalculationWorker(QThread):
                 aggregated_stats,
                 game_summaries,
                 precomputed_moves=precomputed_moves,
+                name_is_regex=self.name_is_regex,
             )
             repeated_position_patterns = (
                 self.stats_controller.error_pattern_service.detect_repeated_position_patterns(
                     self.player_name,
                     analyzed_games,
                     precomputed_moves=precomputed_moves,
+                    name_is_regex=self.name_is_regex,
                 )
             )
             
@@ -407,6 +413,7 @@ class PlayerStatsController(QObject):
         self._session_precomputed_moves: List[Optional[List[MoveData]]] = []
         self._last_unavailable_reason: str = "no_player"
         self._current_player: Optional[str] = None
+        self._current_player_is_regex: bool = False
         self._use_all_databases: bool = False
         self._source_selection: int = 0  # 0=None, 1=Active, 2=All DBs, 3=Selected (Active), 4=Selected (All)
         self._get_selected_games_callback: Optional[Callable[[bool], List["GameData"]]] = None
@@ -565,9 +572,13 @@ class PlayerStatsController(QObject):
         ranked: List[Tuple[float, float, "GameData"]] = []
         for game, summary in zip(self._current_analyzed_games, self.current_game_summaries):
             # Determine whether the player was White or Black in this game
-            if game.white == self._current_player:
+            if player_is_white(
+                game.white, game.black, self._current_player, name_is_regex=self._current_player_is_regex
+            ):
                 player_stats = summary.white_stats
-            elif game.black == self._current_player:
+            elif game_includes_player(
+                game.white, game.black, self._current_player, name_is_regex=self._current_player_is_regex
+            ):
                 player_stats = summary.black_stats
             else:
                 # Game doesn't match current player (shouldn't happen, but be safe)
@@ -669,7 +680,9 @@ class PlayerStatsController(QObject):
         for gi, game in enumerate(analyzed_games):
             if not getattr(game, "analyzed", False):
                 continue
-            is_white_game = (game.white == self._current_player)
+            is_white_game = player_is_white(
+                game.white, game.black, self._current_player, name_is_regex=self._current_player_is_regex
+            )
             moves = self._analysis_moves_for_session_game(gi, game)
             if not moves:
                 continue
@@ -768,7 +781,9 @@ class PlayerStatsController(QObject):
         for gi, game in enumerate(analyzed_games):
             if not getattr(game, "analyzed", False):
                 continue
-            is_white_game = game.white == player
+            is_white_game = player_is_white(
+                game.white, game.black, player, name_is_regex=self._current_player_is_regex
+            )
             moves = self._analysis_moves_for_session_game(gi, game)
             if not moves:
                 continue
@@ -952,7 +967,9 @@ class PlayerStatsController(QObject):
             if not moves:
                 continue
 
-            is_white_game = (game.white == self._current_player)
+            is_white_game = player_is_white(
+                game.white, game.black, self._current_player, name_is_regex=self._current_player_is_regex
+            )
 
             # Per-game accuracy for this player:
             # - Overall game accuracy (used for "Game Acc" column)
@@ -1247,10 +1264,17 @@ class PlayerStatsController(QObject):
         return worst_count, min(accuracies), max(accuracies)
 
     @staticmethod
-    def _player_relative_result(game: "GameData", player_name: str) -> str:
+    def _player_relative_result(
+        game: "GameData", player_name: str, *, name_is_regex: bool = False
+    ) -> str:
         """Map PGN result to Win/Draw/Loss from the player's side."""
         raw = (getattr(game, "result", None) or "").strip()
-        is_white = getattr(game, "white", None) == player_name
+        is_white = player_is_white(
+            getattr(game, "white", None),
+            getattr(game, "black", None),
+            player_name,
+            name_is_regex=name_is_regex,
+        )
         if raw in ("1-0", "1–0"):
             return "Win" if is_white else "Loss"
         if raw in ("0-1", "0–1"):
@@ -1264,13 +1288,20 @@ class PlayerStatsController(QObject):
     ) -> Dict[str, Any]:
         """Build a PDF/table row dict for one ranked game."""
         player = self._current_player or ""
-        is_white = getattr(game, "white", None) == player
+        is_white = player_is_white(
+            getattr(game, "white", None),
+            getattr(game, "black", None),
+            player,
+            name_is_regex=self._current_player_is_regex,
+        )
         opponent = getattr(game, "black", "") if is_white else getattr(game, "white", "")
         return {
             "date": str(getattr(game, "date", "") or "—"),
             "opponent": str(opponent or "—"),
             "color": "White" if is_white else "Black",
-            "result": self._player_relative_result(game, player),
+            "result": self._player_relative_result(
+                game, player, name_is_regex=self._current_player_is_regex
+            ),
             "eco": str(getattr(game, "eco", "") or "—"),
             "accuracy": float(accuracy) if accuracy is not None else None,
             "acpl": float(average_cpl) if average_cpl is not None else None,
@@ -1553,24 +1584,37 @@ class PlayerStatsController(QObject):
         """
         return self._source_selection
     
-    def set_player_selection(self, player_name: Optional[str]) -> None:
+    def set_player_selection(self, player_name: Optional[str], *, name_is_regex: bool = False) -> None:
         """Set the selected player.
         
         Args:
-            player_name: Player name to select, or None to clear selection.
+            player_name: Player name or regular expression, or None to clear selection.
+            name_is_regex: When True, ``player_name`` is a case-insensitive name pattern.
         """
-        if self._current_player == player_name:
+        regex = bool(name_is_regex) and player_name is not None
+        if regex:
+            from app.services.database_search_service import DatabaseSearchService
+
+            if DatabaseSearchService.regex_pattern_error(player_name or ""):
+                return
+        if self._current_player == player_name and self._current_player_is_regex == regex:
             return
         
         if player_name is None:
             # Clear selection
             self._cancel_stats_worker()
             self._current_player = None
+            self._current_player_is_regex = False
             self._session_precomputed_moves = []
             self.player_selection_cleared.emit()
         else:
             self._current_player = player_name
+            self._current_player_is_regex = regex
             self._schedule_stats_recalculation()
+
+    def player_selection_is_regex(self) -> bool:
+        """Whether the current selection is a name pattern rather than one exact name."""
+        return self._current_player_is_regex
     
     def get_current_player(self) -> Optional[str]:
         """Get the currently selected player."""
@@ -1671,7 +1715,9 @@ class PlayerStatsController(QObject):
                 raw = list(selected_games_snapshot) if selected_games_snapshot else []
                 player_games_arg = [
                     g for g in raw
-                    if (g.white == self._current_player or g.black == self._current_player)
+                    if game_includes_player(
+                        g.white, g.black, self._current_player, name_is_regex=self._current_player_is_regex
+                    )
                 ]
             elif self._get_selected_games_callback:
                 try:
@@ -1679,7 +1725,9 @@ class PlayerStatsController(QObject):
                     if selected:
                         player_games_arg = [
                             g for g in selected
-                            if (g.white == self._current_player or g.black == self._current_player)
+                            if game_includes_player(
+                                g.white, g.black, self._current_player, name_is_regex=self._current_player_is_regex
+                            )
                         ]
                 except Exception as e:
                     logging_service = LoggingService.get_instance()
@@ -1692,6 +1740,7 @@ class PlayerStatsController(QObject):
             self._use_all_databases,
             player_games=player_games_arg,
             time_series_user_settings=ts_user,
+            name_is_regex=self._current_player_is_regex,
         )
         self._stats_worker.stats_ready.connect(self._on_stats_worker_ready)
         self._stats_worker.stats_unavailable.connect(self._on_stats_worker_unavailable)

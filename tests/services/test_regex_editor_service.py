@@ -225,6 +225,10 @@ class TestRegexExamples(unittest.TestCase):
         self.assertIn("remove_time_control", ids)
         self.assertIn("games_across_years", ids)
         self.assertIn("tc_increment", ids)
+        self.assertIn("find_last_name", ids)
+        self.assertIn("find_first_name", ids)
+        self.assertIn("last_name_initial", ids)
+        self.assertIn("last_name_particle", ids)
         self.assertEqual(
             [example.group for example in examples if example.group][:1],
             ["Players"],
