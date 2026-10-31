@@ -74,6 +74,12 @@ class RegexPatternLine(QWidget):
         self._setting = False
         self._action = None
         self._icon_px = 16
+        # Chrome (border/background) is painted on this wrapper. A frameless
+        # QPlainTextEdit often drops QSS borders, which made Find look unstyled
+        # on light/scholar panels that share the field background color.
+        self.setObjectName(f"{object_name}Wrap")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setProperty("focused", False)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._edit = QPlainTextEdit(self)
         self._edit.setObjectName(object_name)
@@ -83,6 +89,7 @@ class RegexPatternLine(QWidget):
         self._edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._edit.setTabChangesFocus(True)
         self._edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._edit.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._edit.document().setDocumentMargin(0)
         self._edit.installEventFilter(self)
         self._edit.textChanged.connect(self._on_text_changed)
@@ -120,8 +127,28 @@ class RegexPatternLine(QWidget):
         return None
 
     def set_line_style(self, stylesheet: str, font) -> None:
-        self._edit.setStyleSheet(stylesheet)
+        """Apply line-edit QSS: box on the wrapper, text surface on the editor."""
         self._edit.setFont(font)
+        edit_id = self._edit.objectName()
+        wrap_id = self.objectName()
+        edit_sel = f"QPlainTextEdit#{edit_id}"
+        wrap_sel = f"QWidget#{wrap_id}"
+        chrome = stylesheet.replace(edit_sel, wrap_sel).replace(
+            f"{wrap_sel}:focus", f'{wrap_sel}[focused="true"]'
+        )
+        # Keep typography/colors on the editor; suppress its own box so the
+        # wrapper border is the only chrome (avoids double borders).
+        edit_sheet = (
+            f"{stylesheet}"
+            f"{edit_sel} {{"
+            f"background-color: transparent;"
+            f"border: none;"
+            f"padding: 0px;"
+            f"margin: 0px;"
+            f"}}"
+        )
+        self.setStyleSheet(chrome)
+        self._edit.setStyleSheet(edit_sheet)
 
     def set_line_metrics(self, *, pad_h: int, border_width: int) -> None:
         self._pad_h = max(0, int(pad_h))
@@ -185,11 +212,28 @@ class RegexPatternLine(QWidget):
         super().clearFocus()
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
-        if obj is self._edit and event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
-            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                self.returnPressed.emit()
-                return True
+        if obj is self._edit:
+            etype = event.type()
+            if etype == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
+                if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                    self.returnPressed.emit()
+                    return True
+            if etype == QEvent.Type.FocusIn:
+                self._set_focused(True)
+            elif etype == QEvent.Type.FocusOut:
+                self._set_focused(False)
         return super().eventFilter(obj, event)
+
+    def _set_focused(self, focused: bool) -> None:
+        if bool(self.property("focused")) == focused:
+            return
+        self.setProperty("focused", focused)
+        style = self.style()
+        if style is not None:
+            style.unpolish(self)
+            style.polish(self)
+        self.update()
+
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)

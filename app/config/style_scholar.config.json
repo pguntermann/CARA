@@ -166,6 +166,9 @@
       128,
       118
     ],
+    "$_COLOR_INPUT_FOCUS_BORDER": {
+      "$ref": "$_COLOR_TAN_MOCHA"
+    },
     "$_COLOR_OATMEAL_SCROLL": {
       "$ref": "$_COLOR_OATMEAL_BEIGE"
     },
@@ -337,7 +340,7 @@
     ],
     "$_PADDING_LINE_EDIT_INNER": [
       8,
-      6
+      4
     ]
   },
   "game_tags": {
@@ -622,7 +625,7 @@
           "$ref": "$_COLOR_PEACH_OUTLINE"
         },
         "focus_border_color": {
-          "$ref": "$_COLOR_FOCUS_RING_TEAL"
+          "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
         },
         "border_width": 1,
         "border_radius": 3,
@@ -649,7 +652,7 @@
           "$ref": "$_COLOR_PEACH_OUTLINE"
         },
         "focus_border_color": {
-          "$ref": "$_COLOR_FOCUS_RING_TEAL"
+          "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
         },
         "border_width": 1,
         "border_radius": 3,
@@ -677,7 +680,7 @@
           "$ref": "$_COLOR_PEACH_OUTLINE"
         },
         "focus_border_color": {
-          "$ref": "$_COLOR_FOCUS_RING_TEAL"
+          "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
         },
         "border_width": 1,
         "border_radius": 3,
@@ -2315,7 +2318,7 @@
               "$ref": "$_COLOR_TAUPE_GRID"
             },
             "focus_border_color": {
-              "$ref": "$_COLOR_FOCUS_RING_TEAL"
+              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
             },
             "selection_background_color": {
               "$ref": "$_COLOR_APRICOT_SELECTION"
@@ -3562,12 +3565,12 @@
               "$ref": "$_COLOR_COCOA_BROWN"
             },
             "border_color": {
-              "$ref": "$_COLOR_BOURBON_OUTLINE"
+              "$ref": "$_COLOR_PEACH_OUTLINE"
             },
             "border_width": 1,
             "border_radius": 3,
             "focus_border_color": {
-              "$ref": "$_COLOR_FOCUS_RING_TEAL"
+              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
             }
           },
           "button": {
@@ -3597,12 +3600,12 @@
               "$ref": "$_COLOR_PAPYRUS_WHITE"
             },
             "border_color": {
-              "$ref": "$_COLOR_BOURBON_OUTLINE"
+              "$ref": "$_COLOR_PEACH_OUTLINE"
             },
             "border_width": 1,
             "border_radius": 3,
             "focus_border_color": {
-              "$ref": "$_COLOR_FOCUS_RING_TEAL"
+              "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
             },
             "padding": [
               3,
@@ -4429,7 +4432,7 @@
             "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_DEEP_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           },
           "border_radius": 3,
           "padding": [
@@ -4579,7 +4582,7 @@
             "$ref": "$_FONT_SIZE_BASE_MEDIUM"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_FOCUS_RING_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           },
           "selection_background_color": {
             "$ref": "$_COLOR_APRICOT_SELECTION"
@@ -4850,7 +4853,7 @@
             "$ref": "$_COLOR_INK_BODY"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_FOCUS_RING_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           }
         },
         "validation_dialog": {
@@ -5004,7 +5007,7 @@
             "$ref": "$_COLOR_INK_BODY"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_FOCUS_RING_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           },
           "hover_border_offset": 20,
           "disabled_brightness_factor": 0.5,
@@ -5117,10 +5120,10 @@
             "$ref": "$_COLOR_PAPYRUS_FIELD"
           },
           "border_color": {
-            "$ref": "$_COLOR_FOREST_OUTLINE"
+            "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_DEEP_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           },
           "border_radius": 3,
           "padding": [
@@ -5184,8 +5187,8 @@
           "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
           "background_color": { "$ref": "$_COLOR_WHEAT_CREAM" },
           "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
-          "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
-          "focus_border_color": { "$ref": "$_COLOR_DEEP_TEAL" },
+          "border_color": { "$ref": "$_COLOR_PEACH_OUTLINE" },
+          "focus_border_color": { "$ref": "$_COLOR_INPUT_FOCUS_BORDER" },
           "border_radius": 3,
           "padding": [8, 6],
           "selection_background_color": { "$ref": "$_COLOR_SAGE_PAPER" },
@@ -5197,8 +5200,8 @@
           "font_size": { "$ref": "$_FONT_SIZE_BASE_MEDIUM" },
           "background_color": { "$ref": "$_COLOR_WHEAT_CREAM" },
           "text_color": { "$ref": "$_COLOR_ESPRESSO_INK" },
-          "border_color": { "$ref": "$_COLOR_FOREST_OUTLINE" },
-          "focus_border_color": { "$ref": "$_COLOR_DEEP_TEAL" },
+          "border_color": { "$ref": "$_COLOR_PEACH_OUTLINE" },
+          "focus_border_color": { "$ref": "$_COLOR_INPUT_FOCUS_BORDER" },
           "border_radius": 3,
           "padding": [8, 6],
           "selection_background_color": { "$ref": "$_COLOR_SAGE_PAPER" },
@@ -5601,7 +5604,7 @@
           "minimum_width": 200,
           "minimum_height": 30,
           "focus_border_color": {
-            "$ref": "$_COLOR_FOCUS_RING_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           },
           "selection_background_color": {
             "$ref": "$_COLOR_APRICOT_SELECTION"
@@ -6810,7 +6813,7 @@
             "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_DEEP_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           },
           "border_radius": 3,
           "padding": [
@@ -6958,7 +6961,7 @@
             "$ref": "$_COLOR_PEACH_OUTLINE"
           },
           "focus_border_color": {
-            "$ref": "$_COLOR_DEEP_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           },
           "border_radius": 3,
           "padding": [
@@ -7144,7 +7147,7 @@
           "minimum_width": 200,
           "minimum_height": 30,
           "focus_border_color": {
-            "$ref": "$_COLOR_FOCUS_RING_TEAL"
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
           }
         },
         "buttons": {
