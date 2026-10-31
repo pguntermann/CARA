@@ -100,7 +100,7 @@
                 "explanation": "Average centipawns lost per move versus the engine's best move. Lower means the played moves stayed closer to engine recommendations.",
                 "note": "Approximate guide; depends on engine, depth, and classification settings.",
                 "scale_min": 0,
-                "scale_max": 80,
+                "scale_max": 120,
                 "higher_is_better": false,
                 "unit": "CPL",
                 "bands": [
@@ -121,7 +121,7 @@
                   },
                   {
                     "label": "Amateur",
-                    "end": 80,
+                    "end": 120,
                     "description": "Amateur / beginner; bigger deviations common"
                   }
                 ]
