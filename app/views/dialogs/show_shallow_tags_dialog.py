@@ -65,11 +65,11 @@ class ShowShallowTagsDialog(QDialog):
         config: application config dict.
         games: list of GameData objects in scope.
         controller: ChessLogController instance (not ChessLogChartsController).
-        shallow_keys: set of (game, path_key, preset) 4-tuples classified SHALLOW
+        shallow_keys: set of (game, path_key, preset, cat) 4-tuples classified SHALLOW
             this run.  ``game`` is the GameData object (identity-keyed).
-        vague_keys: set of (game, path_key, preset) 4-tuples with a vague lesson
+        vague_keys: set of (game, path_key, preset, cat) 4-tuples with a vague lesson
             this run (3x3 only).
-        classified_keys: frozenset of (game, path_key, preset) 4-tuples that were
+        classified_keys: frozenset of (game, path_key, preset, cat) 4-tuples that were
             sent to the classifier AND received a parsed verdict this run.
             ``shallow_keys ∪ vague_keys ⊆ classified_keys``.  Only entries in this set
             may be modified by Save; entries outside it are never touched.
