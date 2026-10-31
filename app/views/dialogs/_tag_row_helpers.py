@@ -13,6 +13,23 @@ import chess.pgn
 from app.utils.pgn_variation_path import decode_path, node_at_path
 
 
+def game_header_text(game) -> str:
+    """Return the canonical game-group header string used in exports and dialogs.
+
+    Format: ``White - Black result (date - N moves)``
+    Falls back to "Unknown" / "*" / "????.??.??" for missing fields.
+    """
+    white = str(getattr(game, "white", "") or "").strip() or "Unknown"
+    black = str(getattr(game, "black", "") or "").strip() or "Unknown"
+    result = str(getattr(game, "result", "") or "").strip() or "*"
+    date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
+    try:
+        moves = int(getattr(game, "moves", 0) or 0)
+    except (TypeError, ValueError):
+        moves = 0
+    return f"{white} - {black} {result} ({date} - {moves} moves)"
+
+
 def ply_for_path(pgn_game: Optional[chess.pgn.Game], path) -> int:
     """Return the ply index for *path* within *pgn_game* (0-based from root)."""
     if pgn_game is None:

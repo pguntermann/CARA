@@ -39,7 +39,11 @@ from app.services.chess_log_storage_service import ChessLogStorageService
 from app.utils.chess_log_best_move import resolve_best_move_for_path
 from app.utils.help_icon import make_help_icon
 from app.utils.pgn_variation_path import decode_path
-from app.views.dialogs._tag_row_helpers import node_info as _node_info_fn, ply_for_path as _ply_for_path_fn
+from app.views.dialogs._tag_row_helpers import (
+    game_header_text as _game_header_text,
+    node_info as _node_info_fn,
+    ply_for_path as _ply_for_path_fn,
+)
 from app.views.dialogs.show_tags_dialog import _TagRowWidget, _PRESET_ORDER, _normalize_entries
 from app.views.style.style_manager import StyleManager
 
@@ -272,15 +276,7 @@ class ShowShallowTagsDialog(QDialog):
         return sep
 
     def _make_game_header(self, game) -> QLabel:
-        _white = str(getattr(game, "white", "") or "").strip() or "Unknown"
-        _black = str(getattr(game, "black", "") or "").strip() or "Unknown"
-        _result = str(getattr(game, "result", "") or "").strip() or "*"
-        _date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
-        try:
-            _moves = int(getattr(game, "moves", 0) or 0)
-        except (TypeError, ValueError):
-            _moves = 0
-        text = f"{_white} - {_black} {_result} ({_date} - {_moves} moves)"
+        text = _game_header_text(game)
         label = QLabel(text)
         br, bg, bb = self._bg_rgb
         tr, tg, tb = self._text_color_rgb
@@ -529,12 +525,7 @@ class ShowShallowTagsDialog(QDialog):
                     tag_groups.append({"header": current_header, "rows": current_rows})
                 current_game = game
                 current_rows = []
-                white = str(getattr(game, "white", "") or "").strip() or "Unknown"
-                black = str(getattr(game, "black", "") or "").strip() or "Unknown"
-                result = str(getattr(game, "result", "") or "").strip() or "*"
-                date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
-                moves = getattr(game, "moves", 0) or 0
-                current_header = f"{white} - {black} {result} ({date} - {moves} moves)"
+                current_header = _game_header_text(game)
             current_rows.append(row_widget.snapshot())
         if current_rows:
             tag_groups.append({"header": current_header, "rows": current_rows})

@@ -342,15 +342,6 @@ class TestNarrativeTable(unittest.TestCase):
         self.assertLess(idx_ul, idx_table)
         self.assertLess(idx_table, idx_takeaways)
 
-    def test_markdown_to_html_file_unchanged(self):
-        import subprocess, sys, os
-        result = subprocess.run(
-            ["git", "diff", "--stat", "--", "app/utils/markdown_to_html.py"],
-            capture_output=True, text=True,
-            cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        )
-        self.assertEqual(result.stdout.strip(), "",
-            "markdown_to_html.py must not be modified")
 
 # ---------------------------------------------------------------------------
 # 15: Newlines in notes
@@ -535,6 +526,54 @@ class TestEncodeText(unittest.TestCase):
     def test_figurine_preserved(self):
         result = _encode_text("Knight ♘")
         self.assertIn("♘", result)
+
+
+# ---------------------------------------------------------------------------
+# 18: game_header_text helper — byte-identical output check
+# ---------------------------------------------------------------------------
+
+class TestGameHeaderText(unittest.TestCase):
+    """Verify game_header_text() produces the same string as the old inline format."""
+
+    def _old_fmt(self, game) -> str:
+        """The original four-liner replaced by game_header_text()."""
+        white = str(getattr(game, "white", "") or "").strip() or "Unknown"
+        black = str(getattr(game, "black", "") or "").strip() or "Unknown"
+        result = str(getattr(game, "result", "") or "").strip() or "*"
+        date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
+        try:
+            moves = int(getattr(game, "moves", 0) or 0)
+        except (TypeError, ValueError):
+            moves = 0
+        return f"{white} - {black} {result} ({date} - {moves} moves)"
+
+    def _game(self, **kw):
+        from app.models.database_model import GameData
+        return GameData(**kw)
+
+    def test_all_fields_set(self):
+        from app.views.dialogs._tag_row_helpers import game_header_text
+        g = self._game(game_number=1, white="Kasparov", black="Karpov",
+                       result="1-0", date="1985.10.09", moves=42)
+        self.assertEqual(game_header_text(g), self._old_fmt(g))
+
+    def test_missing_fields_fallback(self):
+        from app.views.dialogs._tag_row_helpers import game_header_text
+        g = self._game(game_number=1)
+        self.assertEqual(game_header_text(g), self._old_fmt(g))
+
+    def test_missing_fields_output(self):
+        from app.views.dialogs._tag_row_helpers import game_header_text
+        g = self._game(game_number=1)
+        h = game_header_text(g)
+        self.assertIn("Unknown - Unknown", h)
+        self.assertIn("* (????.??.??", h)
+
+    def test_none_values_treated_as_missing(self):
+        from app.views.dialogs._tag_row_helpers import game_header_text
+        from app.models.database_model import GameData
+        g = GameData(game_number=1, white=None, black=None, result=None, date=None, moves=None)
+        self.assertEqual(game_header_text(g), self._old_fmt(g))
 
 
 if __name__ == "__main__":

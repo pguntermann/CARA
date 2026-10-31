@@ -78,7 +78,11 @@ from app.utils.chess_log_best_move import resolve_best_move_for_path
 from app.utils.chess_log_preset_order import CLAMP_ORDER, CCT_ORDER
 from app.utils.chess_log_prompts import THREE_BY_THREE_PROMPTS as _3X3_PROMPTS
 from app.utils.pgn_variation_path import decode_path
-from app.views.dialogs._tag_row_helpers import node_info as _node_info_fn, ply_for_path as _ply_for_path_fn
+from app.views.dialogs._tag_row_helpers import (
+    game_header_text as _game_header_text,
+    node_info as _node_info_fn,
+    ply_for_path as _ply_for_path_fn,
+)
 from app.views.style.style_manager import StyleManager
 from app.views.widgets.mini_chessboard_widget import MiniChessBoardWidget
 
@@ -1036,12 +1040,7 @@ class ShowTagsDialog(QDialog):
                     tag_groups.append({"header": current_header, "rows": current_rows})
                 current_game = game
                 current_rows = []
-                white = str(getattr(game, "white", "") or "").strip() or "Unknown"
-                black = str(getattr(game, "black", "") or "").strip() or "Unknown"
-                result = str(getattr(game, "result", "") or "").strip() or "*"
-                date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
-                moves = getattr(game, "moves", 0) or 0
-                current_header = f"{white} - {black} {result} ({date} - {moves} moves)"
+                current_header = _game_header_text(game)
             current_rows.append(row_widget.snapshot())
         if current_rows:
             tag_groups.append({"header": current_header, "rows": current_rows})

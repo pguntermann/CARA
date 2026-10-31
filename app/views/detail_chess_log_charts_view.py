@@ -979,7 +979,10 @@ class DetailChessLogChartsView(QWidget):
         from io import StringIO
         import chess.pgn as _chess_pgn
         from app.models.chess_log_snapshot import TagRowSnapshot
-        from app.views.dialogs._tag_row_helpers import node_info as _node_info
+        from app.views.dialogs._tag_row_helpers import (
+            game_header_text as _game_header_text,
+            node_info as _node_info,
+        )
 
         if not (self._last_shallow_keys and self._controller):
             return []
@@ -998,12 +1001,7 @@ class DetailChessLogChartsView(QWidget):
             except Exception:
                 pass
 
-            white = str(getattr(game, "white", "") or "").strip() or "Unknown"
-            black = str(getattr(game, "black", "") or "").strip() or "Unknown"
-            result = str(getattr(game, "result", "") or "").strip() or "*"
-            date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
-            moves = getattr(game, "moves", 0) or 0
-            header = f"{white} - {black} {result} ({date} - {moves} moves)"
+            header = _game_header_text(game)
 
             rows: List[TagRowSnapshot] = []
             seen: Set[Tuple] = set()
