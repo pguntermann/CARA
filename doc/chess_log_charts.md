@@ -255,6 +255,60 @@ Each `ChessLogCategoryChartWidget` and the narrative `QFrame` carry a `section_n
 
 **Charts tab Export PDF Report** (title unchanged: "Chess Log Charts", file name unchanged) shows the same header lines when a narrative has been generated: Player, Source, counts, Generated (the narrative's generation time), AI model. When no narrative has been generated, only Player, Source, and `Generated:` (the current export time) appear — no counts and no AI model line.
 
+## HTML clipboard export (#73)
+
+Four Chess Log copy actions write **dual-flavor** clipboard data (HTML + plain text via `QMimeData.setHtml` / `QMimeData.setText`). Apps that understand HTML (Notion, chess.com forums, Mail) paste the rich version; plain-text destinations get the raw text.
+
+### Actions and their HTML structure
+
+| Action | Entry point | HTML title |
+|---|---|---|
+| Charts tab — Copy section (narrative) | `DetailChessLogChartsView._copy_section_to_clipboard("narrative")` | same header as Narrative Summary PDF |
+| Charts tab — Copy log | `DetailChessLogChartsView._copy_log_to_clipboard()` | same header as Charts report PDF |
+| ShowTagsDialog — Copy to clipboard | `ShowTagsDialog._on_copy_to_clipboard()` | `Chess Log — Logged Moments` |
+| ShowShallowTagsDialog — Copy to clipboard | `ShowShallowTagsDialog._on_copy_to_clipboard()` | `Chess Log — Check Logs` |
+
+Non-narrative chart sections (e.g. "Copy section → chart_CLAMP") keep plain-text-only behavior — no HTML added.
+
+### `ChessLogHTMLService` (`app/services/chess_log_html_service.py`)
+
+Stateless service instantiated with `config` (the merged application config). Constructor reads chip label strings from `config.ui.dialogs.shallow.labels`.
+
+**Public methods**:
+- `narrative_html(player_name, source_label, narrative_body, n_games, g_with_moments, m_moments, k_not_flagged, generated_at, model_label)` → full HTML string
+- `charts_log_html(player_name, source_label, tag_groups, generated_at, model_label)` → full HTML string
+- `logged_moments_html(tag_groups)` → full HTML string (prefixed `<h2>Chess Log — Logged Moments</h2><hr>`)
+- `logged_moments_plain(tag_groups)` → plain-text string matching existing PDF format
+- `check_logs_html(source_label, model_label, generated_at, tag_groups)` → full HTML string
+- `check_logs_plain(source_label, model_label, generated_at, tag_groups)` → plain-text string matching existing PDF format
+
+**Tag row layout**:
+- **3x3**: `<p><strong>move</strong></p>` then for each Why: `<p><strong>question</strong> [chip]</p>` + optional `<p>answer</p>` (stacked paragraphs — no table).
+- **CLAMP/CCT**: `<p><strong>move</strong>&nbsp;<strong>cats</strong>&nbsp;[chip]</p>` + optional `<p>note</p>`.
+
+`<hr>` separates report header from game groups, and appears between games (not before the first or after the last).
+
+### Pipe-table handling in narrative HTML
+
+Philipp's `markdown_to_html.py` handles most markdown but not GFM pipe tables. `ChessLogHTMLService` contains its own `_split_narrative_blocks()` + `_gfm_table_to_html()` to detect and convert pipe-table blocks; other blocks are passed to `markdown_to_html(block, heading_level_offset=1)` so `##` headings become `<h3>` (not `<h1>`). `markdown_to_html.py` is never modified — all authorship belongs to Philipp Guntermann.
+
+### Chip colors (WCAG AA)
+
+Shallow and vague chips use high-contrast colors so they are readable on both light and dark HTML backgrounds.
+
+| Chip | Background | Contrast vs white text |
+|---|---|---|
+| Shallow | `#9a4400` (dark orange) | ≈ 6.6 : 1 |
+| Vague | `#1d4ed8` (dark blue) | ≈ 6.7 : 1 |
+
+Both exceed the WCAG AA threshold of 4.5:1. All `html.escape()` calls in the service use `quote=False` so apostrophes in Why-question text stay as literal `'` rather than being encoded to `&#x27;`.
+
+### Tests
+
+End-to-end clipboard tests: `tests/views/test_chess_log_clipboard.py` (32 tests, 4 classes — one per copy action). These verify actual `QMimeData` HTML and plain-text contents, not just the generator in isolation.
+
+Unit tests for the HTML service: `tests/services/test_chess_log_html_service.py` (54 tests).
+
 ## Multi-game cache and save-all
 
 **Save Chess Logs for all games** (Chess Log menu, no shortcut): saves every game in `ChessLogController._dirty_games` via `ChessLogStorageService.store_tags` directly — does NOT flip the active game. Handler: `MainWindow._save_chess_logs_for_all_games` → `chess_log_controller.save_all_dirty_games()`. Reports count of saved/failed games in the status bar. Cache coherency across active-game transitions: Rule A (activation promotes from multi-cache before hitting disk) and Rule B (deactivation flushes single-game cache into multi-cache) ensure edits to inactive games are never silently discarded.
@@ -333,7 +387,17 @@ Multi-line prompt strings are stored as single JSON string values with `\n` esca
 
 ### What Paul can test before the PR
 
-1. **Narrative Summary** — run on the logged-game library and compare output quality with the pre-change baseline. The golden fixture tests in `tests/services/test_chess_log_prompts_config_roundtrip.py` prove prompt assembly is byte-identical before and after the config move; the comparison is a spot-check for quality, not a byte diff.
+1. **HTML clipboard — Charts narrative copy**: generate a narrative, right-click → "Copy section" (narrative section). Paste into a rich-text app (Notion, Mail, Pages). Confirm: headings render as headings, bullets as bullets, the Tactical Breakdown table renders as a table. Paste into a plain-text app (TextEdit plain mode): confirm raw markdown, no `<h` tags.
+
+2. **HTML clipboard — Charts "Copy log"**: right-click → "Copy log to clipboard". Paste rich: confirm `<h2>` header and rows. Paste plain: confirm "Chess Log —" prefix, no HTML tags.
+
+3. **HTML clipboard — Logged Moments**: open Show Logged Moments (Chess Log menu or context menu). Click "Copy to clipboard". Paste rich: confirm game header (White − Black), move labels, category chips. Paste plain: confirm no `<h2>` or `<p>` tags.
+
+4. **HTML clipboard — Check Logs**: after a Check Logs run, open Show Shallow/Vague Logs. Click "Copy to clipboard". Paste rich: confirm "Check Logs" title, source label, model name, shallow/vague chips. Paste plain: confirm `Chess Log — Check Logs` header, source label.
+
+5. **Copy buttons enabled/disabled state**: open Show Logged Moments on a game with no moments — "Copy to clipboard" button must be disabled. Same for Show Shallow/Vague Logs with no flagged notes.
+
+6. **Narrative Summary** — run on the logged-game library and compare output quality with the pre-change baseline. The golden fixture tests in `tests/services/test_chess_log_prompts_config_roundtrip.py` prove prompt assembly is byte-identical before and after the config move; the comparison is a spot-check for quality, not a byte diff.
 
 2. **AI Chat** — run a normal analysis session. The golden fixture tests in `tests/services/test_ai_chat_prompts_golden.py` prove system_prompt assembly is byte-identical.
 
@@ -362,6 +426,7 @@ Multi-line prompt strings are stored as single JSON string values with `\n` esca
 - `app/services/chess_log_stats_service.py`
 - `app/services/chess_log_narrative_service.py`
 - `app/services/chess_log_pdf_service.py`
+- `app/services/chess_log_html_service.py` — HTML + plain-text clipboard generation for all four copy actions
 - `app/controllers/chess_log_charts_controller.py`
 - `app/controllers/chess_log_controller.py`
 - `app/views/detail_chess_log_charts_view.py`
