@@ -223,6 +223,12 @@ class TestRegexExamples(unittest.TestCase):
         self.assertIn("remove_titles", ids)
         self.assertIn("remove_federation_code", ids)
         self.assertIn("remove_time_control", ids)
+        self.assertIn("games_across_years", ids)
+        self.assertIn("tc_increment", ids)
+        self.assertEqual(
+            [example.group for example in examples if example.group][:1],
+            ["Players"],
+        )
         for example in examples:
             preview = self.service.preview(
                 example.pattern,

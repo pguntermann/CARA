@@ -853,7 +853,100 @@
         "examples_replace_message": "Replace the current pattern with \"{name}\"?",
         "examples": [
           {
+            "id": "name_spellings",
+            "group": "Players",
+            "label": "Several spellings of a name",
+            "pattern": "Müller|Mueller|Muller",
+            "sample": "Mueller, Hans",
+            "select_text": "Müller|Mueller|Muller",
+            "tooltip": "Matches any of these spellings. Use on White or Black. Search ignores case. Edit the highlighted names."
+          },
+          {
+            "id": "any_of_these_players",
+            "group": "Players",
+            "label": "Any of these players",
+            "pattern": "Carlsen|Nepomniachtchi|Giri",
+            "sample": "Giri, Anish",
+            "select_text": "Carlsen|Nepomniachtchi|Giri",
+            "tooltip": "Matches any of these last names. Use on White or Black. For either color, add the same pattern on both rows and join them with OR. Edit the highlighted names."
+          },
+          {
+            "id": "remove_titles",
+            "group": "Players",
+            "label": "Player titles (GM/IM/FM/…)",
+            "pattern": "\\b(?:WGM|WIM|WFM|WCM|GM|IM|FM|CM|NM)\\.?\\s*",
+            "sample": "GM Magnus Carlsen",
+            "select_text": "WGM|WIM|WFM|WCM|GM|IM|FM|CM|NM",
+            "tooltip": "Matches common title prefixes such as GM, IM, FM, WGM, and NM, including an optional period. Use on White or Black. Edit the highlighted title list to add more."
+          },
+          {
+            "id": "remove_rating_parens",
+            "group": "Players",
+            "label": "Rating in parentheses",
+            "pattern": "\\s*\\(\\d{3,4}\\)",
+            "sample": "Carlsen (2830)",
+            "tooltip": "Matches a 3–4 digit rating inside parentheses, as in a player name. Example: \"Carlsen (2830)\"."
+          },
+          {
+            "id": "keep_digits_only",
+            "group": "Players",
+            "label": "Non-digits",
+            "pattern": "[^0-9]+",
+            "sample": "elo 2755",
+            "tooltip": "Matches everything that is not a digit. Useful when cleaning WhiteElo / BlackElo values such as \"elo 2755\"."
+          },
+          {
+            "id": "online_site",
+            "group": "Events and sites",
+            "label": "Online site",
+            "pattern": "lichess|chess\\.com|chess24",
+            "sample": "lichess.org",
+            "select_text": "lichess|chess\\.com|chess24",
+            "tooltip": "Matches a common online site. Use on Site. Edit the highlighted list."
+          },
+          {
+            "id": "round_number",
+            "group": "Events and sites",
+            "label": "Round number",
+            "pattern": "\\bRound\\s+\\d+\\b",
+            "sample": "Candidates Round 3",
+            "tooltip": "Matches \"Round\" followed by a number. Use on Event."
+          },
+          {
+            "id": "remove_federation_code",
+            "group": "Events and sites",
+            "label": "Trailing federation code",
+            "pattern": "\\s*(?:\\[[A-Z]{3}\\]|\\([A-Z]{3}\\)|[A-Z]{3})\\s*$",
+            "sample": "Wijk aan Zee NED",
+            "tooltip": "Matches a trailing 3-letter federation code, optionally in [ ] or ( ). Use on Site or Event. Example: \"Wijk aan Zee NED\" or \"Berlin [GER]\"."
+          },
+          {
+            "id": "remove_time_control",
+            "group": "Events and sites",
+            "label": "Time-control fragment",
+            "pattern": "\\s*\\b(?:\\d+\\+\\d+|[Gg]/\\d+|\\d+\\|\\d+)\\b\\s*",
+            "sample": "Tata Steel 15+10 Masters",
+            "tooltip": "Matches time-control tokens such as 10+0, 15+10, G/90, or 15|10 inside an event name. Use on Event."
+          },
+          {
+            "id": "keep_year",
+            "group": "Events and sites",
+            "label": "First 4-digit year",
+            "pattern": ".*?(\\d{4}).*",
+            "sample": "London 2024 Open",
+            "tooltip": "Captures the first four-digit year in an event name. Example: \"London 2024 Open\" → \"2024\"."
+          },
+          {
+            "id": "keep_first_three_words",
+            "group": "Events and sites",
+            "label": "First three words",
+            "pattern": "^(\\S+(?:\\s+\\S+){0,2}).*$",
+            "sample": "Tata Steel Masters Wijk aan Zee",
+            "tooltip": "Captures the first three whitespace-separated words of an event or site name."
+          },
+          {
             "id": "keep_before_dash",
+            "group": "Events and sites",
             "label": "Keep text before \"-\"",
             "pattern": "^(.*?)\\s*-\\s*.*$",
             "sample": "Wijk aan Zee - Masters",
@@ -861,6 +954,7 @@
           },
           {
             "id": "keep_after_dash",
+            "group": "Events and sites",
             "label": "Keep text after \"-\"",
             "pattern": "^.*?\\s*-\\s*(.*)$",
             "sample": "Wijk aan Zee - Masters",
@@ -868,6 +962,7 @@
           },
           {
             "id": "keep_before_comma",
+            "group": "Events and sites",
             "label": "Keep text before \",\"",
             "pattern": "^(.*?)\\s*,.*$",
             "sample": "Candidates, Toronto",
@@ -875,6 +970,7 @@
           },
           {
             "id": "keep_after_comma",
+            "group": "Events and sites",
             "label": "Keep text after \",\"",
             "pattern": "^.*,\\s*(.*)$",
             "sample": "Candidates, Toronto",
@@ -882,6 +978,7 @@
           },
           {
             "id": "keep_in_parens",
+            "group": "Events and sites",
             "label": "Keep text inside (…)",
             "pattern": ".*?\\(([^)]+)\\).*",
             "sample": "Olympiad (Open)",
@@ -889,60 +986,105 @@
           },
           {
             "id": "keep_before_parens",
+            "group": "Events and sites",
             "label": "Keep text before (…)",
             "pattern": "^(.*?)\\s*\\(.*$",
             "sample": "Olympiad (Open)",
             "tooltip": "Captures the text before the first parenthesis. Example: \"Olympiad (Open)\" → \"Olympiad\"."
           },
           {
-            "id": "remove_rating_parens",
-            "label": "Rating in parentheses",
-            "pattern": "\\s*\\(\\d{3,4}\\)",
-            "sample": "Carlsen (2830)",
-            "tooltip": "Matches a 3–4 digit rating inside parentheses, as in a player name. Example: \"Carlsen (2830)\"."
+            "id": "games_from_one_year",
+            "group": "Dates",
+            "label": "Games from one year",
+            "pattern": "^2024",
+            "sample": "2024.03.18",
+            "select_text": "2024",
+            "tooltip": "Matches dates in 2024, such as 2024.03.18. Use on Date. Edit the highlighted year."
           },
           {
-            "id": "keep_year",
-            "label": "First 4-digit year",
-            "pattern": ".*?(\\d{4}).*",
-            "sample": "London 2024 Open",
-            "tooltip": "Captures the first four-digit year in an event name. Example: \"London 2024 Open\" → \"2024\"."
+            "id": "games_across_years",
+            "group": "Dates",
+            "label": "A span of years",
+            "pattern": "^20(?:1[5-9]|2[0-4])",
+            "sample": "2019.11.02",
+            "select_text": "1[5-9]|2[0-4]",
+            "tooltip": "Matches dates from 2015 through 2024. Use on Date. Edit the highlighted numbers for another span."
           },
           {
-            "id": "keep_digits_only",
-            "label": "Non-digits",
-            "pattern": "[^0-9]+",
-            "sample": "elo 2755",
-            "tooltip": "Matches everything that is not a digit. Useful when cleaning WhiteElo / BlackElo values such as \"elo 2755\"."
+            "id": "games_in_one_month",
+            "group": "Dates",
+            "label": "One month",
+            "pattern": "\\.11\\.",
+            "sample": "2018.11.09",
+            "select_text": "11",
+            "tooltip": "Matches November in a PGN date (YYYY.MM.DD). Use on Date. Edit the highlighted month."
           },
           {
-            "id": "keep_first_three_words",
-            "label": "First three words",
-            "pattern": "^(\\S+(?:\\s+\\S+){0,2}).*$",
-            "sample": "Tata Steel Masters Wijk aan Zee",
-            "tooltip": "Captures the first three whitespace-separated words of an event or site name."
+            "id": "unknown_date_part",
+            "group": "Dates",
+            "label": "Unknown month or day",
+            "pattern": "\\?\\?",
+            "sample": "1999.??.??",
+            "tooltip": "Matches ??, which PGN uses for an unknown month or day. Use on Date. Example: 1999.??.??."
           },
           {
-            "id": "remove_titles",
-            "label": "Player titles (GM/IM/FM/…)",
-            "pattern": "\\b(?:WGM|WIM|WFM|WCM|GM|IM|FM|CM|NM)\\.?\\s*",
-            "sample": "GM Magnus Carlsen",
-            "select_text": "WGM|WIM|WFM|WCM|GM|IM|FM|CM|NM",
-            "tooltip": "Matches common title prefixes such as GM, IM, FM, WGM, and NM, including an optional period. Edit the highlighted title list to add more."
+            "id": "eco_letter",
+            "group": "Openings",
+            "label": "ECO letter group",
+            "pattern": "^B\\d{2}$",
+            "sample": "B22",
+            "select_text": "B",
+            "tooltip": "Matches every ECO code in group B, such as B22. Use on ECO. Edit the highlighted letter (A–E)."
           },
           {
-            "id": "remove_federation_code",
-            "label": "Trailing federation code",
-            "pattern": "\\s*(?:\\[[A-Z]{3}\\]|\\([A-Z]{3}\\)|[A-Z]{3})\\s*$",
-            "sample": "Wijk aan Zee NED",
-            "tooltip": "Matches a trailing 3-letter federation code, optionally in [ ] or ( ). Example: \"Wijk aan Zee NED\" or \"Berlin [GER]\"."
+            "id": "opening_names",
+            "group": "Openings",
+            "label": "Opening names",
+            "pattern": "Sicilian|Najdorf|Sveshnikov",
+            "sample": "Sicilian, Najdorf",
+            "select_text": "Sicilian|Najdorf|Sveshnikov",
+            "tooltip": "Matches any of these opening names. Use on Event, or on a custom tag such as Opening. Edit the highlighted names."
           },
           {
-            "id": "remove_time_control",
-            "label": "Time-control fragment",
-            "pattern": "\\s*\\b(?:\\d+\\+\\d+|[Gg]/\\d+|\\d+\\|\\d+)\\b\\s*",
-            "sample": "Tata Steel 15+10 Masters",
-            "tooltip": "Matches time-control tokens such as 10+0, 15+10, G/90, or 15|10 inside an event name."
+            "id": "tc_increment",
+            "group": "Clocks",
+            "label": "Clock with an increment",
+            "pattern": "\\d+\\+\\d+",
+            "sample": "300+5",
+            "tooltip": "Matches a clock with an increment, such as 300+5 or 180+2. Use on TimeControl. The pattern sees the original tag, not the base seconds."
+          },
+          {
+            "id": "tc_seconds",
+            "group": "Clocks",
+            "label": "Seconds and no increment",
+            "pattern": "^\\d+$",
+            "sample": "300",
+            "tooltip": "Matches a clock that is only a number of seconds, such as 300 for five minutes and no increment. Use on TimeControl."
+          },
+          {
+            "id": "tc_moves",
+            "group": "Clocks",
+            "label": "Moves and time",
+            "pattern": "\\d+/\\d+",
+            "sample": "40/7200:1800+30",
+            "tooltip": "Matches a classical control written as moves/seconds, such as 40/7200. Use on TimeControl."
+          },
+          {
+            "id": "tc_correspondence",
+            "group": "Clocks",
+            "label": "Correspondence clock (- or *)",
+            "pattern": "^[-*]$",
+            "sample": "-",
+            "tooltip": "Matches a missing clock written as - or *. Use on TimeControl."
+          },
+          {
+            "id": "tc_type_fast",
+            "group": "Clocks",
+            "label": "Bullet or blitz",
+            "pattern": "Bullet|Blitz",
+            "sample": "Blitz",
+            "select_text": "Bullet|Blitz",
+            "tooltip": "Matches the Bullet or Blitz category. Use on TC Type, which stores the category name rather than the clock. Edit the highlighted names (Rapid and Classical work the same way)."
           }
         ],
         "pattern_placeholder": "Regular expression",

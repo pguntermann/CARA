@@ -56,6 +56,7 @@ class RegexExample:
     sample: str = ""
     tooltip: str = ""
     select_text: str = ""
+    group: str = ""
 
 
 @dataclass(frozen=True)
@@ -141,6 +142,7 @@ class RegexEditorService:
             sample = str(item.get("sample", "") or "")
             tooltip = str(item.get("tooltip", "") or "")
             select_text = str(item.get("select_text", "") or "")
+            group = str(item.get("group", "") or "").strip()
             if not example_id or not label or not isinstance(pattern, str) or pattern == "":
                 raise ValueError(
                     f"ui.dialogs.regex_editor.examples[{index}] needs id, label, and pattern"
@@ -165,6 +167,7 @@ class RegexEditorService:
                     sample=sample,
                     tooltip=tooltip,
                     select_text=select_text,
+                    group=group,
                 )
             )
         return examples

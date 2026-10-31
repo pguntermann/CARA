@@ -344,8 +344,17 @@ class RegexEditorDialog(QDialog):
     def _examples_menu(self) -> QMenu:
         menu = QMenu(self._examples_button)
         StyleManager.style_context_menu(menu, self._app_config)
+        current_group = None
+        target = menu
         for example in self.controller.examples():
-            action = menu.addAction(example.label)
+            if example.group != current_group:
+                current_group = example.group
+                if example.group:
+                    target = menu.addMenu(example.group)
+                    StyleManager.style_context_menu(target, self._app_config)
+                else:
+                    target = menu
+            action = target.addAction(example.label)
             if example.tooltip:
                 action.setToolTip(example.tooltip)
             action.triggered.connect(lambda _checked=False, item=example: self._apply_example(item))

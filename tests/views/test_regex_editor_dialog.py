@@ -35,6 +35,29 @@ def _highlighted(dialog: RegexEditorDialog) -> list:
     return [selection.cursor.selectedText() for selection in dialog.sample_edit.extraSelections()]
 
 
+def _menu_labels(menu: QMenu) -> list[str]:
+    labels: list[str] = []
+    for action in menu.actions():
+        child = action.menu()
+        if child is not None:
+            labels.extend(_menu_labels(child))
+        elif action.text():
+            labels.append(action.text())
+    return labels
+
+
+def _menu_action(menu: QMenu, label: str):
+    for action in menu.actions():
+        child = action.menu()
+        if child is not None:
+            found = _menu_action(child, label)
+            if found is not None:
+                return found
+        elif action.text() == label:
+            return action
+    return None
+
+
 def _app() -> QApplication:
     app = QApplication.instance()
     if app is None:
@@ -212,10 +235,17 @@ class TestRegexEditorDialog(unittest.TestCase):
         dialog.show()
         _app().processEvents()
         menu = dialog._examples_menu()
-        labels = [action.text() for action in menu.actions()]
+        labels = _menu_labels(menu)
+        self.assertEqual(
+            [action.text() for action in menu.actions()],
+            ["Players", "Events and sites", "Dates", "Openings", "Clocks"],
+        )
         self.assertIn("Player titles (GM/IM/FM/…)", labels)
-        self.assertIn("Trailing federation code", labels)
-        titles = next(action for action in menu.actions() if action.text() == "Player titles (GM/IM/FM/…)")
+        self.assertIn("Several spellings of a name", labels)
+        self.assertIn("Games from one year", labels)
+        self.assertIn("ECO letter group", labels)
+        self.assertIn("Clock with an increment", labels)
+        titles = _menu_action(menu, "Player titles (GM/IM/FM/…)")
         titles.trigger()
         self.assertIn("GM", dialog.pattern_edit.toPlainText())
         self.assertEqual(dialog.sample_edit.toPlainText(), "GM Magnus Carlsen")
