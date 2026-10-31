@@ -39,10 +39,18 @@ _VAGUE_BG = "#1d4ed8"
 # ---------------------------------------------------------------------------
 _TABLE_STYLE = "table-layout:fixed;width:100%;border-collapse:collapse"
 _CELL_STYLE = (
+    "vertical-align:top;"
     "white-space:normal;overflow-wrap:break-word;word-wrap:break-word;"
     "border:1px solid #888;padding:4px 8px"
 )
 _TABLE_3COL_PCT = [20, 40, 40]
+
+# ---------------------------------------------------------------------------
+# Heading styles — bold + font-size so headings stay prominent in editors
+# (chess.com forum, Word) that strip or ignore <hN> semantics.
+# ---------------------------------------------------------------------------
+_H2_STYLE = "margin-top:1.2em;font-weight:bold;font-size:1.4em"
+_H3_STYLE = "margin-top:1.2em;font-weight:bold;font-size:1.2em"
 
 
 class ChessLogHTMLService:
@@ -474,7 +482,7 @@ def _gfm_table_to_html(table_text: str) -> str:
         for i, cell in enumerate(header_cells):
             w = col_pcts[i] if i < len(col_pcts) else col_pcts[-1]
             th_style = f"text-align:left;width:{w}%;{_CELL_STYLE}"
-            out.append(f'<th style="{th_style}">{_table_cell_html(cell)}</th>')
+            out.append(f'<th style="{th_style}" valign="top">{_table_cell_html(cell)}</th>')
         out.append("</tr></thead>")
         data_lines = lines[2:]
     else:
@@ -486,7 +494,7 @@ def _gfm_table_to_html(table_text: str) -> str:
             continue
         out.append("<tr>")
         for cell in _parse_cells(line):
-            out.append(f'<td style="{_CELL_STYLE}">{_table_cell_html(cell)}</td>')
+            out.append(f'<td style="{_CELL_STYLE}" valign="top">{_table_cell_html(cell)}</td>')
         out.append("</tr>")
     out.append("</tbody></table>")
     return "".join(out)
@@ -504,15 +512,32 @@ def _table_cell_html(cell: str) -> str:
 
 
 def _wrap_html_document(body: str) -> str:
-    """Wrap body HTML in a complete UTF-8 document, adding heading margins.
+    """Wrap body HTML in a complete UTF-8 document, styling headings.
 
-    1. Adds margin-top:1.2em to bare <h2> and <h3> tags.
+    1. Adds margin-top, font-weight:bold, and font-size to every h2/h3.
+       Merges with any existing style attribute so there is never more
+       than one style attribute on a heading tag.
+       Wraps each heading's text in <strong> so it stays bold even if
+       the receiving editor drops the heading's own style.
     2. Encodes every non-ASCII character as a decimal numeric character
        reference so the HTML is pure ASCII and safe regardless of the
        receiver's assumed encoding.
     3. Wraps in <!DOCTYPE html> with <meta charset="utf-8">.
     """
-    body = re.sub(r"<(h[23])(>|\s)", r'<\1 style="margin-top:1.2em"\2', body)
+    def _style_heading(m: re.Match) -> str:
+        level, attrs, content = m.group(1), m.group(2), m.group(3)
+        new_style = _H2_STYLE if level == "2" else _H3_STYLE
+        existing = re.search(r'style="([^"]*)"', attrs)
+        if existing:
+            merged = f"{new_style};{existing.group(1)}"
+            new_attrs = re.sub(r'style="[^"]*"', f'style="{merged}"', attrs)
+        else:
+            new_attrs = f' style="{new_style}"' + attrs
+        if not content.startswith("<strong>"):
+            content = f"<strong>{content}</strong>"
+        return f"<h{level}{new_attrs}>{content}</h{level}>"
+
+    body = re.sub(r"<h([23])([^>]*)>(.*?)</h\1>", _style_heading, body, flags=re.DOTALL)
     body = body.encode("ascii", "xmlcharrefreplace").decode("ascii")
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'

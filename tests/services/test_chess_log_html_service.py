@@ -692,26 +692,57 @@ class TestTableStyles(unittest.TestCase):
         h = _gfm_table_to_html(table)
         self.assertIn("width:50.0%", h)
 
+    def test_th_has_vertical_align_top(self):
+        self.assertIn("vertical-align:top", self._h())
+
+    def test_td_has_vertical_align_top(self):
+        self.assertIn("vertical-align:top", self._h())
+
+    def test_th_has_valign_attribute(self):
+        self.assertIn('valign="top"', self._h())
+
+    def test_td_has_valign_attribute(self):
+        self.assertIn('valign="top"', self._h())
+
 
 # ---------------------------------------------------------------------------
 # 21: Section heading margins
 # ---------------------------------------------------------------------------
 
 class TestHeadingMargins(unittest.TestCase):
-    def test_game_header_h3_has_margin_top(self):
+    _H2_STYLE = "margin-top:1.2em;font-weight:bold;font-size:1.4em"
+    _H3_STYLE = "margin-top:1.2em;font-weight:bold;font-size:1.2em"
+
+    def test_game_header_h3_has_correct_style(self):
         groups = [{"header": "Game header", "rows": [_clamp_snap()]}]
         h = _svc().logged_moments_html(groups)
-        self.assertIn('<h3 style="margin-top:1.2em">', h)
+        self.assertIn(f'style="{self._H3_STYLE}"', h)
 
-    def test_narrative_section_h3_has_margin_top(self):
-        h = _svc().narrative_html(
-            "P", "src", "## Section Heading\n\nBody text.",
-        )
-        self.assertIn('<h3 style="margin-top:1.2em"', h)
+    def test_narrative_section_h3_has_correct_style(self):
+        h = _svc().narrative_html("P", "src", "## Section Heading\n\nBody text.")
+        self.assertIn("margin-top:1.2em", h)
+        self.assertIn("font-weight:bold", h)
+        self.assertIn("font-size:1.2em", h)
 
-    def test_report_title_h2_has_margin_top(self):
+    def test_report_title_h2_has_correct_style(self):
         h = _svc().logged_moments_html(_groups([_clamp_snap()]))
-        self.assertIn('<h2 style="margin-top:1.2em">', h)
+        self.assertIn(f'style="{self._H2_STYLE}"', h)
+
+    def test_h3_text_wrapped_in_strong(self):
+        groups = [{"header": "Game header", "rows": [_clamp_snap()]}]
+        h = _svc().logged_moments_html(groups)
+        self.assertIn("<strong>Game header</strong>", h)
+
+    def test_h2_text_wrapped_in_strong(self):
+        h = _svc().logged_moments_html(_groups([_clamp_snap()]))
+        self.assertIn("<strong>Chess Log &#8212; Logged Moments</strong>", h)
+
+    def test_no_double_style_on_h3_with_id(self):
+        import re
+        h = _svc().narrative_html("P", "src", "## Heading\n\nBody.")
+        tags = re.findall(r"<h3[^>]*>", h)
+        for tag in tags:
+            self.assertEqual(tag.count("style="), 1, f"double style in: {tag}")
 
 
 if __name__ == "__main__":
