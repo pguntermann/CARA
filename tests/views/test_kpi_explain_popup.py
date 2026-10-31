@@ -10,8 +10,7 @@ def _sample_config() -> dict:
         "ui": {
             "panels": {
                 "detail": {
-                    "summary": {
-                        "key_statistics": {
+                    "kpi_statistics": {
                             "kpi_tip": {
                                 "wrap_width": 320,
                                 "band_table_desc_wrap": 160,
@@ -77,7 +76,6 @@ def _sample_config() -> dict:
                                     ],
                                 },
                             },
-                        }
                     }
                 }
             }
@@ -96,7 +94,14 @@ class TestBuildKpiTip(unittest.TestCase):
         self.assertEqual(len(tip.bands), 2)
         self.assertEqual(tip.bands[0].description, "Near-engine precision")
         self.assertEqual(tip.bands[1].description, "Casual play")
+        self.assertEqual(tip.value_label, "This game")
         self.assertIn("centipawn", tip.explanation.lower())
+        overall = build_kpi_tip(
+            "average_cpl", 22.5, "22.5", _sample_config(), value_label="Overall"
+        )
+        self.assertIsNotNone(overall)
+        assert overall is not None
+        self.assertEqual(overall.value_label, "Overall")
 
     def test_missing_config_returns_none(self) -> None:
         self.assertIsNone(build_kpi_tip("average_cpl", 1.0, "1"))

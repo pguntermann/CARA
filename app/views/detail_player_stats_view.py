@@ -46,6 +46,11 @@ from app.models.game_model import GameModel
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.services.player_stats_service import merged_player_stats_time_series_chart_cfg
+from app.views.widgets.kpi_explain_popup import (
+    HoverableKpiValueLabel,
+    KpiExplainPopup,
+    build_kpi_tip,
+)
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
@@ -3021,6 +3026,9 @@ class DetailPlayerStatsView(QWidget):
         
         self.scroll_area.setWidget(self.content_widget)
         layout.addWidget(self.scroll_area)
+        self._kpi_explain_popup: Optional[KpiExplainPopup] = None
+        self.scroll_area.verticalScrollBar().valueChanged.connect(self._hide_kpi_explain_popup)
+        self.scroll_area.horizontalScrollBar().valueChanged.connect(self._hide_kpi_explain_popup)
         
         # Install event filter on scroll area to monitor width changes
         self.scroll_area.installEventFilter(self)
@@ -3677,6 +3685,7 @@ class DetailPlayerStatsView(QWidget):
         Keeps the player selection section visible.
         Also removes spacing items to prevent accumulation.
         """
+        self._hide_kpi_explain_popup()
         self._player_stats_section_wrappers.clear()
         self._player_stats_section_spacers.clear()
         self._player_stats_visibility_hint_label = None
@@ -5051,10 +5060,16 @@ class DetailPlayerStatsView(QWidget):
             accuracy_text = f"{accuracy:.1f}% (Min: {min_acc:.1f}%, Max: {max_acc:.1f}%)"
         else:
             accuracy_text = f"{accuracy:.1f}%"
-        self._add_stat_row(grid, 3, "Average Accuracy:", accuracy_text, label_font, value_font, text_color)
+        self._add_stat_row(
+            grid, 3, "Average Accuracy:", accuracy_text, label_font, value_font, text_color,
+            kpi_id="accuracy", kpi_value=float(accuracy), kpi_display=f"{accuracy:.1f}%",
+        )
         # Estimated Elo
         est_elo = stats.player_stats.estimated_elo if stats.player_stats.estimated_elo is not None else 0
-        self._add_stat_row(grid, 4, "Estimated Elo:", str(est_elo), label_font, value_font, text_color)
+        self._add_stat_row(
+            grid, 4, "Estimated Elo:", str(est_elo), label_font, value_font, text_color,
+            kpi_id="estimated_elo", kpi_value=float(est_elo), kpi_display=str(est_elo),
+        )
         # Average CPL (include per-game min/max if available)
         avg_cpl = stats.player_stats.average_cpl if stats.player_stats.average_cpl is not None else 0.0
         min_acpl = getattr(stats, "min_acpl", None)
@@ -5063,7 +5078,10 @@ class DetailPlayerStatsView(QWidget):
             cpl_text = f"{avg_cpl:.1f} (Min: {min_acpl:.1f}, Max: {max_acpl:.1f})"
         else:
             cpl_text = f"{avg_cpl:.1f}"
-        self._add_stat_row(grid, 5, "Average CPL:", cpl_text, label_font, value_font, text_color)
+        self._add_stat_row(
+            grid, 5, "Average CPL:", cpl_text, label_font, value_font, text_color,
+            kpi_id="average_cpl", kpi_value=float(avg_cpl), kpi_display=f"{avg_cpl:.1f}",
+        )
         # Best Move % (include per-game min/max if available)
         best_move_pct = stats.player_stats.best_move_percentage if stats.player_stats.best_move_percentage is not None else 0.0
         min_best = getattr(stats, "min_best_move_pct", None)
@@ -5090,7 +5108,10 @@ class DetailPlayerStatsView(QWidget):
             blunder_text = f"{blunder_rate:.1f}% (Min: {min_blunder:.1f}%, Max: {max_blunder:.1f}%)"
         else:
             blunder_text = f"{blunder_rate:.1f}%"
-        self._add_stat_row(grid, 8, "Blunder Rate:", blunder_text, label_font, value_font, text_color)
+        self._add_stat_row(
+            grid, 8, "Blunder Rate:", blunder_text, label_font, value_font, text_color,
+            kpi_id="blunder_rate", kpi_value=float(blunder_rate), kpi_display=f"{blunder_rate:.1f}%",
+        )
         
         # The grid itself has a stretch column between labels and values for flexible spacing
         # The grid widget will expand to fill available space, and the stretch column will shrink when width is reduced
@@ -6713,8 +6734,26 @@ class DetailPlayerStatsView(QWidget):
         if self._endgame_tree_increase_button is not None:
             self._endgame_tree_increase_button.setEnabled(can_increase)
     
+    def _ensure_kpi_explain_popup(self) -> KpiExplainPopup:
+        popup = self._kpi_explain_popup
+        if popup is None:
+            popup = KpiExplainPopup(self.config, self)
+            self._kpi_explain_popup = popup
+        return popup
+
+    def _hide_kpi_explain_popup(self, *_args) -> None:
+        popup = getattr(self, "_kpi_explain_popup", None)
+        if popup is not None:
+            popup.hide()
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._hide_kpi_explain_popup()
+        super().hideEvent(event)
+
     def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
-                     label_font: QFont, value_font: QFont, text_color: QColor) -> None:
+                     label_font: QFont, value_font: QFont, text_color: QColor,
+                     *, kpi_id: Optional[str] = None, kpi_value: Optional[float] = None,
+                     kpi_display: Optional[str] = None) -> None:
         """Add a statistics row to a grid.
         
         Grid has 3 columns: 0=label (left), 1=stretch (flexible), 2=value (right)
@@ -6730,7 +6769,20 @@ class DetailPlayerStatsView(QWidget):
         
         # Column 1 is the stretch column - no widget needed, it's handled by column stretch
         
-        value = QLabel(value_text)
+        tip = None
+        if kpi_id is not None and kpi_value is not None:
+            tip = build_kpi_tip(
+                kpi_id,
+                float(kpi_value),
+                kpi_display if kpi_display is not None else value_text,
+                self.config,
+                value_label="Overall",
+            )
+        if tip is not None:
+            value: QLabel = HoverableKpiValueLabel(value_text)
+            value.attach_kpi_tip(tip, self._ensure_kpi_explain_popup())
+        else:
+            value = QLabel(value_text)
         value.setFont(value_font)
         value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
         value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)

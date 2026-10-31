@@ -92,9 +92,10 @@
             "best_count": 3,
             "missed_tactics_count": 99,
             "missed_tactics_display_count": 99
-          },
-          "key_statistics": {
-            "kpi_tips": {
+          }
+        },
+        "kpi_statistics": {
+          "kpi_tips": {
               "average_cpl": {
                 "title": "Average CPL",
                 "explanation": "Average centipawns lost per move versus the engine's best move. Lower means the played moves stayed closer to engine recommendations.",
@@ -128,7 +129,7 @@
               },
               "accuracy": {
                 "title": "Accuracy",
-                "explanation": "CARA's accuracy score for the player's moves in this game (derived from move quality / CPL). Higher is better.",
+                "explanation": "CARA's accuracy score for the player's moves (derived from move quality / CPL). Higher is better.",
                 "note": "Approximate guide; formula and thresholds are configurable.",
                 "scale_min": 50,
                 "scale_max": 100,
@@ -159,8 +160,8 @@
               },
               "estimated_elo": {
                 "title": "Estimated Elo",
-                "explanation": "A rough strength estimate inferred from this game's move quality. It is not an official rating.",
-                "note": "Approximate, single-game estimate — treat as a ballpark only.",
+                "explanation": "A rough strength estimate inferred from move quality. It is not an official rating.",
+                "note": "Approximate estimate — treat as a ballpark only.",
                 "scale_min": 800,
                 "scale_max": 2800,
                 "higher_is_better": true,
@@ -225,7 +226,6 @@
                 ]
               }
             }
-          }
         },
         "player_stats": {
           "placeholder_text_no_player": "Select a player to view statistics",
