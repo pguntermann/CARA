@@ -2,6 +2,7 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from io import StringIO
+import re
 import chess.pgn
 import chess
 
@@ -64,6 +65,7 @@ class DatabaseSearchService:
                     pass
         position_hashes = sorted(set(position_hashes))
         position_hashes_fuzzy = sorted(set(position_hashes_fuzzy))
+        regex_patterns = DatabaseSearchService._compile_regex_patterns(criteria)
         
         # Collect matching games from all databases
         matching_games: List[tuple] = []
@@ -86,7 +88,11 @@ class DatabaseSearchService:
             
             games = database.get_all_games()
             for game in games:
-                ctx = {"position_matches": position_matches, "position_matches_fuzzy": position_matches_fuzzy}
+                ctx = {
+                    "position_matches": position_matches,
+                    "position_matches_fuzzy": position_matches_fuzzy,
+                    "regex_patterns": regex_patterns,
+                }
                 if DatabaseSearchService._evaluate_criteria_tree(game, criteria_tree, ctx):
                     # Provide ref_ply for Search Results if we matched by position.
                     ref_ply = 0
@@ -413,6 +419,23 @@ class DatabaseSearchService:
                 return not is_hit
             return is_hit
 
+        if operator == SearchOperator.MATCHES_REGEX:
+            subject = DatabaseSearchService._regex_subject(game, criterion)
+            if subject is None or not str(value or "").strip():
+                return False
+            compiled = None
+            patterns = (context or {}).get("regex_patterns") if context else None
+            if isinstance(patterns, dict):
+                compiled = patterns.get(id(criterion))
+            elif isinstance(value, str) and value:
+                try:
+                    compiled = re.compile(value, re.IGNORECASE)
+                except re.error:
+                    compiled = None
+            if compiled is None:
+                return False
+            return compiled.search(subject) is not None
+
         # Tags: only allow membership operators (whole-tag match, case-insensitive).
         if criterion.field == SearchField.TAGS:
             raw = getattr(game, "game_tags_raw", "") or ""
@@ -555,6 +578,48 @@ class DatabaseSearchService:
         return False
     
     @staticmethod
+    def regex_pattern_error(pattern: str) -> str:
+        """Empty when the pattern can be used as a case-insensitive search."""
+        text = str(pattern or "")
+        if not text.strip():
+            return "Enter a regular expression."
+        try:
+            re.compile(text, re.IGNORECASE)
+        except re.error:
+            return "That regular expression is not valid."
+        return ""
+
+    @staticmethod
+    def _compile_regex_patterns(criteria: List[SearchCriteria]) -> Dict[int, Optional[re.Pattern]]:
+        compiled: Dict[int, Optional[re.Pattern]] = {}
+        for criterion in criteria:
+            if criterion.operator != SearchOperator.MATCHES_REGEX:
+                continue
+            text = str(criterion.value or "")
+            if not text.strip():
+                compiled[id(criterion)] = None
+                continue
+            try:
+                compiled[id(criterion)] = re.compile(text, re.IGNORECASE)
+            except re.error:
+                compiled[id(criterion)] = None
+        return compiled
+
+    @staticmethod
+    def _regex_subject(game: GameData, criterion: SearchCriteria) -> Optional[str]:
+        """Text the pattern is tested against.
+
+        Time control is stored for numeric compares as base seconds. A pattern
+        is tested against the original tag, such as ``300+5``.
+        """
+        if criterion.field == SearchField.TIMECONTROL:
+            return getattr(game, "time_control", "") or ""
+        value = DatabaseSearchService._get_field_value(game, criterion)
+        if value is None:
+            return None
+        return str(value)
+
+    @staticmethod
     def _get_field_value(game: GameData, criterion: SearchCriteria, context: Optional[Dict[str, Any]] = None) -> Any:
         """Get the value of a field from a game.
         
@@ -672,6 +737,7 @@ class DatabaseSearchService:
             SearchOperator.IS_TRUE: "is",
             SearchOperator.IS_FALSE: "is not",
             SearchOperator.DOES_NOT_CONTAIN: "not contains",
+            SearchOperator.MATCHES_REGEX: "matches regex",
         }
         
         parts = []

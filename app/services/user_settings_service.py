@@ -645,6 +645,14 @@ class UserSettingsService:
         """Replace named bulk-operation plans in memory (persisted on exit)."""
         self.get_model().set_bulk_operation_plans(plans)
 
+    def get_saved_regexes(self) -> Dict[str, str]:
+        """Return named regular expressions (name → pattern)."""
+        return self.get_model().get_saved_regexes()
+
+    def update_saved_regexes(self, saved: Dict[str, Any]) -> None:
+        """Replace the named regular-expression library in memory (persisted on exit)."""
+        self.get_model().set_saved_regexes(saved)
+
     def get_keyboard_shortcuts(self) -> Dict[str, Any]:
         """Return keyboard shortcut preferences (overrides map)."""
         return self.get_model().get_keyboard_shortcuts()

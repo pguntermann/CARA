@@ -13,7 +13,9 @@ def generate_checkbox_stylesheet(
     font_size: float,
     bg_color: List[int],
     border_color: List[int],
-    checkmark_path: Path
+    checkmark_path: Path,
+    *,
+    font_weight: int | None = None,
 ) -> str:
     """Generate QSS stylesheet for checkboxes.
     
@@ -45,11 +47,13 @@ def generate_checkbox_stylesheet(
     # Get checkmark URL
     checkmark_url = str(checkmark_path).replace("\\", "/") if checkmark_path.exists() else ""
     
+    weight = f"font-weight: {int(font_weight)};" if font_weight else ""
     stylesheet = (
         f"QCheckBox {{"
         f"color: rgb({text_color[0]}, {text_color[1]}, {text_color[2]});"
         f"font-family: {font_family};"
         f"font-size: {font_size}pt;"
+        f"{weight}"
         f"spacing: {spacing}px;"
         f"margin-top: {margin_top}px;"
         f"margin-bottom: {margin_bottom}px;"
@@ -83,7 +87,9 @@ def apply_checkbox_styling(
     font_size: float,
     bg_color: List[int],
     border_color: List[int],
-    checkmark_path: Path
+    checkmark_path: Path,
+    *,
+    font_weight: int | None = None,
 ) -> None:
     """Apply checkbox styling to a list of checkboxes.
     
@@ -98,7 +104,14 @@ def apply_checkbox_styling(
         checkmark_path: Path to checkmark.svg icon.
     """
     checkbox_style = generate_checkbox_stylesheet(
-        config, text_color, font_family, font_size, bg_color, border_color, checkmark_path
+        config,
+        text_color,
+        font_family,
+        font_size,
+        bg_color,
+        border_color,
+        checkmark_path,
+        font_weight=font_weight,
     )
     
     for checkbox in checkboxes:

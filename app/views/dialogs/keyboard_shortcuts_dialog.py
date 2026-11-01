@@ -384,6 +384,9 @@ class KeyboardShortcutsDialog(QDialog):
         self.table_header_text = table_config.get(
             "header_text_color", [200, 200, 200]
         )
+        self.table_header_font_size = scale_font_size(
+            table_config.get("header_font_size", self.font_size)
+        )
         self.table_item_padding = int(table_config.get("item_padding", 5))
         self.table_header_padding = int(table_config.get("header_padding", 5))
         self.table_category_width = int(table_config.get("category_column_width", 140))
@@ -686,7 +689,8 @@ class KeyboardShortcutsDialog(QDialog):
             f"{header_border_qss}"
             f"padding: {self.table_header_padding}px;"
             f"font-family: {self.label_font_family};"
-            f"font-size: {self.font_size}pt;"
+            f"font-size: {self.table_header_font_size}pt;"
+            f"font-weight: 500;"
             f"}}"
         )
         self.table.configure_row_chrome(
@@ -705,6 +709,9 @@ class KeyboardShortcutsDialog(QDialog):
 
         header = self.table.horizontalHeader()
         if header is not None:
+            header.setFont(
+                QFont(self.label_font_family, int(self.table_header_font_size))
+            )
             header_palette = header.palette()
             header_palette.setColor(
                 header.backgroundRole(), QColor(*self.table_header_bg)

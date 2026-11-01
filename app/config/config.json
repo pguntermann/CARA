@@ -92,15 +92,16 @@
             "best_count": 3,
             "missed_tactics_count": 99,
             "missed_tactics_display_count": 99
-          },
-          "key_statistics": {
-            "kpi_tips": {
+          }
+        },
+        "kpi_statistics": {
+          "kpi_tips": {
               "average_cpl": {
                 "title": "Average CPL",
                 "explanation": "Average centipawns lost per move versus the engine's best move. Lower means the played moves stayed closer to engine recommendations.",
                 "note": "Approximate guide; depends on engine, depth, and classification settings.",
                 "scale_min": 0,
-                "scale_max": 80,
+                "scale_max": 120,
                 "higher_is_better": false,
                 "unit": "CPL",
                 "bands": [
@@ -121,14 +122,14 @@
                   },
                   {
                     "label": "Amateur",
-                    "end": 80,
+                    "end": 120,
                     "description": "Amateur / beginner; bigger deviations common"
                   }
                 ]
               },
               "accuracy": {
                 "title": "Accuracy",
-                "explanation": "CARA's accuracy score for the player's moves in this game (derived from move quality / CPL). Higher is better.",
+                "explanation": "CARA's accuracy score for the player's moves (derived from move quality / CPL). Higher is better.",
                 "note": "Approximate guide; formula and thresholds are configurable.",
                 "scale_min": 50,
                 "scale_max": 100,
@@ -159,8 +160,8 @@
               },
               "estimated_elo": {
                 "title": "Estimated Elo",
-                "explanation": "A rough strength estimate inferred from this game's move quality. It is not an official rating.",
-                "note": "Approximate, single-game estimate — treat as a ballpark only.",
+                "explanation": "A rough strength estimate inferred from move quality. It is not an official rating.",
+                "note": "Approximate estimate — treat as a ballpark only.",
                 "scale_min": 800,
                 "scale_max": 2800,
                 "higher_is_better": true,
@@ -225,7 +226,6 @@
                 ]
               }
             }
-          }
         },
         "player_stats": {
           "placeholder_text_no_player": "Select a player to view statistics",
@@ -841,6 +841,582 @@
             "find": "\\s*\\b(?:\\d+\\+\\d+|[Gg]/\\d+|\\d+\\|\\d+)\\b\\s*",
             "replace": "",
             "tooltip": "Removes common time-control tokens such as 10+0, 15+10, G/90, or 15|10 from Event (and similar) tags."
+          }
+        ]
+      },
+      "regex_editor": {
+        "title": "Edit regular expression",
+        "sample_label": "Sample text",
+        "blocks_label": "Building blocks",
+        "examples_button": "Example regular expressions",
+        "examples_title": "Use example",
+        "examples_replace_message": "Replace the current pattern with \"{name}\"?",
+        "examples": [
+          {
+            "id": "name_spellings",
+            "group": "Players",
+            "label": "Several spellings of a name",
+            "pattern": "Müller|Mueller|Muller",
+            "sample": "Mueller, Hans",
+            "select_text": "Müller|Mueller|Muller",
+            "tooltip": "Matches any of these spellings. Use on White or Black. Search ignores case. Edit the highlighted names."
+          },
+          {
+            "id": "any_of_these_players",
+            "group": "Players",
+            "label": "Any of these players",
+            "pattern": "Carlsen|Nepomniachtchi|Giri",
+            "sample": "Giri, Anish",
+            "select_text": "Carlsen|Nepomniachtchi|Giri",
+            "tooltip": "Matches any of these last names. Use on White or Black. For either color, add the same pattern on both rows and join them with OR. Edit the highlighted names."
+          },
+          {
+            "id": "find_last_name",
+            "group": "Players",
+            "label": "A last name",
+            "pattern": "^Carlsen,",
+            "sample": "Carlsen, Magnus",
+            "select_text": "Carlsen",
+            "tooltip": "Matches every player with this last name, such as Carlsen, Magnus. Use on the player selection, or on White or Black. Edit the highlighted name."
+          },
+          {
+            "id": "find_first_name",
+            "group": "Players",
+            "label": "A first name",
+            "pattern": ",\\s*Paul\\b",
+            "sample": "Morphy, Paul",
+            "select_text": "Paul",
+            "tooltip": "Matches a given name after the comma, such as Morphy, Paul. Pauline is left out. Use on the player selection, or on White or Black. Edit the highlighted name."
+          },
+          {
+            "id": "last_name_initial",
+            "group": "Players",
+            "label": "Last name starts with",
+            "pattern": "^M\\w*,",
+            "sample": "Murphy, Paul",
+            "select_text": "M",
+            "tooltip": "Matches last names that start with this letter, such as Murphy, Paul. Use on the player selection, or on White or Black. Edit the highlighted letter."
+          },
+          {
+            "id": "last_name_particle",
+            "group": "Players",
+            "label": "Last name with van, von, or de",
+            "pattern": "\\b(?:van|von|de)\\s+\\S+,",
+            "sample": "van Foreest, Jorden",
+            "select_text": "van|von|de",
+            "tooltip": "Matches a particle before the last name, such as van Foreest, Jorden. Use on the player selection, or on White or Black. Edit the highlighted words."
+          },
+          {
+            "id": "remove_titles",
+            "group": "Players",
+            "label": "Player titles (GM/IM/FM/…)",
+            "pattern": "\\b(?:WGM|WIM|WFM|WCM|GM|IM|FM|CM|NM)\\.?\\s*",
+            "sample": "GM Magnus Carlsen",
+            "select_text": "WGM|WIM|WFM|WCM|GM|IM|FM|CM|NM",
+            "tooltip": "Matches common title prefixes such as GM, IM, FM, WGM, and NM, including an optional period. Use on White or Black. Edit the highlighted title list to add more."
+          },
+          {
+            "id": "remove_rating_parens",
+            "group": "Players",
+            "label": "Rating in parentheses",
+            "pattern": "\\s*\\(\\d{3,4}\\)",
+            "sample": "Carlsen (2830)",
+            "tooltip": "Matches a 3–4 digit rating inside parentheses, as in a player name. Example: \"Carlsen (2830)\"."
+          },
+          {
+            "id": "keep_digits_only",
+            "group": "Players",
+            "label": "Non-digits",
+            "pattern": "[^0-9]+",
+            "sample": "elo 2755",
+            "tooltip": "Matches everything that is not a digit. Useful when cleaning WhiteElo / BlackElo values such as \"elo 2755\"."
+          },
+          {
+            "id": "online_site",
+            "group": "Events and sites",
+            "label": "Online site",
+            "pattern": "lichess|chess\\.com|chess24",
+            "sample": "lichess.org",
+            "select_text": "lichess|chess\\.com|chess24",
+            "tooltip": "Matches a common online site. Use on Site. Edit the highlighted list."
+          },
+          {
+            "id": "round_number",
+            "group": "Events and sites",
+            "label": "Round number",
+            "pattern": "\\bRound\\s+\\d+\\b",
+            "sample": "Candidates Round 3",
+            "tooltip": "Matches \"Round\" followed by a number. Use on Event."
+          },
+          {
+            "id": "remove_federation_code",
+            "group": "Events and sites",
+            "label": "Trailing federation code",
+            "pattern": "\\s*(?:\\[[A-Z]{3}\\]|\\([A-Z]{3}\\)|[A-Z]{3})\\s*$",
+            "sample": "Wijk aan Zee NED",
+            "tooltip": "Matches a trailing 3-letter federation code, optionally in [ ] or ( ). Use on Site or Event. Example: \"Wijk aan Zee NED\" or \"Berlin [GER]\"."
+          },
+          {
+            "id": "remove_time_control",
+            "group": "Events and sites",
+            "label": "Time-control fragment",
+            "pattern": "\\s*\\b(?:\\d+\\+\\d+|[Gg]/\\d+|\\d+\\|\\d+)\\b\\s*",
+            "sample": "Tata Steel 15+10 Masters",
+            "tooltip": "Matches time-control tokens such as 10+0, 15+10, G/90, or 15|10 inside an event name. Use on Event."
+          },
+          {
+            "id": "keep_year",
+            "group": "Events and sites",
+            "label": "First 4-digit year",
+            "pattern": ".*?(\\d{4}).*",
+            "sample": "London 2024 Open",
+            "tooltip": "Captures the first four-digit year in an event name. Example: \"London 2024 Open\" → \"2024\"."
+          },
+          {
+            "id": "keep_first_three_words",
+            "group": "Events and sites",
+            "label": "First three words",
+            "pattern": "^(\\S+(?:\\s+\\S+){0,2}).*$",
+            "sample": "Tata Steel Masters Wijk aan Zee",
+            "tooltip": "Captures the first three whitespace-separated words of an event or site name."
+          },
+          {
+            "id": "keep_before_dash",
+            "group": "Events and sites",
+            "label": "Keep text before \"-\"",
+            "pattern": "^(.*?)\\s*-\\s*.*$",
+            "sample": "Wijk aan Zee - Masters",
+            "tooltip": "Matches an event name and captures the text before the dash. Example: \"Wijk aan Zee - Masters\"."
+          },
+          {
+            "id": "keep_after_dash",
+            "group": "Events and sites",
+            "label": "Keep text after \"-\"",
+            "pattern": "^.*?\\s*-\\s*(.*)$",
+            "sample": "Wijk aan Zee - Masters",
+            "tooltip": "Captures the text after the dash. Example: \"Wijk aan Zee - Masters\" → \"Masters\"."
+          },
+          {
+            "id": "keep_before_comma",
+            "group": "Events and sites",
+            "label": "Keep text before \",\"",
+            "pattern": "^(.*?)\\s*,.*$",
+            "sample": "Candidates, Toronto",
+            "tooltip": "Captures the text before the first comma. Example: \"Candidates, Toronto\"."
+          },
+          {
+            "id": "keep_after_comma",
+            "group": "Events and sites",
+            "label": "Keep text after \",\"",
+            "pattern": "^.*,\\s*(.*)$",
+            "sample": "Candidates, Toronto",
+            "tooltip": "Captures the text after the last comma. Example: \"Candidates, Toronto\" → \"Toronto\"."
+          },
+          {
+            "id": "keep_in_parens",
+            "group": "Events and sites",
+            "label": "Keep text inside (…)",
+            "pattern": ".*?\\(([^)]+)\\).*",
+            "sample": "Olympiad (Open)",
+            "tooltip": "Captures the text inside the first pair of parentheses. Example: \"Olympiad (Open)\" → \"Open\"."
+          },
+          {
+            "id": "keep_before_parens",
+            "group": "Events and sites",
+            "label": "Keep text before (…)",
+            "pattern": "^(.*?)\\s*\\(.*$",
+            "sample": "Olympiad (Open)",
+            "tooltip": "Captures the text before the first parenthesis. Example: \"Olympiad (Open)\" → \"Olympiad\"."
+          },
+          {
+            "id": "games_from_one_year",
+            "group": "Dates",
+            "label": "Games from one year",
+            "pattern": "^2024",
+            "sample": "2024.03.18",
+            "select_text": "2024",
+            "tooltip": "Matches dates in 2024, such as 2024.03.18. Use on Date. Edit the highlighted year."
+          },
+          {
+            "id": "games_across_years",
+            "group": "Dates",
+            "label": "A span of years",
+            "pattern": "^20(?:1[5-9]|2[0-4])",
+            "sample": "2019.11.02",
+            "select_text": "1[5-9]|2[0-4]",
+            "tooltip": "Matches dates from 2015 through 2024. Use on Date. Edit the highlighted numbers for another span."
+          },
+          {
+            "id": "games_in_one_month",
+            "group": "Dates",
+            "label": "One month",
+            "pattern": "\\.11\\.",
+            "sample": "2018.11.09",
+            "select_text": "11",
+            "tooltip": "Matches November in a PGN date (YYYY.MM.DD). Use on Date. Edit the highlighted month."
+          },
+          {
+            "id": "unknown_date_part",
+            "group": "Dates",
+            "label": "Unknown month or day",
+            "pattern": "\\?\\?",
+            "sample": "1999.??.??",
+            "tooltip": "Matches ??, which PGN uses for an unknown month or day. Use on Date. Example: 1999.??.??."
+          },
+          {
+            "id": "eco_letter",
+            "group": "Openings",
+            "label": "ECO letter group",
+            "pattern": "^B\\d{2}$",
+            "sample": "B22",
+            "select_text": "B",
+            "tooltip": "Matches every ECO code in group B, such as B22. Use on ECO. Edit the highlighted letter (A–E)."
+          },
+          {
+            "id": "opening_names",
+            "group": "Openings",
+            "label": "Opening names",
+            "pattern": "Sicilian|Najdorf|Sveshnikov",
+            "sample": "Sicilian, Najdorf",
+            "select_text": "Sicilian|Najdorf|Sveshnikov",
+            "tooltip": "Matches any of these opening names. Use on Event, or on a custom tag such as Opening. Edit the highlighted names."
+          },
+          {
+            "id": "tc_increment",
+            "group": "Clocks",
+            "label": "Clock with an increment",
+            "pattern": "\\d+\\+\\d+",
+            "sample": "300+5",
+            "tooltip": "Matches a clock with an increment, such as 300+5 or 180+2. Use on TimeControl. The pattern sees the original tag, not the base seconds."
+          },
+          {
+            "id": "tc_seconds",
+            "group": "Clocks",
+            "label": "Seconds and no increment",
+            "pattern": "^\\d+$",
+            "sample": "300",
+            "tooltip": "Matches a clock that is only a number of seconds, such as 300 for five minutes and no increment. Use on TimeControl."
+          },
+          {
+            "id": "tc_moves",
+            "group": "Clocks",
+            "label": "Moves and time",
+            "pattern": "\\d+/\\d+",
+            "sample": "40/7200:1800+30",
+            "tooltip": "Matches a classical control written as moves/seconds, such as 40/7200. Use on TimeControl."
+          },
+          {
+            "id": "tc_correspondence",
+            "group": "Clocks",
+            "label": "Correspondence clock (- or *)",
+            "pattern": "^[-*]$",
+            "sample": "-",
+            "tooltip": "Matches a missing clock written as - or *. Use on TimeControl."
+          },
+          {
+            "id": "tc_type_fast",
+            "group": "Clocks",
+            "label": "Bullet or blitz",
+            "pattern": "Bullet|Blitz",
+            "sample": "Blitz",
+            "select_text": "Bullet|Blitz",
+            "tooltip": "Matches the Bullet or Blitz category. Use on TC Type, which stores the category name rather than the clock. Edit the highlighted names (Rapid and Classical work the same way)."
+          }
+        ],
+        "pattern_placeholder": "Regular expression",
+        "empty_template": "^$",
+        "sample_placeholder": "Paste or type text to test the pattern",
+        "ok_button": "OK",
+        "cancel_button": "Cancel",
+        "save_button": "Save this regular expression",
+        "load_button": "Load or remove a saved regular expression",
+        "save_title": "Save regular expression",
+        "save_prompt": "Name:",
+        "save_name_required": "Enter a name.",
+        "overwrite_title": "Overwrite regular expression",
+        "overwrite_message": "A regular expression named \"{name}\" already exists. Overwrite it?",
+        "load_title": "Load regular expression",
+        "load_missing": "\"{name}\" was not found.",
+        "load_replace_message": "Replace the current pattern with \"{name}\"?",
+        "load_empty": "No saved regular expressions",
+        "remove_menu": "Remove…",
+        "remove_title": "Remove regular expression",
+        "remove_message": "Remove the saved regular expression \"{name}\"?",
+        "open_tooltip": "Edit regular expression",
+        "max_sample_chars": 8000,
+        "max_highlighted_matches": 200,
+        "explain_label": "Explanation",
+        "explain_placeholder": "The pattern will be explained here as you type.",
+        "explain": {
+          "capturing_group": "Capturing group #{number}. Groups multiple tokens together and creates a capture group for extracting a substring or using a backreference.",
+          "noncapturing_group": "Non-capturing group. Groups tokens without creating a backreference.",
+          "positive_lookahead": "Positive lookahead. Matches the enclosed pattern ahead, without consuming it.",
+          "negative_lookahead": "Negative lookahead. Succeeds when the enclosed pattern does not match ahead.",
+          "positive_lookbehind": "Positive lookbehind. Matches the enclosed pattern behind, without consuming it.",
+          "negative_lookbehind": "Negative lookbehind. Succeeds when the enclosed pattern does not match behind.",
+          "named_group": "Named group \"{name}\" (#{number}). A capture group you can refer to by name.",
+          "backreference": "Backreference. Matches the same text as capturing group #{number}.",
+          "named_backreference": "Backreference. Matches the same text as the group named \"{name}\".",
+          "comment": "Comment. Ignored by the match.",
+          "flags": "Flags ({flags}). Changes matching options from here on.",
+          "flags_group": "Flags group ({flags}). Applies those options inside the group only.",
+          "character_set": "Character set. Match any character in the set.",
+          "negated_set": "Negated set. Match any character that is not in the set.",
+          "range": "Range. Matches a character in the range \"{start}\" to \"{end}\" (char code {start_code} to {end_code}).{case_note}",
+          "digit": "Digit. Matches any digit (0–9).",
+          "not_digit": "Not a digit. Matches any character that is not a digit.",
+          "word": "Word. Matches any word character (alphanumeric and underscore).",
+          "not_word": "Not a word character. Matches any character that is not a letter, digit, or underscore.",
+          "whitespace": "Whitespace. Matches a space, tab, or line break.",
+          "not_whitespace": "Not whitespace. Matches any character that is not whitespace.",
+          "word_boundary": "Word boundary. Matches the edge between a word character and something else.",
+          "not_word_boundary": "Not a word boundary. Matches a position that is not the edge of a word.",
+          "backspace": "Backspace character.",
+          "start_string": "Start of the text. Matches only at the beginning.",
+          "end_string": "End of the text. Matches only at the end.",
+          "newline": "Newline.",
+          "carriage_return": "Carriage return.",
+          "tab": "Tab.",
+          "form_feed": "Form feed.",
+          "vertical_tab": "Vertical tab.",
+          "bell": "Bell character.",
+          "escaped_literal": "Literal. Matches the character {text}.{case_note}",
+          "literal": "Literal. Matches {text} exactly.{case_note}",
+          "any": "Any character. Matches any character except a newline.",
+          "start_anchor": "Start. Matches the beginning of the text.",
+          "end_anchor": "End. Matches the end of the text.",
+          "alternation": "Alternation. Match either the expression before or the expression after.",
+          "quantifier_zero_or_more": "Quantifier. Match 0 or more of the preceding token.{lazy_note}",
+          "quantifier_one_or_more": "Quantifier. Match 1 or more of the preceding token.{lazy_note}",
+          "quantifier_zero_or_one": "Quantifier. The preceding token is optional.{lazy_note}",
+          "quantifier_exact": "Quantifier. Match the preceding token exactly {n} times.{lazy_note}",
+          "quantifier_at_least": "Quantifier. Match the preceding token at least {n} times.{lazy_note}",
+          "quantifier_at_most": "Quantifier. Match the preceding token at most {m} times.{lazy_note}",
+          "quantifier_between": "Quantifier. Match the preceding token between {n} and {m} times.{lazy_note}",
+          "quantifier_lazy": " Prefers fewer matches.",
+          "case_sensitive_token": "Case sensitive.",
+          "case_insensitive_token": "Ignores case.",
+          "bad_escape": "Not a valid escape here.",
+          "unclosed": "Incomplete escape.",
+          "unmatched": "Unmatched closing parenthesis."
+        },
+        "block_groups": [
+          {
+            "id": "characters",
+            "label": "Characters",
+            "blocks": [
+              {
+                "id": "digit",
+                "label": "Digit",
+                "insert": "\\d",
+                "tooltip": "A digit (0–9)."
+              },
+              {
+                "id": "not_digit",
+                "label": "Not digit",
+                "insert": "\\D",
+                "tooltip": "Any character that is not a digit."
+              },
+              {
+                "id": "word",
+                "label": "Word",
+                "insert": "\\w",
+                "tooltip": "A letter, digit, or underscore."
+              },
+              {
+                "id": "not_word",
+                "label": "Not word",
+                "insert": "\\W",
+                "tooltip": "Any character that is not a letter, digit, or underscore."
+              },
+              {
+                "id": "space",
+                "label": "Space",
+                "insert": "\\s",
+                "tooltip": "Whitespace."
+              },
+              {
+                "id": "not_space",
+                "label": "Not space",
+                "insert": "\\S",
+                "tooltip": "Any character that is not whitespace."
+              },
+              {
+                "id": "any",
+                "label": "Any",
+                "insert": ".",
+                "tooltip": "Any character except a newline."
+              }
+            ]
+          },
+          {
+            "id": "anchors",
+            "label": "Anchors",
+            "blocks": [
+              {
+                "id": "start",
+                "label": "Start",
+                "insert": "^",
+                "tooltip": "The start of the text."
+              },
+              {
+                "id": "end",
+                "label": "End",
+                "insert": "$",
+                "tooltip": "The end of the text."
+              },
+              {
+                "id": "boundary",
+                "label": "Word edge",
+                "insert": "\\b",
+                "tooltip": "The edge of a word."
+              }
+            ]
+          },
+          {
+            "id": "quantifiers",
+            "label": "Quantifiers",
+            "blocks": [
+              {
+                "id": "optional",
+                "label": "0 or 1",
+                "insert": "(?:text)?",
+                "select_text": "text",
+                "tooltip": "The placeholder is optional. A selection is wrapped."
+              },
+              {
+                "id": "one_or_more",
+                "label": "1 or more",
+                "insert": "(?:text)+",
+                "select_text": "text",
+                "tooltip": "One or more of the placeholder. A selection is wrapped."
+              },
+              {
+                "id": "zero_or_more",
+                "label": "0 or more",
+                "insert": "(?:text)*",
+                "select_text": "text",
+                "tooltip": "Zero or more of the placeholder. A selection is wrapped."
+              },
+              {
+                "id": "exact_count",
+                "label": "Exactly n",
+                "insert": "(?:text){2}",
+                "select_text": "text",
+                "tooltip": "Exactly this many of the placeholder. Edit the number. A selection is wrapped."
+              },
+              {
+                "id": "at_least_count",
+                "label": "n or more",
+                "insert": "(?:text){2,}",
+                "select_text": "text",
+                "tooltip": "At least this many of the placeholder. Edit the number. A selection is wrapped."
+              },
+              {
+                "id": "between_count",
+                "label": "n to m",
+                "insert": "(?:text){2,4}",
+                "select_text": "text",
+                "tooltip": "Between these many of the placeholder. Edit the numbers. A selection is wrapped."
+              }
+            ]
+          },
+          {
+            "id": "groups",
+            "label": "Groups",
+            "blocks": [
+              {
+                "id": "group",
+                "label": "Group",
+                "insert": "(text)",
+                "select_text": "text",
+                "tooltip": "A capturing group. Use \\1 in the replacement to refer to it."
+              },
+              {
+                "id": "noncapturing",
+                "label": "Non-capturing",
+                "insert": "(?:text)",
+                "select_text": "text",
+                "tooltip": "Groups without creating a capture. A selection is wrapped."
+              },
+              {
+                "id": "or",
+                "label": "Or",
+                "insert": "(?:a|b)",
+                "select_text": "a|b",
+                "tooltip": "Either alternative."
+              }
+            ],
+            "groups": [
+              {
+                "id": "lookaround",
+                "label": "Lookaround",
+                "blocks": [
+                  {
+                    "id": "lookahead",
+                    "label": "Lookahead",
+                    "insert": "(?=text)",
+                    "select_text": "text",
+                    "tooltip": "Matches ahead without consuming the text. A selection is wrapped."
+                  },
+                  {
+                    "id": "lookahead_not",
+                    "label": "Not lookahead",
+                    "insert": "(?!text)",
+                    "select_text": "text",
+                    "tooltip": "Succeeds when the text ahead does not match. A selection is wrapped."
+                  },
+                  {
+                    "id": "lookbehind",
+                    "label": "Lookbehind",
+                    "insert": "(?<=text)",
+                    "select_text": "text",
+                    "tooltip": "Matches behind without consuming the text. A selection is wrapped."
+                  },
+                  {
+                    "id": "lookbehind_not",
+                    "label": "Not lookbehind",
+                    "insert": "(?<!text)",
+                    "select_text": "text",
+                    "tooltip": "Succeeds when the text behind does not match. A selection is wrapped."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "sets",
+            "label": "Sets",
+            "blocks": [
+              {
+                "id": "class",
+                "label": "Set",
+                "insert": "[abc]",
+                "select_text": "abc",
+                "tooltip": "Any one of these characters."
+              },
+              {
+                "id": "not_class",
+                "label": "Not set",
+                "insert": "[^abc]",
+                "select_text": "abc",
+                "tooltip": "Any character except these."
+              },
+              {
+                "id": "letters",
+                "label": "Letters",
+                "insert": "[a-zA-Z]",
+                "select_text": "a-zA-Z",
+                "tooltip": "Any ASCII letter."
+              },
+              {
+                "id": "digits_range",
+                "label": "Digits",
+                "insert": "[0-9]",
+                "select_text": "0-9",
+                "tooltip": "Any digit from 0 to 9. Same as \\d for ASCII digits."
+              }
+            ]
           }
         ]
       }

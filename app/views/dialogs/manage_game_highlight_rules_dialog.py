@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QColor, QShowEvent
+from PyQt6.QtGui import QColor, QFont, QShowEvent
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -232,6 +232,9 @@ class ManageGameHighlightRulesDialog(QDialog):
         )
         self.table_header_text = table_config.get(
             "header_text_color", [200, 200, 200]
+        )
+        self.table_header_font_size = scale_font_size(
+            table_config.get("header_font_size", self.font_size)
         )
         self.table_item_padding = int(table_config.get("item_padding", 5))
         self.table_header_padding = int(table_config.get("header_padding", 5))
@@ -682,7 +685,8 @@ class ManageGameHighlightRulesDialog(QDialog):
             f"{header_border}"
             f"padding: {self.table_header_padding}px;"
             f"font-family: {self.label_font_family};"
-            f"font-size: {self.font_size}pt;"
+            f"font-size: {self.table_header_font_size}pt;"
+            f"font-weight: 500;"
             f"}}"
         )
         self.table.configure_row_chrome(
@@ -701,6 +705,9 @@ class ManageGameHighlightRulesDialog(QDialog):
 
         header = self.table.horizontalHeader()
         if header is not None:
+            header.setFont(
+                QFont(self.label_font_family, int(self.table_header_font_size))
+            )
             header_palette = header.palette()
             header_palette.setColor(
                 header.backgroundRole(), QColor(*self.table_header_bg)

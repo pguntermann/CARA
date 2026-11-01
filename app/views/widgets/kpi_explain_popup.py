@@ -1,4 +1,4 @@
-"""Themed KPI explanation popup for Game Summary key statistics.
+"""Themed KPI explanation popup for Game Summary and Player Stats.
 
 Reuses the move-link popup placement/caret styling, with a range scale that
 shows where the current value sits among approximate skill bands.
@@ -68,6 +68,7 @@ class KpiTip:
     higher_is_better: bool
     bands: Tuple[KpiBand, ...]
     unit: str = ""
+    value_label: str = "This game"
 
 
 @dataclass(frozen=True)
@@ -111,12 +112,12 @@ def _int_value(value: Any, fallback: int, *, minimum: int = 0) -> int:
 
 
 def load_kpi_tip_visual_style(config: Optional[Dict[str, Any]]) -> KpiTipVisualStyle:
-    """Resolve ``ui.panels.detail.summary.key_statistics.kpi_tip`` theme values."""
+    """Resolve ``ui.panels.detail.kpi_statistics.kpi_tip`` theme values."""
     raw: Dict[str, Any] = {}
     if config:
         ui = config.get("ui", {})
         panel = ui.get("panels", {}).get("detail", {})
-        tip = panel.get("summary", {}).get("key_statistics", {}).get("kpi_tip", {})
+        tip = panel.get("kpi_statistics", {}).get("kpi_tip", {})
         if isinstance(tip, dict):
             raw = tip
     scale = raw.get("scale", {}) if isinstance(raw.get("scale"), dict) else {}
@@ -168,12 +169,12 @@ def _header_color_delta(value: Any) -> int:
 def _kpi_spec_from_config(
     kpi_id: str, config: Optional[Dict[str, Any]]
 ) -> Optional[Dict[str, Any]]:
-    """Load one KPI tip spec from ``config.json`` (``ui.panels.detail.summary.key_statistics.kpi_tips``)."""
+    """Load one KPI tip spec from ``config.json`` (``ui.panels.detail.kpi_statistics.kpi_tips``)."""
     if not config:
         return None
     ui = config.get("ui", {})
     panel = ui.get("panels", {}).get("detail", {})
-    tips = panel.get("summary", {}).get("key_statistics", {}).get("kpi_tips", {})
+    tips = panel.get("kpi_statistics", {}).get("kpi_tips", {})
     if not isinstance(tips, dict):
         return None
     spec = tips.get(kpi_id)
@@ -187,6 +188,8 @@ def build_kpi_tip(
     value: float,
     display_value: str,
     config: Optional[Dict[str, Any]] = None,
+    *,
+    value_label: str = "This game",
 ) -> Optional[KpiTip]:
     """Build a tip for ``kpi_id`` from config, or None when missing/invalid."""
     spec = _kpi_spec_from_config(kpi_id, config)
@@ -230,6 +233,7 @@ def build_kpi_tip(
         higher_is_better=bool(spec.get("higher_is_better", True)),
         bands=tuple(bands),
         unit=str(spec.get("unit", "")),
+        value_label=str(value_label or "This game"),
     )
 
 
@@ -858,7 +862,7 @@ class KpiExplainPopup(QWidget):
     def _apply_tip(self, tip: KpiTip) -> None:
         self._title.setText(tip.title)
         unit = f" {tip.unit}" if tip.unit and tip.unit not in tip.display_value else ""
-        self._value.setText(f"This game: {tip.display_value}{unit}")
+        self._value.setText(f"{tip.value_label}: {tip.display_value}{unit}")
         self._explanation.setText(tip.explanation)
         self._explanation.setVisible(bool(tip.explanation))
         marker = QColor(*self._style.title_color)
