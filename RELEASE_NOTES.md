@@ -1,5 +1,30 @@
 # Release Notes
 
+# CARA v2.9.3 - Regex Editor & Player Stats KPI hover tips
+
+**Release Date:** 01.11.2026
+
+This release introduces a shared **Regex Editor** for building and testing regular expressions in **Bulk Operations**, **Search Games**, and **Player Stats**, implements the same KPI tooltips from **Game Summary** also to **Player Stats** and includes a few improvements of the **light** and **scholar** themes.
+
+## New Features
+
+- **Regex Editor:** A reusable dialog to build and test regular expressions with sample highlighting, building blocks, example patterns, and save/load. Open it from the small `.*` control on regex fields.
+- **Bulk Operations:** Regex find/replace for PGN header tags can use the Regex Editor.
+- **Search Games:** The **matches regex** operator is available on suitable criteria, with the same Regex Editor.
+- **Player Stats – regex player filter:** Tick **Regex** next to the player control to aggregate stats for every name that matches a pattern (case-insensitive). If the expression matches both the White and Black side players of any particular game, the game is counted from White's side.
+
+## Enhancements
+
+- **KPI hover tips:** The themed KPI explanation popup is shared between Game Summary and Player Stats.
+- **Average CPL scale:** The amateur band on the Average CPL skill guide extends to 120.
+- **Themes / UI:** Light and Scholar theme refinements for inputs, Find fields, buttons, and search/regex panels.
+
+## Documentation
+
+- **User manual:** New Regex Editor section; floating chapter chip while scrolling
+
+---
+
 # CARA v2.9.2 - Game Summary improvements & better AI chat error handling
 
 **Release Date:** 13.10.2026
