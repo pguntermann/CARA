@@ -393,6 +393,15 @@ class TestNarrativeHeaderLines(unittest.TestCase):
         self.assertIn("Generated: 2026-10-31 14:22", h)
         self.assertIn("AI model: claude-sonnet-4-6", h)
 
+    def test_has_3x3_produces_shallow_vague_label(self):
+        h = _svc().narrative_html(
+            "Paul", "CLAMP + 3x3", "## Summary\n\nText.",
+            n_games=10, g_games=8, m_moments=25, s_flagged=5, has_3x3=True,
+            generated_at="2026-11-01 10:00",
+            model_label="claude-sonnet-4-6",
+        )
+        self.assertIn("5 Shallow/Vague", h)
+
     def test_check_logs_html_header_source_model_generated(self):
         h = _svc().check_logs_html(
             _groups([_clamp_snap()]),

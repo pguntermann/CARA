@@ -170,6 +170,16 @@ class ChessLogStorageService:
         return ChessLogStorageService.is_entry_ignore_honoured(entry)
 
     @staticmethod
+    def entry_has_flag(entry: Dict[str, Any]) -> bool:
+        """Return True if this entry carries a Shallow or Vague flag (Ignored counts).
+
+        This is the shared predicate used by both compute_narrative_counts (stats
+        service) and get_shallow_vague_keys (chess_log_controller) — they must agree.
+        check_hash is not consulted; only is_shallow/is_vague matter here.
+        """
+        return bool(entry.get("is_shallow")) or bool(entry.get("is_vague"))
+
+    @staticmethod
     def load_nag_shown(game: GameData) -> bool:
         """Read the nag_shown flag from the CARAChessLog payload.
 

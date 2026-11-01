@@ -788,6 +788,36 @@ class TestMakeEntryCheckHash(unittest.TestCase):
         self.assertNotIn("check_hash", e)
 
 
+class TestEntryHasFlag(unittest.TestCase):
+    """entry_has_flag: is_shallow/is_vague; Ignored counts; check_hash not consulted."""
+
+    def test_is_shallow_true_returns_true(self):
+        self.assertTrue(ChessLogStorageService.entry_has_flag({"is_shallow": True}))
+
+    def test_is_vague_true_returns_true(self):
+        self.assertTrue(ChessLogStorageService.entry_has_flag({"is_vague": True}))
+
+    def test_neither_flag_returns_false(self):
+        self.assertFalse(ChessLogStorageService.entry_has_flag({"why": "some note"}))
+
+    def test_is_shallow_with_ignore_still_returns_true(self):
+        e = {"is_shallow": True, "ignore_shallow": True}
+        self.assertTrue(ChessLogStorageService.entry_has_flag(e))
+
+    def test_stale_check_hash_with_is_shallow_returns_true(self):
+        # Hash of old text doesn't match current 'why', but entry_has_flag ignores
+        # check_hash — only is_shallow/is_vague matter; stale entry still flagged.
+        stale_hash = ChessLogStorageService.compute_check_hash("old text")
+        e = {"why": "edited text", "check_hash": stale_hash, "is_shallow": True}
+        self.assertTrue(ChessLogStorageService.entry_has_flag(e))
+
+    def test_stale_check_hash_without_flag_returns_false(self):
+        # Stale hash alone does not make entry flagged.
+        stale_hash = ChessLogStorageService.compute_check_hash("old text")
+        e = {"why": "edited text", "check_hash": stale_hash}
+        self.assertFalse(ChessLogStorageService.entry_has_flag(e))
+
+
 class TestCheckRun(unittest.TestCase):
     """load_check_run and store_tags _check_run round-trip."""
 

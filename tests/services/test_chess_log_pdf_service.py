@@ -130,6 +130,31 @@ class TestExportNarrativeReport(unittest.TestCase):
         finally:
             tmp_path.unlink(missing_ok=True)
 
+    def test_has_3x3_produces_shallow_vague_in_narrative_pdf(self):
+        import pypdf as _pypdf
+        svc = ChessLogPDFService({})
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            svc.export_narrative_report(
+                tmp_path,
+                player_name="Paul",
+                source_label="CLAMP + 3x3",
+                narrative_text="## Summary\n\nText.",
+                model_label="claude-sonnet-4-6",
+                generated_at="2026-11-01 10:00",
+                n_games=10,
+                g_games=8,
+                m_moments=25,
+                s_flagged=5,
+                has_3x3=True,
+            )
+            reader = _pypdf.PdfReader(str(tmp_path))
+            text = " ".join(p.extract_text() or "" for p in reader.pages)
+            self.assertIn("5 Shallow/Vague", text)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
 
 @requires_qt
 class TestExportTagsSmoke(unittest.TestCase):
@@ -1541,6 +1566,17 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
         )
         self.assertIn("Generated: 2025-01-01 08:00", text)
         self.assertNotIn("Exported:", text)
+
+    def test_has_3x3_produces_shallow_vague_in_charts_pdf(self):
+        text = self._export_charts_and_extract(
+            narrative_text="## Summary\n\nText.",
+            n_games=10,
+            g_games=8,
+            m_moments=25,
+            s_flagged=5,
+            has_3x3=True,
+        )
+        self.assertIn("5 Shallow/Vague", text)
 
 
 # ---------------------------------------------------------------------------

@@ -399,6 +399,8 @@ class ChessLogController:
                     by_preset.setdefault(e.get("preset", ""), []).append(e)
                 for preset, preset_entries in by_preset.items():
                     for e in preset_entries:
+                        if not ChessLogStorageService.entry_has_flag(e):
+                            continue
                         cat = e.get("cat", "")
                         key = (game, path_key, preset, cat if preset == "3x3" else "")
                         if e.get("is_shallow"):

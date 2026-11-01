@@ -293,7 +293,7 @@ def compute_narrative_counts(
                 game_has_moment = True
                 if preset == "3x3":
                     has_3x3 = True
-                if _moment_has_flag(preset, preset_entries):
+                if _moment_has_flag(preset_entries):
                     s += 1
 
         if game_has_moment:
@@ -302,26 +302,13 @@ def compute_narrative_counts(
     return n, g, m, s, has_3x3
 
 
-def _moment_has_flag(preset: str, entries: List[Dict[str, Any]]) -> bool:
-    """Return True if this (path_key, preset) moment has any Shallow or Vague flag.
+def _moment_has_flag(entries: List[Dict[str, Any]]) -> bool:
+    """Return True if any entry in this moment has a Shallow or Vague flag.
 
-    Ignored flags count — the Ignore checkbox does not suppress the flag here.
-    This matches the rule used by ChessLogController.get_shallow_vague_keys
-    (Show Shallow/Vague Logs), which checks is_shallow/is_vague without any
-    ignore exemption.
+    Delegates to ChessLogStorageService.entry_has_flag — the same predicate used
+    by get_shallow_vague_keys (Show Shallow/Vague Logs), so both code paths agree.
     """
-    if preset == "3x3":
-        for e in entries:
-            cat = e.get("cat", "")
-            if cat in ("Why1", "Why2", "Why3") and e.get("is_shallow"):
-                return True
-            if cat == "Why4" and e.get("is_vague"):
-                return True
-    else:
-        for e in entries:
-            if e.get("is_shallow"):
-                return True
-    return False
+    return any(ChessLogStorageService.entry_has_flag(e) for e in entries)
 
 
 # ---------------------------------------------------------------------------
