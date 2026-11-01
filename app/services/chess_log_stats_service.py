@@ -224,25 +224,32 @@ def get_all_players(games: List[GameData]) -> List[Tuple[str, int]]:
     return qualified
 
 
+def shallow_flag_label(has_3x3: bool) -> str:
+    """Return 'Shallow/Vague' if any counted moment is 3x3, else 'Shallow'."""
+    return "Shallow/Vague" if has_3x3 else "Shallow"
+
+
 def compute_narrative_counts(
     games: List[GameData],
     player: str,
     color_filter: str,
     get_tags_fn: Callable[[GameData], Dict[str, Any]],
-) -> Tuple[int, int, int, int]:
-    """Return (n_games, g_with_moments, m_moments, k_unflagged) for the narrative scope.
+) -> Tuple[int, int, int, int, bool]:
+    """Return (n_games, g_with_moments, m_moments, s_flagged, has_3x3) for the narrative scope.
 
     - n_games:        games in scope (match player + color_filter)
     - g_with_moments: games where the player has at least one logged moment
     - m_moments:      total (path_key, preset) moments for the player in those games
-    - k_unflagged:    moments with no saved non-ignored Shallow or Vague verdict
+    - s_flagged:      moments with any Shallow or Vague flag (Ignored flags count)
+    - has_3x3:        True if any counted moment uses the 3x3 preset
 
     Only path_keys whose color matches the player's own color in each game are
-    counted; opponent-tagged moves are excluded.  Never-checked moments count as
-    not flagged.  An Ignored Shallow/Vague verdict counts as not flagged.
+    counted; opponent-tagged moves are excluded.  Never-checked moments (no
+    is_shallow/is_vague) are not counted in s_flagged.
     """
     player_cf = (player or "").casefold().strip()
-    n = g = m = k = 0
+    n = g = m = s = 0
+    has_3x3 = False
 
     for game in games:
         if not game_matches_player_color(game, player_cf, color_filter):
@@ -284,29 +291,35 @@ def compute_narrative_counts(
             for preset, preset_entries in by_preset.items():
                 m += 1
                 game_has_moment = True
-                if not _moment_is_flagged(preset, preset_entries):
-                    k += 1
+                if preset == "3x3":
+                    has_3x3 = True
+                if _moment_has_flag(preset, preset_entries):
+                    s += 1
 
         if game_has_moment:
             g += 1
 
-    return n, g, m, k
+    return n, g, m, s, has_3x3
 
 
-def _moment_is_flagged(preset: str, entries: List[Dict[str, Any]]) -> bool:
-    """Return True if this (path_key, preset) moment has a non-ignored Shallow or Vague verdict."""
+def _moment_has_flag(preset: str, entries: List[Dict[str, Any]]) -> bool:
+    """Return True if this (path_key, preset) moment has any Shallow or Vague flag.
+
+    Ignored flags count — the Ignore checkbox does not suppress the flag here.
+    This matches the rule used by ChessLogController.get_shallow_vague_keys
+    (Show Shallow/Vague Logs), which checks is_shallow/is_vague without any
+    ignore exemption.
+    """
     if preset == "3x3":
         for e in entries:
             cat = e.get("cat", "")
-            if cat in ("Why1", "Why2", "Why3"):
-                if e.get("is_shallow") and not ChessLogStorageService.is_entry_ignore_honoured(e):
-                    return True
-            elif cat == "Why4":
-                if e.get("is_vague") and not ChessLogStorageService.is_entry_ignore_honoured(e):
-                    return True
+            if cat in ("Why1", "Why2", "Why3") and e.get("is_shallow"):
+                return True
+            if cat == "Why4" and e.get("is_vague"):
+                return True
     else:
         for e in entries:
-            if e.get("is_shallow") and not ChessLogStorageService.is_entry_ignore_honoured(e):
+            if e.get("is_shallow"):
                 return True
     return False
 

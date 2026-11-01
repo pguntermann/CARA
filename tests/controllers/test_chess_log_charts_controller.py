@@ -1754,10 +1754,11 @@ class TestNarrativeMetadataCache(unittest.TestCase):
 
     def test_metadata_cleared_initially(self):
         ctrl = self._make_controller()
-        generated_at, model_label, n, g, m, k = ctrl.get_last_narrative_metadata()
+        generated_at, model_label, n, g, m, s, has_3x3 = ctrl.get_last_narrative_metadata()
         self.assertEqual(generated_at, "")
         self.assertEqual(model_label, "")
-        self.assertEqual((n, g, m, k), (0, 0, 0, 0))
+        self.assertEqual((n, g, m, s), (0, 0, 0, 0))
+        self.assertFalse(has_3x3)
 
     def test_metadata_captured_on_narrative_ready(self):
         from unittest.mock import patch
@@ -1770,13 +1771,14 @@ class TestNarrativeMetadataCache(unittest.TestCase):
 
         with patch(
             "app.controllers.chess_log_charts_controller.compute_narrative_counts",
-            return_value=(5, 3, 8, 4),
+            return_value=(5, 3, 8, 4, False),
         ):
             ctrl._on_narrative_thread_ready("Narrative text", [], None)
 
-        _, model_label, n, g, m, k = ctrl.get_last_narrative_metadata()
+        _, model_label, n, g, m, s, has_3x3 = ctrl.get_last_narrative_metadata()
         self.assertEqual(model_label, "Anthropic claude-opus-4-7")
-        self.assertEqual((n, g, m, k), (5, 3, 8, 4))
+        self.assertEqual((n, g, m, s), (5, 3, 8, 4))
+        self.assertFalse(has_3x3)
 
     def test_metadata_generated_at_is_set(self):
         from unittest.mock import patch
@@ -1787,11 +1789,11 @@ class TestNarrativeMetadataCache(unittest.TestCase):
 
         with patch(
             "app.controllers.chess_log_charts_controller.compute_narrative_counts",
-            return_value=(0, 0, 0, 0),
+            return_value=(0, 0, 0, 0, False),
         ):
             ctrl._on_narrative_thread_ready("text", [], None)
 
-        generated_at, _, _, _, _, _ = ctrl.get_last_narrative_metadata()
+        generated_at, _, _, _, _, _, _ = ctrl.get_last_narrative_metadata()
         self.assertRegex(generated_at, r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
 
     def test_metadata_unchanged_after_resolve_games_changes(self):
@@ -1803,14 +1805,14 @@ class TestNarrativeMetadataCache(unittest.TestCase):
 
         with patch(
             "app.controllers.chess_log_charts_controller.compute_narrative_counts",
-            return_value=(6, 5, 5, 3),
+            return_value=(6, 5, 5, 3, False),
         ):
             ctrl._on_narrative_thread_ready("text", [], None)
 
         # Now change what _resolve_games would return — shouldn't affect cached counts.
         ctrl._resolve_games = MagicMock(return_value=["extra_game"])
-        _, _, n, g, m, k = ctrl.get_last_narrative_metadata()
-        self.assertEqual((n, g, m, k), (6, 5, 5, 3))
+        _, _, n, g, m, s, _ = ctrl.get_last_narrative_metadata()
+        self.assertEqual((n, g, m, s), (6, 5, 5, 3))
 
     def test_metadata_cleared_on_failed_narrative(self):
         from unittest.mock import patch
@@ -1821,16 +1823,17 @@ class TestNarrativeMetadataCache(unittest.TestCase):
         # First, set some values.
         with patch(
             "app.controllers.chess_log_charts_controller.compute_narrative_counts",
-            return_value=(3, 2, 4, 1),
+            return_value=(3, 2, 4, 1, False),
         ):
             ctrl._on_narrative_thread_ready("text", [], None)
 
         # Now fail.
         ctrl._on_narrative_thread_failed("error")
-        generated_at, model_label, n, g, m, k = ctrl.get_last_narrative_metadata()
+        generated_at, model_label, n, g, m, s, has_3x3 = ctrl.get_last_narrative_metadata()
         self.assertEqual(generated_at, "")
         self.assertEqual(model_label, "")
-        self.assertEqual((n, g, m, k), (0, 0, 0, 0))
+        self.assertEqual((n, g, m, s), (0, 0, 0, 0))
+        self.assertFalse(has_3x3)
 
     def test_metadata_cleared_on_source_change(self):
         from unittest.mock import patch
@@ -1840,13 +1843,14 @@ class TestNarrativeMetadataCache(unittest.TestCase):
 
         with patch(
             "app.controllers.chess_log_charts_controller.compute_narrative_counts",
-            return_value=(3, 2, 4, 1),
+            return_value=(3, 2, 4, 1, False),
         ):
             ctrl._on_narrative_thread_ready("text", [], None)
 
         ctrl.set_source_selection(0)
-        _, _, n, g, m, k = ctrl.get_last_narrative_metadata()
-        self.assertEqual((n, g, m, k), (0, 0, 0, 0))
+        _, _, n, g, m, s, has_3x3 = ctrl.get_last_narrative_metadata()
+        self.assertEqual((n, g, m, s), (0, 0, 0, 0))
+        self.assertFalse(has_3x3)
 
 
 @unittest.skipUnless(_QT_AVAILABLE, "Qt not available in this environment")
@@ -1876,7 +1880,7 @@ class TestInFlightGuard(unittest.TestCase):
 
         with patch(
             "app.controllers.chess_log_charts_controller.compute_narrative_counts",
-            return_value=(0, 0, 0, 0),
+            return_value=(0, 0, 0, 0, False),
         ):
             ctrl._on_narrative_thread_ready("Stale narrative", [], None)
 
@@ -1896,7 +1900,7 @@ class TestInFlightGuard(unittest.TestCase):
 
         with patch(
             "app.controllers.chess_log_charts_controller.compute_narrative_counts",
-            return_value=(0, 0, 0, 0),
+            return_value=(0, 0, 0, 0, False),
         ):
             ctrl._on_narrative_thread_ready("Fresh narrative", [], None)
 
@@ -1996,7 +2000,7 @@ class TestInFlightGuardViaRealStartPaths(unittest.TestCase):
 
         # No further game-set change — result must be accepted
         with patch("app.controllers.chess_log_charts_controller.compute_narrative_counts",
-                   return_value=(0, 0, 0, 0)):
+                   return_value=(0, 0, 0, 0, False)):
             fake_thread.narrative_ready.emit("Fresh", [], None)
 
         self.assertEqual(len(received), 1,
@@ -2020,7 +2024,7 @@ class TestInFlightGuardViaRealStartPaths(unittest.TestCase):
         ctrl._clear_result_cache()
 
         with patch("app.controllers.chess_log_charts_controller.compute_narrative_counts",
-                   return_value=(0, 0, 0, 0)):
+                   return_value=(0, 0, 0, 0, False)):
             fake_thread.narrative_ready.emit("Stale", [], None)
 
         self.assertEqual(received, [], "stale narrative from real start path must be dropped")
@@ -2135,7 +2139,7 @@ class TestInFlightGuardViaRealStartPaths(unittest.TestCase):
         ctrl.set_user_settings({"chess_log": {"charts": {"progression_x_axis_mode": "calendar_linear"}}})
 
         with patch("app.controllers.chess_log_charts_controller.compute_narrative_counts",
-                   return_value=(0, 0, 0, 0)):
+                   return_value=(0, 0, 0, 0, False)):
             fake_thread.narrative_ready.emit("Fresh", [], None)
 
         self.assertEqual(len(received), 1, "narrative after chart option change must not be blocked")
@@ -2473,7 +2477,7 @@ class TestGameSetKeyInvalidation(unittest.TestCase):
         self._run_schedule(ctrl, games2)
 
         with patch("app.controllers.chess_log_charts_controller.compute_narrative_counts",
-                   return_value=(0, 0, 0, 0)):
+                   return_value=(0, 0, 0, 0, False)):
             fake_thread.narrative_ready.emit("Stale from old set", [], None)
 
         self.assertEqual(received, [], "narrative from old game set must be dropped")

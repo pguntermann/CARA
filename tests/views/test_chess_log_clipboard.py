@@ -102,7 +102,7 @@ def _make_charts_stub_controller():
     ctrl.get_last_narrative_result.return_value = ("", [], None)
     ctrl.get_last_shallow_result.return_value = (None, None, None)
     ctrl.get_current_source_filenames.return_value = []
-    ctrl.get_last_narrative_metadata.return_value = ("", "", 0, 0, 0, 0)
+    ctrl.get_last_narrative_metadata.return_value = ("", "", 0, 0, 0, 0, False)
     for sig in (
         "charts_updated", "charts_unavailable", "charts_skipped", "charts_loading",
         "players_ready", "player_selection_cleared", "narrative_ready", "narrative_failed",

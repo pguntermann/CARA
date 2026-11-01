@@ -17,6 +17,7 @@ import html
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.services.chess_log_stats_service import shallow_flag_label
 from app.utils.chess_log_prompts import THREE_BY_THREE_PROMPTS
 from app.utils.chess_log_preset_order import order_categories
 from app.utils.markdown_to_html import markdown_to_html
@@ -80,13 +81,14 @@ class ChessLogHTMLService:
         n_games: int = 0,
         g_games: int = 0,
         m_moments: int = 0,
-        k_unflagged: int = 0,
+        s_flagged: int = 0,
+        has_3x3: bool = False,
         generated_at: str = "",
         model_label: str = "",
     ) -> str:
         parts = [
             self._narrative_header_html(
-                player_name, source_label, n_games, g_games, m_moments, k_unflagged,
+                player_name, source_label, n_games, g_games, m_moments, s_flagged, has_3x3,
                 generated_at, model_label,
             )
         ]
@@ -109,13 +111,14 @@ class ChessLogHTMLService:
         n_games: int = 0,
         g_games: int = 0,
         m_moments: int = 0,
-        k_unflagged: int = 0,
+        s_flagged: int = 0,
+        has_3x3: bool = False,
         generated_at: str = "",
         model_label: str = "",
     ) -> str:
         parts = [
             self._charts_header_html(
-                player_name, source_label, n_games, g_games, m_moments, k_unflagged,
+                player_name, source_label, n_games, g_games, m_moments, s_flagged, has_3x3,
                 generated_at, model_label, bool(narrative_text),
             )
         ]
@@ -196,7 +199,8 @@ class ChessLogHTMLService:
         n_games: int,
         g_games: int,
         m_moments: int,
-        k_unflagged: int,
+        s_flagged: int,
+        has_3x3: bool,
         generated_at: str,
         model_label: str,
     ) -> str:
@@ -207,7 +211,7 @@ class ChessLogHTMLService:
             parts.append(f"<p>Source: {html.escape(source_label, quote=False)}</p>")
         counts = (
             f"{n_games} games · {g_games} with logged moments "
-            f"· {m_moments} moments · {k_unflagged} not flagged"
+            f"· {m_moments} moments · {s_flagged} {shallow_flag_label(has_3x3)}"
         )
         parts.append(f"<p>{html.escape(counts, quote=False)}</p>")
         if generated_at:
@@ -224,7 +228,8 @@ class ChessLogHTMLService:
         n_games: int,
         g_games: int,
         m_moments: int,
-        k_unflagged: int,
+        s_flagged: int,
+        has_3x3: bool,
         generated_at: str,
         model_label: str,
         has_narrative: bool,
@@ -238,7 +243,7 @@ class ChessLogHTMLService:
         if has_narrative:
             counts = (
                 f"{n_games} games · {g_games} with logged moments "
-                f"· {m_moments} moments · {k_unflagged} not flagged"
+                f"· {m_moments} moments · {s_flagged} {shallow_flag_label(has_3x3)}"
             )
             parts.append(f"<p>{html.escape(counts, quote=False)}</p>")
         if generated_at:

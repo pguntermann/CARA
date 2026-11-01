@@ -378,7 +378,7 @@ class TestNarrativeHeaderLines(unittest.TestCase):
     def test_narrative_html_header_player_source_counts(self):
         h = _svc().narrative_html(
             "Paul", "62-game CLAMP", "## Heading\n\nBody.",
-            n_games=62, g_games=47, m_moments=120, k_unflagged=115,
+            n_games=62, g_games=47, m_moments=120, s_flagged=115,
             generated_at="2026-10-31 14:22",
             model_label="claude-sonnet-4-6",
         )
@@ -388,7 +388,8 @@ class TestNarrativeHeaderLines(unittest.TestCase):
         self.assertIn("62 games", h)
         self.assertIn("47 with logged moments", h)
         self.assertIn("120 moments", h)
-        self.assertIn("115 not flagged", h)
+        self.assertIn("115 Shallow", h)
+        self.assertNotIn("not flagged", h)
         self.assertIn("Generated: 2026-10-31 14:22", h)
         self.assertIn("AI model: claude-sonnet-4-6", h)
 
@@ -618,7 +619,7 @@ class TestHtmlDocumentWrapper(unittest.TestCase):
         # The counts line in narrative_html uses · as separator
         h = _svc().narrative_html(
             "Paul", "src", "## H\n\nBody.",
-            n_games=5, g_games=3, m_moments=10, k_unflagged=8,
+            n_games=5, g_games=3, m_moments=10, s_flagged=8,
         )
         self.assertIn("&#183;", h)   # middle dot (U+00B7)
         self.assertNotIn("·", h)

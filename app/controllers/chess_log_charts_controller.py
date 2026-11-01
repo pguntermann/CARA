@@ -519,7 +519,7 @@ class ChessLogChartsController(QObject):
         self._cached_narrative: str = ""
         self._cached_narrative_flags: list = []
         self._cached_narrative_usage: Optional[Any] = None
-        self._cached_narrative_counts: Optional[Tuple[int, int, int, int]] = None
+        self._cached_narrative_counts: Optional[Tuple[int, int, int, int, bool]] = None
         self._cached_narrative_generated_at: str = ""
         self._cached_narrative_model_label: str = ""
         self._cached_shallow_keys: Optional[Any] = None
@@ -634,12 +634,12 @@ class ChessLogChartsController(QObject):
         return self._cached_narrative, self._cached_narrative_flags, self._cached_narrative_usage
 
     def get_last_narrative_metadata(self) -> tuple:
-        """Return (generated_at, model_label, n_games, g_games, m_moments, k_unflagged)."""
-        n, g, m, k = self._cached_narrative_counts or (0, 0, 0, 0)
+        """Return (generated_at, model_label, n_games, g_games, m_moments, s_flagged, has_3x3)."""
+        n, g, m, s, has_3x3 = self._cached_narrative_counts or (0, 0, 0, 0, False)
         return (
             self._cached_narrative_generated_at,
             self._cached_narrative_model_label,
-            n, g, m, k,
+            n, g, m, s, has_3x3,
         )
 
     def get_last_shallow_result(self) -> tuple:

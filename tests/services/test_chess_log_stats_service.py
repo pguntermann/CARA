@@ -15,6 +15,7 @@ from app.services.chess_log_stats_service import (
     aggregate,
     compute_narrative_counts,
     get_all_players,
+    shallow_flag_label,
 )
 
 
@@ -759,7 +760,7 @@ class TestAggregateExcludesOrphans(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestComputeNarrativeCounts(unittest.TestCase):
-    """Tests for compute_narrative_counts — N/G/M/K counting logic."""
+    """Tests for compute_narrative_counts — N/G/M/S counting logic."""
 
     _BASE_PGN = (
         '[Event "Test"]\n[Site "?"]\n[Date "2025.06.01"]\n'
@@ -784,40 +785,43 @@ class TestComputeNarrativeCounts(unittest.TestCase):
         return compute_narrative_counts(games, player, color_filter, self._get_tags)
 
     def test_no_games(self):
-        n, g, m, k = self._counts([])
-        self.assertEqual((n, g, m, k), (0, 0, 0, 0))
+        n, g, m, s, has_3x3 = self._counts([])
+        self.assertEqual((n, g, m, s, has_3x3), (0, 0, 0, 0, False))
 
     def test_game_no_moments_counts_n_not_g(self):
         game = self._make_game()   # no entries_per_path → has_chess_log_tags=False
-        n, g, m, k = self._counts([game])
+        n, g, m, s, has_3x3 = self._counts([game])
         self.assertEqual(n, 1)
         self.assertEqual(g, 0)
         self.assertEqual(m, 0)
-        self.assertEqual(k, 0)
+        self.assertEqual(s, 0)
+        self.assertFalse(has_3x3)
 
-    def test_unflagged_clamp_moment(self):
+    def test_unflagged_clamp_moment_not_counted_in_s(self):
+        # No is_shallow/is_vague → never-checked → s=0
         e = ChessLogStorageService.make_entry("CLAMP", "C", "why text")
         game = self._make_game(entries_per_path={self._WHITE_PATH: [e]})
-        n, g, m, k = self._counts([game])
-        self.assertEqual((n, g, m, k), (1, 1, 1, 1))
+        n, g, m, s, has_3x3 = self._counts([game])
+        self.assertEqual((n, g, m, s, has_3x3), (1, 1, 1, 0, False))
 
-    def test_shallow_flagged_clamp_not_in_k(self):
+    def test_shallow_flagged_clamp_counted_in_s(self):
+        # is_shallow=True → counted in s
         e = ChessLogStorageService.make_entry("CLAMP", "C", "why", is_shallow=True)
         game = self._make_game(entries_per_path={self._WHITE_PATH: [e]})
-        n, g, m, k = self._counts([game])
-        self.assertEqual((n, g, m, k), (1, 1, 1, 0))
+        n, g, m, s, has_3x3 = self._counts([game])
+        self.assertEqual((n, g, m, s, has_3x3), (1, 1, 1, 1, False))
 
-    def test_shallow_ignored_counts_as_not_flagged(self):
-        # is_shallow=True, ignore_shallow=True, no hash → legacy ignore → honoured
+    def test_shallow_ignored_still_counted_in_s(self):
+        # is_shallow=True, ignore_shallow=True → Ignored flag still counts in s
         e = ChessLogStorageService.make_entry(
             "CLAMP", "C", "why", is_shallow=True, ignore_shallow=True
         )
         game = self._make_game(entries_per_path={self._WHITE_PATH: [e]})
-        n, g, m, k = self._counts([game])
-        self.assertEqual((n, g, m, k), (1, 1, 1, 1))
+        n, g, m, s, has_3x3 = self._counts([game])
+        self.assertEqual((n, g, m, s, has_3x3), (1, 1, 1, 1, False))
 
-    def test_3x3_vague_lesson_is_flagged(self):
-        # Why4 with is_vague=True → flagged, not K
+    def test_3x3_vague_lesson_counted_in_s(self):
+        # Why4 with is_vague=True → counted in s; has_3x3=True
         entries = [
             ChessLogStorageService.make_entry("3x3", "Why1", "w1"),
             ChessLogStorageService.make_entry("3x3", "Why2", "w2"),
@@ -825,11 +829,11 @@ class TestComputeNarrativeCounts(unittest.TestCase):
             ChessLogStorageService.make_entry("3x3", "Why4", "w4", is_vague=True),
         ]
         game = self._make_game(entries_per_path={self._WHITE_PATH: entries})
-        n, g, m, k = self._counts([game])
-        self.assertEqual((n, g, m, k), (1, 1, 1, 0))
+        n, g, m, s, has_3x3 = self._counts([game])
+        self.assertEqual((n, g, m, s, has_3x3), (1, 1, 1, 1, True))
 
-    def test_3x3_shallow_why2_ignored_not_flagged(self):
-        # Why2 is_shallow=True but Ignored → not flagged → K
+    def test_3x3_shallow_why2_ignored_still_counted_in_s(self):
+        # Why2 is_shallow=True, Ignored → Ignored flag still counts in s; has_3x3=True
         entries = [
             ChessLogStorageService.make_entry("3x3", "Why1", "w1"),
             ChessLogStorageService.make_entry(
@@ -839,39 +843,62 @@ class TestComputeNarrativeCounts(unittest.TestCase):
             ChessLogStorageService.make_entry("3x3", "Why4", "w4"),
         ]
         game = self._make_game(entries_per_path={self._WHITE_PATH: entries})
-        n, g, m, k = self._counts([game])
-        self.assertEqual((n, g, m, k), (1, 1, 1, 1))
+        n, g, m, s, has_3x3 = self._counts([game])
+        self.assertEqual((n, g, m, s, has_3x3), (1, 1, 1, 1, True))
 
     def test_opponent_moment_excluded(self):
-        # Black-path moment when filtering for Alice (White) → excluded from M and K
+        # Black-path moment when filtering for Alice (White) → excluded from m and s
         e = ChessLogStorageService.make_entry("CLAMP", "C", "why")
         game = self._make_game(entries_per_path={self._BLACK_PATH: [e]})
-        n, g, m, k = self._counts([game])
+        n, g, m, s, has_3x3 = self._counts([game])
         self.assertEqual(n, 1)
         self.assertEqual(g, 0)
         self.assertEqual(m, 0)
-        self.assertEqual(k, 0)
+        self.assertEqual(s, 0)
+        self.assertFalse(has_3x3)
+
+    def test_multiple_flags_on_one_moment_count_once(self):
+        # CLAMP moment with multiple entries, each is_shallow=True → still s=1
+        entries = [
+            ChessLogStorageService.make_entry("CLAMP", "C", "note1", is_shallow=True),
+            ChessLogStorageService.make_entry("CLAMP", "L", "note2", is_shallow=True),
+        ]
+        game = self._make_game(entries_per_path={self._WHITE_PATH: entries})
+        n, g, m, s, has_3x3 = self._counts([game])
+        self.assertEqual(s, 1)
+
+    def test_never_checked_moment_not_counted_in_s(self):
+        # No is_shallow/is_vague set → never-checked → s=0
+        e = ChessLogStorageService.make_entry("CLAMP", "C", "note without check")
+        game = self._make_game(entries_per_path={self._WHITE_PATH: [e]})
+        n, g, m, s, _ = self._counts([game])
+        self.assertEqual(s, 0)
 
     def test_combined_set_exact_counts(self):
-        """Full test set as specified: N=6, G=5, M=5, K=3."""
-        # Game 1: Alice White, White path unflagged CLAMP (K), Black path excluded
+        """Full test: N=6, G=5, M=5, S=4, has_3x3=True.
+
+        g2 (CLAMP Shallow) and g3 (CLAMP Shallow Ignored) both count in s — Ignored
+        flags count.  g4 (3x3 Vague) and g5 (3x3 Shallow Ignored) likewise.
+        g1 (CLAMP unflagged) does not.
+        """
+        # Game 1: Alice White, White path unflagged CLAMP (s=0), Black path excluded
         g1 = self._make_game(entries_per_path={
             self._WHITE_PATH: [ChessLogStorageService.make_entry("CLAMP", "C", "why")],
             self._BLACK_PATH: [ChessLogStorageService.make_entry("CLAMP", "C", "opp")],
         })
-        # Game 2: Alice White, White path CLAMP flagged Shallow (not K)
+        # Game 2: Alice White, White path CLAMP Shallow (s+1)
         g2 = self._make_game(entries_per_path={
             self._WHITE_PATH: [ChessLogStorageService.make_entry(
                 "CLAMP", "C", "why", is_shallow=True
             )],
         })
-        # Game 3: Alice White, White path CLAMP flagged Shallow but Ignored (K)
+        # Game 3: Alice White, White path CLAMP Shallow Ignored (s+1 — Ignored counts)
         g3 = self._make_game(entries_per_path={
             self._WHITE_PATH: [ChessLogStorageService.make_entry(
                 "CLAMP", "C", "why", is_shallow=True, ignore_shallow=True
             )],
         })
-        # Game 4: Alice White, 3x3 with Vague Lesson (not K)
+        # Game 4: Alice White, 3x3 with Vague Lesson (s+1, has_3x3=True)
         g4 = self._make_game(entries_per_path={
             self._WHITE_PATH: [
                 ChessLogStorageService.make_entry("3x3", "Why1", "w1"),
@@ -880,7 +907,7 @@ class TestComputeNarrativeCounts(unittest.TestCase):
                 ChessLogStorageService.make_entry("3x3", "Why4", "w4", is_vague=True),
             ],
         })
-        # Game 5: Alice White, 3x3 Why2 Shallow but Ignored (K)
+        # Game 5: Alice White, 3x3 Why2 Shallow Ignored (s+1 — Ignored counts)
         g5 = self._make_game(entries_per_path={
             self._WHITE_PATH: [
                 ChessLogStorageService.make_entry("3x3", "Why1", "w1"),
@@ -894,16 +921,29 @@ class TestComputeNarrativeCounts(unittest.TestCase):
         # Game 6: Alice White, no chess log tags
         g6 = self._make_game()
 
-        n, g, m, k = self._counts([g1, g2, g3, g4, g5, g6])
+        n, g, m, s, has_3x3 = self._counts([g1, g2, g3, g4, g5, g6])
         self.assertEqual(n, 6, f"N expected 6, got {n}")
         self.assertEqual(g, 5, f"G expected 5, got {g}")
         self.assertEqual(m, 5, f"M expected 5, got {m}")
-        self.assertEqual(k, 3, f"K expected 3, got {k}")
+        self.assertEqual(s, 4, f"S expected 4, got {s}")
+        self.assertTrue(has_3x3, "has_3x3 expected True")
 
     def test_player_not_in_game_excluded_from_n(self):
         game = self._make_game(white="Charlie", black="Bob")
-        n, g, m, k = self._counts([game], player="Alice")
+        n, g, m, s, _ = self._counts([game], player="Alice")
         self.assertEqual(n, 0)
+
+
+# ---------------------------------------------------------------------------
+# shallow_flag_label
+# ---------------------------------------------------------------------------
+
+class TestShallowFlagLabel(unittest.TestCase):
+    def test_clamp_cct_only_label_is_shallow(self):
+        self.assertEqual(shallow_flag_label(False), "Shallow")
+
+    def test_has_3x3_label_is_shallow_vague(self):
+        self.assertEqual(shallow_flag_label(True), "Shallow/Vague")
 
 
 # ---------------------------------------------------------------------------

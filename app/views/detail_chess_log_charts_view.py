@@ -849,9 +849,10 @@ class DetailChessLogChartsView(QWidget):
         files = self._controller.get_current_source_filenames() if self._controller else []
         source_label = f"{label}: {', '.join(files)}" if files else label
         generated_at = model_label = ""
-        n = g = m = k = 0
+        n = g = m = s = 0
+        has_3x3 = False
         if self._controller:
-            generated_at, model_label, n, g, m, k = self._controller.get_last_narrative_metadata()
+            generated_at, model_label, n, g, m, s, has_3x3 = self._controller.get_last_narrative_metadata()
         return ChessLogHTMLService(self._config).narrative_html(
             player_name,
             source_label,
@@ -859,7 +860,8 @@ class DetailChessLogChartsView(QWidget):
             n_games=n,
             g_games=g,
             m_moments=m,
-            k_unflagged=k,
+            s_flagged=s,
+            has_3x3=has_3x3,
             generated_at=generated_at,
             model_label=model_label,
         )
@@ -949,9 +951,10 @@ class DetailChessLogChartsView(QWidget):
         source_label = f"{label}: {', '.join(files)}" if files else label
         narrative = sanitize_narrative_markdown(self._last_narrative)
         generated_at = model_label = ""
-        n = g = m = k = 0
+        n = g = m = s = 0
+        has_3x3 = False
         if self._controller and narrative:
-            generated_at, model_label, n, g, m, k = self._controller.get_last_narrative_metadata()
+            generated_at, model_label, n, g, m, s, has_3x3 = self._controller.get_last_narrative_metadata()
 
         chart_preset_names = [
             (w.property("section_name") or "").replace("chart_", "")
@@ -969,7 +972,8 @@ class DetailChessLogChartsView(QWidget):
             n_games=n,
             g_games=g,
             m_moments=m,
-            k_unflagged=k,
+            s_flagged=s,
+            has_3x3=has_3x3,
             generated_at=generated_at,
             model_label=model_label,
         )
@@ -1136,9 +1140,10 @@ class DetailChessLogChartsView(QWidget):
         files = self._controller.get_current_source_filenames() if self._controller else []
         source_label = f"{label}: {', '.join(files)}" if files else label
         narrative_model_label = generated_at = ""
-        n = g = m = k = 0
+        n = g = m = s = 0
+        has_3x3 = False
         if self._controller and narrative_text:
-            generated_at, narrative_model_label, n, g, m, k = self._controller.get_last_narrative_metadata()
+            generated_at, narrative_model_label, n, g, m, s, has_3x3 = self._controller.get_last_narrative_metadata()
         ChessLogPDFService(self._config).export_charts_report(
             Path(path),
             player_name,
@@ -1151,7 +1156,8 @@ class DetailChessLogChartsView(QWidget):
             n_games=n,
             g_games=g,
             m_moments=m,
-            k_unflagged=k,
+            s_flagged=s,
+            has_3x3=has_3x3,
         )
 
     def _export_narrative_pdf(self) -> None:
@@ -1184,9 +1190,10 @@ class DetailChessLogChartsView(QWidget):
         source_label = f"{label}: {', '.join(files)}" if files else label
 
         generated_at = model_label = ""
-        n = g = m = k = 0
+        n = g = m = s = 0
+        has_3x3 = False
         if self._controller:
-            generated_at, model_label, n, g, m, k = self._controller.get_last_narrative_metadata()
+            generated_at, model_label, n, g, m, s, has_3x3 = self._controller.get_last_narrative_metadata()
 
         ChessLogPDFService(self._config).export_narrative_report(
             Path(path),
@@ -1198,5 +1205,6 @@ class DetailChessLogChartsView(QWidget):
             n_games=n,
             g_games=g,
             m_moments=m,
-            k_unflagged=k,
+            s_flagged=s,
+            has_3x3=has_3x3,
         )

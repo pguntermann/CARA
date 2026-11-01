@@ -23,6 +23,7 @@ from PyQt6.QtGui import (
 
 from app.models.chess_log_snapshot import TagRowSnapshot
 from app.services.chess_log_narrative_service import sanitize_narrative_markdown
+from app.services.chess_log_stats_service import shallow_flag_label
 from app.services.chess_log_storage_service import ChessLogStorageService
 from app.services.pdf_report_base import BasePDFReportService
 from app.utils.chess_log_prompts import THREE_BY_THREE_PROMPTS as _3X3_PROMPTS
@@ -188,7 +189,8 @@ class ChessLogPDFService(BasePDFReportService):
         n_games: int = 0,
         g_games: int = 0,
         m_moments: int = 0,
-        k_unflagged: int = 0,
+        s_flagged: int = 0,
+        has_3x3: bool = False,
     ) -> bool:
         """Write Chess Log Charts page (charts + narrative + optional shallow rows) to a PDF."""
         painter = None
@@ -220,7 +222,7 @@ class ChessLogPDFService(BasePDFReportService):
             if narrative:
                 counts_line = (
                     f"{n_games} games · {g_games} with logged moments "
-                    f"· {m_moments} moments · {k_unflagged} not flagged"
+                    f"· {m_moments} moments · {s_flagged} {shallow_flag_label(has_3x3)}"
                 )
                 y = self._draw_text_line(
                     painter, counts_line,
@@ -308,7 +310,8 @@ class ChessLogPDFService(BasePDFReportService):
         n_games: int = 0,
         g_games: int = 0,
         m_moments: int = 0,
-        k_unflagged: int = 0,
+        s_flagged: int = 0,
+        has_3x3: bool = False,
     ) -> bool:
         """Write a narrative-only Narrative Summary PDF."""
         painter = None
@@ -336,7 +339,7 @@ class ChessLogPDFService(BasePDFReportService):
                 )
             counts_line = (
                 f"{n_games} games · {g_games} with logged moments "
-                f"· {m_moments} moments · {k_unflagged} not flagged"
+                f"· {m_moments} moments · {s_flagged} {shallow_flag_label(has_3x3)}"
             )
             y = self._draw_text_line(
                 painter, counts_line,

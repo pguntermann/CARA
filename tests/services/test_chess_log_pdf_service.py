@@ -112,7 +112,7 @@ class TestExportNarrativeReport(unittest.TestCase):
                 n_games=10,
                 g_games=7,
                 m_moments=23,
-                k_unflagged=18,
+                s_flagged=18,
             )
             self.assertTrue(result, "export_narrative_report returned False")
             self.assertTrue(tmp_path.exists(), "PDF file not created")
@@ -1441,7 +1441,8 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
         n_games: int = 0,
         g_games: int = 0,
         m_moments: int = 0,
-        k_unflagged: int = 0,
+        s_flagged: int = 0,
+        has_3x3: bool = False,
     ) -> str:
         import pypdf as _pypdf
         import tempfile
@@ -1467,7 +1468,8 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
                     n_games=n_games,
                     g_games=g_games,
                     m_moments=m_moments,
-                    k_unflagged=k_unflagged,
+                    s_flagged=s_flagged,
+                    has_3x3=has_3x3,
                 )
             reader = _pypdf.PdfReader(str(tmp_path))
             return " ".join(p.extract_text() or "" for p in reader.pages)
@@ -1485,15 +1487,15 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
             n_games=12,
             g_games=8,
             m_moments=20,
-            k_unflagged=15,
+            s_flagged=15,
         )
         self.assertIn("Player: Paul", text)
         self.assertIn("Source: Active Database: DB.pgn", text)
         self.assertIn("12 games", text)
         self.assertIn("8 with logged moments", text)
         self.assertIn("20 moments", text)
-        # pypdf may extract the 'fl' ligature as 'ﬂ'; match the number + prefix only
-        self.assertIn("15 not", text)
+        self.assertIn("15 Shallow", text)
+        self.assertNotIn("not flagged", text)
         self.assertIn("Generated: 2026-05-10 09:15", text)
         self.assertIn("AI model: Anthropic claude-opus-4-7", text)
         self.assertNotIn("Exported:", text)
@@ -1509,7 +1511,7 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
             n_games=12,
             g_games=8,
             m_moments=20,
-            k_unflagged=15,
+            s_flagged=15,
         )
         self.assertIn("Player: Paul", text)
         self.assertIn("Source: Active Database: DB.pgn", text)
@@ -1517,6 +1519,7 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
         self.assertNotIn("Exported:", text)
         self.assertNotIn("AI model:", text)
         self.assertNotIn("not flagged", text)
+        self.assertNotIn("Shallow", text)
 
     def test_title_unchanged(self):
         """Title must remain 'Chess Log Charts — {player}'."""

@@ -760,7 +760,7 @@ class TestExportPdfReportNarrativeMetadata(unittest.TestCase):
         ctrl.get_last_narrative_metadata.return_value = (
             "2026-06-01 12:00",      # generated_at
             "Anthropic claude-x",    # model_label
-            10, 7, 18, 14,           # n, g, m, k
+            10, 7, 18, 14, False,    # n, g, m, s, has_3x3
         )
         ctrl.get_current_source_filenames.return_value = ["DB.pgn"]
         view.set_controller(ctrl)
@@ -771,10 +771,11 @@ class TestExportPdfReportNarrativeMetadata(unittest.TestCase):
 
         def _fake_export(_svc, path, player_name, source_label, chart_pixmaps, narrative_text,
                          shallow_rows, *, model_label="", generated_at="",
-                         n_games=0, g_games=0, m_moments=0, k_unflagged=0):
+                         n_games=0, g_games=0, m_moments=0, s_flagged=0, has_3x3=False):
             captured.update(
                 model_label=model_label, generated_at=generated_at,
-                n_games=n_games, g_games=g_games, m_moments=m_moments, k_unflagged=k_unflagged,
+                n_games=n_games, g_games=g_games, m_moments=m_moments,
+                s_flagged=s_flagged, has_3x3=has_3x3,
             )
             return True
 
@@ -788,7 +789,8 @@ class TestExportPdfReportNarrativeMetadata(unittest.TestCase):
         self.assertEqual(captured.get("n_games"), 10)
         self.assertEqual(captured.get("g_games"), 7)
         self.assertEqual(captured.get("m_moments"), 18)
-        self.assertEqual(captured.get("k_unflagged"), 14)
+        self.assertEqual(captured.get("s_flagged"), 14)
+        self.assertFalse(captured.get("has_3x3"))
 
     def test_export_pdf_report_passes_empty_metadata_when_no_narrative(self):
         """When no narrative, counts/generated_at/model_label are all empty/zero."""
@@ -807,10 +809,11 @@ class TestExportPdfReportNarrativeMetadata(unittest.TestCase):
 
         def _fake_export(_svc, path, player_name, source_label, chart_pixmaps, narrative_text,
                          shallow_rows, *, model_label="", generated_at="",
-                         n_games=0, g_games=0, m_moments=0, k_unflagged=0):
+                         n_games=0, g_games=0, m_moments=0, s_flagged=0, has_3x3=False):
             captured.update(
                 model_label=model_label, generated_at=generated_at,
-                n_games=n_games, g_games=g_games, m_moments=m_moments, k_unflagged=k_unflagged,
+                n_games=n_games, g_games=g_games, m_moments=m_moments,
+                s_flagged=s_flagged, has_3x3=has_3x3,
             )
             return True
 
@@ -824,7 +827,8 @@ class TestExportPdfReportNarrativeMetadata(unittest.TestCase):
         self.assertEqual(captured.get("n_games"), 0)
         self.assertEqual(captured.get("g_games"), 0)
         self.assertEqual(captured.get("m_moments"), 0)
-        self.assertEqual(captured.get("k_unflagged"), 0)
+        self.assertEqual(captured.get("s_flagged"), 0)
+        self.assertFalse(captured.get("has_3x3"))
         ctrl.get_last_narrative_metadata.assert_not_called()
 
 
