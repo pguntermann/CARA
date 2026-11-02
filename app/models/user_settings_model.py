@@ -722,6 +722,27 @@ class UserSettingsModel(QObject):
         self._settings["bulk_operation_plans"] = cleaned
         self.settings_changed.emit()
 
+    def get_saved_regexes(self) -> Dict[str, str]:
+        """Named regular expressions (name → pattern)."""
+        raw = self._settings.get("saved_regexes", {})
+        if not isinstance(raw, dict):
+            return {}
+        saved: Dict[str, str] = {}
+        for name, pattern in raw.items():
+            if isinstance(name, str) and name.strip() and isinstance(pattern, str) and pattern != "":
+                saved[name.strip()] = pattern
+        return saved
+
+    def set_saved_regexes(self, saved: Dict[str, Any]) -> None:
+        """Replace the named regular-expression library."""
+        cleaned: Dict[str, str] = {}
+        if isinstance(saved, dict):
+            for name, pattern in saved.items():
+                if isinstance(name, str) and name.strip() and isinstance(pattern, str) and pattern != "":
+                    cleaned[name.strip()] = pattern
+        self._settings["saved_regexes"] = cleaned
+        self.settings_changed.emit()
+
     def get_keyboard_shortcuts(self) -> Dict[str, Any]:
         """Get keyboard shortcut preferences (overrides map)."""
         raw = self._settings.get("keyboard_shortcuts", {})

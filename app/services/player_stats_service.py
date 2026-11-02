@@ -17,12 +17,13 @@ from app.services.game_summary_service import GameSummary, PlayerStatistics, Pha
 from app.controllers.game_controller import GameController
 from app.services.logging_service import LoggingService, init_worker_logging
 from app.utils.concurrency_utils import get_process_pool_max_workers
+from app.services.player_name_match import game_includes_player, player_is_white
 from app.services.player_stats_time_series_user import player_stats_block_with_time_series_overrides
 
 
 def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, game_black: str,
                             game_eco: str, player_name: str, config: Dict[str, Any],
-                            game_index: int = 0) -> Optional[Dict[str, Any]]:
+                            game_index: int = 0, name_is_regex: bool = False) -> Optional[Dict[str, Any]]:
     """Process a single game for statistics aggregation (must be top-level for pickling).
 
     game_index is used to preserve order of results when using as_completed().
@@ -76,7 +77,9 @@ def _process_game_for_stats(game_pgn: str, game_result: str, game_white: str, ga
             return None
         
         # Determine if player is white or black
-        is_white_game = (game_white == player_name)
+        is_white_game = player_is_white(
+            game_white, game_black, player_name, name_is_regex=name_is_regex
+        )
         
         # Get player statistics for this game
         if is_white_game:
@@ -1123,7 +1126,7 @@ class PlayerStatsService:
         self.summary_service = GameSummaryService(config)
     
     def get_player_games(self, player_name: str, databases: List[DatabaseModel], 
-                        only_analyzed: bool = True) -> Tuple[List[GameData], int]:
+                        only_analyzed: bool = True, name_is_regex: bool = False) -> Tuple[List[GameData], int]:
         """Get all games for a player from the given databases.
         
         Args:
@@ -1140,14 +1143,10 @@ class PlayerStatsService:
         for database in databases:
             games = database.get_all_games()
             for game in games:
-                # Check if player is white or black
-                # Use exact matching to preserve whitespace and special characters
-                # This ensures players with trailing/leading whitespace are correctly matched
-                is_player = False
-                if game.white and game.white == player_name:
-                    is_player = True
-                elif game.black and game.black == player_name:
-                    is_player = True
+                # Exact mode keeps whitespace. Regex mode searches the raw name.
+                is_player = game_includes_player(
+                    game.white, game.black, player_name, name_is_regex=name_is_regex
+                )
                 
                 if is_player:
                     total_count += 1
@@ -1164,6 +1163,7 @@ class PlayerStatsService:
         progress_callback: Optional[Callable[[int, str], None]] = None,
         cancellation_check: Optional[Callable[[], bool]] = None,
         time_series_user_settings: Optional[Dict[str, Any]] = None,
+        name_is_regex: bool = False,
     ) -> Tuple[Optional[AggregatedPlayerStats], List[GameSummary]]:
         """Aggregate statistics for a player across multiple games.
         
@@ -1218,6 +1218,7 @@ class PlayerStatsService:
                     player_name,
                     self.config,
                     idx,
+                    name_is_regex,
                 ): game
                 for idx, game in enumerate(analyzed_games)
             }

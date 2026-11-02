@@ -148,6 +148,9 @@ class HighlightRuleFrequencyDialog(QDialog):
         )
         self.table_header_bg = table_config.get("header_background_color", [50, 50, 55])
         self.table_header_text = table_config.get("header_text_color", [220, 220, 220])
+        self.table_header_font_size = scale_font_size(
+            table_config.get("header_font_size", self.font_size)
+        )
         self.table_header_padding = int(table_config.get("header_padding", 6))
         self.table_header_section_border = bool(
             table_config.get("header_section_border", True)
@@ -265,10 +268,16 @@ class HighlightRuleFrequencyDialog(QDialog):
             f"{header_border}"
             f"padding: {self.table_header_padding}px;"
             f"font-family: {self.label_font_family};"
-            f"font-size: {self.font_size}pt;"
+            f"font-size: {self.table_header_font_size}pt;"
+            f"font-weight: 500;"
             f"}}"
         )
         self.table.setStyleSheet(table_style)
+        header = self.table.horizontalHeader()
+        if header is not None:
+            header.setFont(
+                QFont(self.label_font_family, int(self.table_header_font_size))
+            )
         StyleManager.style_table_scrollbar(
             self.table,
             self.config,

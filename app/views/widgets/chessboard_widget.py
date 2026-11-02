@@ -525,7 +525,7 @@ class ChessBoardWidget(QWidget):
         # Account for evaluation bar width when visible
         eval_bar_width = 0
         if eval_bar_visible:
-            eval_bar_width = self.evaluation_bar.width + self.eval_bar_padding_left
+            eval_bar_width = self.evaluation_bar.bar_width + self.eval_bar_padding_left
         
         # Account for right-side widgets (material + game tags) when visible.
         # They share the same "slot" to the right of the board; reserve the maximum width.
@@ -2682,7 +2682,7 @@ class ChessBoardWidget(QWidget):
         
         # Position evaluation bar to the left of the board
         # It should be attached to the left edge of the board area with padding
-        eval_bar_width = self.evaluation_bar.width  # width is an attribute, not a method
+        eval_bar_width = self.evaluation_bar.bar_width
         eval_bar_x = start_x - eval_bar_width - self.eval_bar_padding_left
         eval_bar_y = start_y
         eval_bar_height = board_size

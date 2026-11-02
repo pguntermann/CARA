@@ -20,16 +20,21 @@ from PyQt6.QtWidgets import (
     QToolButton,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize
-from PyQt6.QtGui import QPalette, QColor, QFont, QShowEvent, QFontMetrics
+from PyQt6.QtGui import QAction, QPalette, QColor, QFont, QShowEvent, QFontMetrics
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
+from app.controllers.regex_editor_controller import RegexEditorController
 from app.models.search_criteria import SearchCriteria, SearchField, SearchOperator, LogicOperator, SearchQuery
 from app.models.database_model import DatabaseModel
 
+from app.services.database_search_service import DatabaseSearchService
 from app.services.game_tags_service import GameTagsService
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.external_open import open_user_manual
-from app.utils.themed_icon import themed_icon_from_svg, SVG_MENU_TRASH, SVG_MENU_INFO
+from app.utils.themed_icon import SVG_MENU_INFO, SVG_MENU_TRASH, SVG_REGEX, themed_icon_from_svg
+from app.views.dialogs.regex_editor_dialog import edit_regex
+from app.views.style.line_edit import generate_line_edit_stylesheet
+from app.views.widgets.regex_syntax import RegexPatternLine, regex_token_colors
 
 
 class _ChipWrapContainer(QWidget):
@@ -401,13 +406,26 @@ class CriteriaRowWidget(QWidget):
         self.operator_combo = QComboBox()
         self.operator_combo.addItems(["contains", "not contains", "equals", "starts with", "ends with"])
         self.operator_combo.setFixedWidth(130)
+        self.operator_combo.currentTextChanged.connect(self._sync_regex_mode)
         layout.addWidget(self.operator_combo)
         
-        # Value input
-        self.value_input = QLineEdit()
+        # Value input. It is a pattern field so "matches regex" can color the text.
+        self._pattern_classifier = RegexEditorController(
+            self.config,
+            case_sensitive=False,
+            show_replace=False,
+            replacement="",
+        )
+        self.value_input = RegexPatternLine(
+            regex_token_colors(self.config),
+            self._pattern_classifier.classify,
+            object_name="searchRegexValue",
+        )
         self.value_input.setPlaceholderText("Value...")
         self.value_input.setMinimumWidth(100)  # Reduced from 150
         self.value_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._regex_placeholder_active = False
+        self._install_regex_editor_action()
         layout.addWidget(self.value_input)
 
         # Position input (hidden by default)
@@ -480,7 +498,7 @@ class CriteriaRowWidget(QWidget):
             self.operator_combo.addItems([
                 "equals", "not equals", "greater than", "less than",
                 "greater than or equal", "less than or equal",
-                "is empty", "is not empty"
+                "is empty", "is not empty", "matches regex"
             ])
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
@@ -489,7 +507,7 @@ class CriteriaRowWidget(QWidget):
             self.position_input.setVisible(False)
         elif field_text == "Date":
             self.operator_combo.addItems([
-                "contains", "not contains", "equals", "not equals", "before", "after"
+                "contains", "not contains", "equals", "not equals", "before", "after", "matches regex"
             ])
             self.value_input.setPlaceholderText("YYYY.MM.DD (use ?? for unknown)")
             self.value_input.setVisible(True)
@@ -497,7 +515,9 @@ class CriteriaRowWidget(QWidget):
             self.custom_tag_input.setVisible(False)
             self.position_input.setVisible(False)
         elif field_text == "Custom PGN header tag":
-            self.operator_combo.addItems(["contains", "not contains", "equals", "not equals", "starts with", "ends with"])
+            self.operator_combo.addItems([
+                "contains", "not contains", "equals", "not equals", "starts with", "ends with", "matches regex"
+            ])
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
             self.value_input.setPlaceholderText("Value...")
@@ -526,17 +546,82 @@ class CriteriaRowWidget(QWidget):
             self.position_input.setVisible(True)
             self.position_input.setText("(Current Position)")
         else:
-            # Text fields
-            self.operator_combo.addItems([
-                "contains", "not contains", "equals", "not equals", "starts with", "ends with", 
-                "is empty", "is not empty"
-            ])
+            # Text fields. Result stays on the plain string operators.
+            operators = [
+                "contains", "not contains", "equals", "not equals", "starts with", "ends with",
+                "is empty", "is not empty",
+            ]
+            if field_text != "Result":
+                operators.append("matches regex")
+            self.operator_combo.addItems(operators)
             self.value_input.setPlaceholderText("Value...")
             self.value_input.setVisible(True)
             self.value_input.setEnabled(True)
             self.tags_picker_btn.setVisible(False)
             self.custom_tag_input.setVisible(False)
             self.position_input.setVisible(False)
+        self._sync_regex_mode()
+
+    def _install_regex_editor_action(self) -> None:
+        editor_cfg = self.config.get("ui", {}).get("dialogs", {}).get("regex_editor", {})
+        if not isinstance(editor_cfg, dict):
+            editor_cfg = {}
+        action_cfg = editor_cfg.get("find_action", {})
+        if not isinstance(action_cfg, dict):
+            action_cfg = {}
+        icon_svg = str(action_cfg.get("icon_svg") or SVG_REGEX)
+        tint = action_cfg.get("icon_tint", [200, 200, 200])
+        if not isinstance(tint, (list, tuple)) or len(tint) < 3:
+            tint = [200, 200, 200]
+        px = max(1, int(action_cfg.get("icon_px", 16)))
+        source = themed_icon_from_svg(icon_svg, tint)
+        icon = QAction(self.value_input)
+        icon.setIcon(source)
+        icon.setToolTip(str(editor_cfg.get("open_tooltip", "Edit regular expression")))
+        icon.triggered.connect(self._open_regex_editor)
+        icon.setVisible(False)
+        self._regex_action = icon
+        self.value_input.set_editor_action(icon, px)
+
+    def _open_regex_editor(self) -> None:
+        result = edit_regex(
+            self.config,
+            pattern=self.value_input.text(),
+            replacement="",
+            case_sensitive=False,
+            show_replace=False,
+            # The first search row carries a group border. A child dialog
+            # would inherit that border onto every widget inside it.
+            parent=self.window(),
+        )
+        if result is None:
+            return
+        self.value_input.setText(result.pattern)
+        self._sync_regex_mode()
+
+    def _sync_regex_mode(self) -> None:
+        """Color the value and show the editor button only for a regex operator."""
+        active = (
+            self.operator_combo.currentText() == "matches regex"
+            and self.value_input.isEnabled()
+            and not self.value_input.isHidden()
+        )
+        if hasattr(self, "_regex_action"):
+            self._regex_action.setVisible(active)
+        self.value_input.set_highlighting(active)
+        if active:
+            self.value_input.setPlaceholderText("Regular expression")
+        elif self._regex_placeholder_active:
+            self.value_input.setPlaceholderText(self._plain_value_placeholder())
+        self._regex_placeholder_active = active
+
+    def _plain_value_placeholder(self) -> str:
+        field_text = self.field_combo.currentText()
+        if field_text == "TimeControl":
+            return "Base seconds (e.g. 300, 600)"
+        if field_text == "Date":
+            return "YYYY.MM.DD (use ?? for unknown)"
+        return "Value..."
     
     def _apply_styling(self) -> None:
         """Apply styling to widgets."""
@@ -619,7 +704,7 @@ class CriteriaRowWidget(QWidget):
         focus_border_color = [self.input_focus_border_color.red(), self.input_focus_border_color.green(), self.input_focus_border_color.blue()]
         
         StyleManager.style_line_edits(
-            [self.value_input, self.custom_tag_input, self.position_input],
+            [self.custom_tag_input, self.position_input],
             self.config,
             font_family=self.input_font_family,  # Match original dialog font
             font_size=self.input_font_size,  # Match original dialog font size
@@ -628,33 +713,79 @@ class CriteriaRowWidget(QWidget):
             focus_border_color=focus_border_color,  # Match combobox focus border color
             padding=input_padding  # Preserve existing padding for alignment
         )
+        self._style_regex_value()
         
-        # Set Remove button height to match input field height
-        # Use the smallest non-zero input height so the icon button never ends up taller
-        # than the other controls in the row (Qt style differences can make buttons taller).
-        for w in (self.field_combo, self.operator_combo, self.value_input, self.position_input):
+        # Lock every control in the row to the dropdown height so text inputs
+        # and comboboxes stay aligned (Windows especially can size them differently).
+        for w in (
+            self.field_combo,
+            self.operator_combo,
+            self.logic_combo,
+            self.value_input,
+            self.position_input,
+            self.custom_tag_input,
+        ):
             try:
                 w.updateGeometry()
             except Exception:
                 pass
-        height_candidates = [
+        combo_heights = [
             int(self.field_combo.sizeHint().height() or 0),
             int(self.operator_combo.sizeHint().height() or 0),
-            int(self.value_input.sizeHint().height() or 0),
+            int(self.logic_combo.sizeHint().height() or 0),
         ]
-        if self.position_input.isVisible():
-            height_candidates.append(int(self.position_input.sizeHint().height() or 0))
-        target_h = min([h for h in height_candidates if h > 0], default=0)
+        target_h = max([h for h in combo_heights if h > 0], default=0)
         if target_h <= 0:
-            # Fallback: calculate from font metrics
             from PyQt6.QtGui import QFontMetrics, QFont
-            font = QFont(self.input_font_family, self.input_font_size)
+            font = QFont(self.input_font_family, int(self.input_font_size))
             fm = QFontMetrics(font)
-            text_height = fm.height()
-            target_h = text_height + (self.input_padding[1] * 2) + 2
+            pad_v = self.input_padding[1] if isinstance(self.input_padding, list) and len(self.input_padding) > 1 else 4
+            target_h = fm.height() + (int(pad_v) * 2) + 2
 
-        self.remove_btn.setFixedSize(int(target_h), int(target_h))
-        self.tags_picker_btn.setFixedHeight(int(target_h))
+        if target_h > 0:
+            for combo in (self.field_combo, self.operator_combo, self.logic_combo):
+                combo.setFixedHeight(int(target_h))
+            self.value_input.setFixedHeight(int(target_h))
+            self.value_input.set_line_metrics(pad_h=self._regex_pad_h, border_width=self._regex_border_width)
+            self.position_input.setFixedHeight(int(target_h))
+            self.custom_tag_input.setFixedHeight(int(target_h))
+            self.remove_btn.setFixedSize(int(target_h), int(target_h))
+            self.tags_picker_btn.setFixedHeight(int(target_h))
+
+    def _style_regex_value(self) -> None:
+        """Match the shared line-edit look. Padding is applied as viewport margins."""
+        line_edit = self.config.get("ui", {}).get("styles", {}).get("line_edit", {})
+        if not isinstance(line_edit, dict):
+            line_edit = {}
+        text_color = line_edit.get("text_color", [200, 200, 200])
+        bg_color = line_edit.get("background_color", [45, 45, 50])
+        border_color = line_edit.get("border_color", [60, 60, 65])
+        focus_border = line_edit.get("focus_border_color", [70, 90, 130])
+        family = resolve_font_family(str(line_edit.get("font_family", "Helvetica Neue")))
+        size = scale_font_size(line_edit.get("font_size", 11))
+        padding = line_edit.get("padding", [8, 4])
+        pad_h = int(padding[0]) if isinstance(padding, list) and padding else 8
+        border_width = int(line_edit.get("border_width", 1))
+        sheet = generate_line_edit_stylesheet(
+            self.config,
+            text_color,
+            family,
+            size,
+            bg_color,
+            border_color,
+            focus_border,
+            border_width=border_width,
+            border_radius=int(line_edit.get("border_radius", 3)),
+            padding=[0, 0],
+            hover_border_offset=int(line_edit.get("hover_border_offset", 20)),
+            disabled_brightness_factor=float(line_edit.get("disabled_brightness_factor", 0.5)),
+        ).replace("QLineEdit", "QPlainTextEdit#searchRegexValue")
+        font = self.value_input.font()
+        font.setFamily(family)
+        font.setPointSizeF(float(size))
+        self.value_input.set_line_style(sheet, font)
+        self._regex_pad_h = pad_h
+        self._regex_border_width = border_width
     
     def get_criterion(self) -> Optional[SearchCriteria]:
         """Get SearchCriteria from this row.
@@ -712,6 +843,7 @@ class CriteriaRowWidget(QWidget):
             "after": SearchOperator.DATE_AFTER,
             "is": SearchOperator.IS_TRUE,
             "is not": SearchOperator.IS_FALSE,
+            "matches regex": SearchOperator.MATCHES_REGEX,
         }
         operator = operator_map.get(operator_text)
         if operator is None:
@@ -777,6 +909,13 @@ class CriteriaRowWidget(QWidget):
             value = list(self._selected_tags)
             if not value:
                 return None
+        elif operator == SearchOperator.MATCHES_REGEX:
+            pattern = self.value_input.text()
+            error = DatabaseSearchService.regex_pattern_error(pattern)
+            if error:
+                self._last_validation_error = error
+                return None
+            value = pattern
         elif field == SearchField.TIMECONTROL and operator not in [SearchOperator.IS_EMPTY, SearchOperator.IS_NOT_EMPTY]:
             # Parse TimeControl value as integer (base seconds)
             try:
@@ -867,6 +1006,7 @@ class CriteriaRowWidget(QWidget):
             SearchOperator.DATE_CONTAINS: "contains",
             SearchOperator.IS_TRUE: "is",
             SearchOperator.IS_FALSE: "is not",
+            SearchOperator.MATCHES_REGEX: "matches regex",
         }
         operator_text = operator_map.get(criterion.operator)
         if operator_text and operator_text in [self.operator_combo.itemText(i) for i in range(self.operator_combo.count())]:

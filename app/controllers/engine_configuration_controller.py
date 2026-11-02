@@ -325,16 +325,41 @@ class EngineConfigurationController(QObject):
             self.TASK_BRILLIANCY_DETECTION: TaskType.BRILLIANCY_DETECTION,
         }
         
+        show_wdl_probabilities = self._cara_show_wdl_probabilities_enabled()
+
         validation_results = {}
         for task, parameters in task_params.items():
             task_type = task_type_map.get(task, TaskType.EVALUATION)
-            validation_result = self.config_service.validate_parameters(task_type, parameters)
+            validation_result = self.config_service.validate_parameters(
+                task_type,
+                parameters,
+                show_wdl_probabilities=(
+                    show_wdl_probabilities
+                    if task_type == TaskType.MANUAL_ANALYSIS
+                    else None
+                ),
+            )
             validation_results[task] = validation_result
         
         # Hide progress after validation (will be shown again during save if needed)
         self.progress_service.hide_progress()
         
         return validation_results
+
+    @staticmethod
+    def _cara_show_wdl_probabilities_enabled() -> bool:
+        """Return whether Manual Analysis WDL display is enabled in user settings."""
+        try:
+            from app.services.user_settings_service import UserSettingsService
+
+            settings = (
+                UserSettingsService.get_instance()
+                .get_model()
+                .get_manual_analysis()
+            )
+            return bool(settings.get("show_wdl_probabilities", True))
+        except Exception:
+            return True
     
     def save_parameters(self, task_params: Dict[str, Dict[str, Any]], engine_name: str) -> Tuple[bool, str]:
         """Save parameters to engine_parameters.json.

@@ -1,13 +1,189 @@
 """Evaluation bar widget for displaying position evaluation."""
 
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush
-from PyQt6.QtCore import Qt, QRect, QRectF, QTimer
-from typing import Dict, Any, Optional
+from __future__ import annotations
+
 import time
+from typing import Any, Dict, Optional, Tuple
+
+from PyQt6.QtCore import QPoint, QRectF, Qt, QTimer
+from PyQt6.QtGui import (
+    QBrush,
+    QColor,
+    QCursor,
+    QFont,
+    QFontMetrics,
+    QGuiApplication,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPen,
+)
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from app.models.evaluation_model import EvaluationModel
 from app.services.logging_service import LoggingService
+from app.utils.font_utils import resolve_font_family, scale_font_size
+from app.views.style.tooltip import load_tooltip_style
+
+Rgb = Tuple[int, int, int]
+
+
+def _rgb_from_cfg(value: Any, fallback: Rgb) -> Rgb:
+    if isinstance(value, (list, tuple)) and len(value) >= 3:
+        try:
+            return (int(value[0]), int(value[1]), int(value[2]))
+        except (TypeError, ValueError):
+            return fallback
+    return fallback
+
+
+class EvalBarValueTip(QWidget):
+    """Large-font hover tip showing the current evaluation score."""
+
+    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._chrome = load_tooltip_style(config)
+        board_cfg = config.get("ui", {}).get("panels", {}).get("main", {}).get("board", {})
+        tip_cfg = board_cfg.get("evaluation_bar", {}).get("tooltip", {})
+        if not isinstance(tip_cfg, dict):
+            tip_cfg = {}
+
+        self._enabled = bool(tip_cfg.get("enabled", True))
+        self._anchor_gap = max(0, int(tip_cfg.get("anchor_gap", 8) or 8))
+        self._padding = max(4, int(tip_cfg.get("padding", self._chrome.padding) or self._chrome.padding))
+        self._hover_delay_ms = max(
+            0, int(tip_cfg.get("hover_delay_ms", self._chrome.hover_delay_ms) or 0)
+        )
+        self._decimals = max(0, int(tip_cfg.get("decimals", 2) or 2))
+        font_size = max(10, int(tip_cfg.get("font_size", 22) or 22))
+        font_weight = str(tip_cfg.get("font_weight", "bold") or "bold").strip().lower()
+        equal = _rgb_from_cfg(tip_cfg.get("text_color_equal"), self._chrome.text)
+        self._color_positive = _rgb_from_cfg(tip_cfg.get("text_color_positive"), equal)
+        self._color_negative = _rgb_from_cfg(tip_cfg.get("text_color_negative"), equal)
+        self._color_equal = equal
+        self._last_text = ""
+        self._last_sign = 0
+
+        self.setWindowFlags(
+            Qt.WindowType.ToolTip
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.NoDropShadowWindowHint
+            | Qt.WindowType.WindowDoesNotAcceptFocus
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        family = resolve_font_family(self._chrome.font_family)
+        value_font = QFont(family, max(10, scale_font_size(font_size)))
+        value_font.setBold(font_weight == "bold")
+
+        self._label = QLabel("", self)
+        self._label.setFont(value_font)
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._set_label_color(self._color_equal)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(self._padding, self._padding, self._padding, self._padding)
+        layout.addWidget(self._label)
+
+    @property
+    def enabled(self) -> bool:
+        return self._enabled
+
+    @property
+    def hover_delay_ms(self) -> int:
+        return self._hover_delay_ms
+
+    @property
+    def decimals(self) -> int:
+        return self._decimals
+
+    def color_for_sign(self, sign: int) -> Rgb:
+        if sign > 0:
+            return self._color_positive
+        if sign < 0:
+            return self._color_negative
+        return self._color_equal
+
+    def present(
+        self,
+        anchor: QWidget,
+        text: str,
+        *,
+        sign: int = 0,
+        cursor_global: Optional[QPoint] = None,
+    ) -> None:
+        if not self._enabled or not anchor.isVisible():
+            return
+        if text != self._last_text or sign != self._last_sign:
+            self._label.setText(text)
+            self._set_label_color(self.color_for_sign(sign))
+            metrics = QFontMetrics(self._label.font())
+            text_w = metrics.boundingRect(text).width() + 4
+            text_h = metrics.height() + 2
+            self.setFixedSize(
+                max(1, text_w + 2 * self._padding),
+                max(1, text_h + 2 * self._padding),
+            )
+            self._last_text = text
+            self._last_sign = sign
+
+        tip_w = self.width()
+        tip_h = self.height()
+        screen = QGuiApplication.screenAt(anchor.mapToGlobal(anchor.rect().center()))
+        if screen is None:
+            screen = QGuiApplication.primaryScreen()
+        if screen is None:
+            return
+        avail = screen.availableGeometry()
+        cursor_pos = cursor_global if cursor_global is not None else QCursor.pos()
+        y = cursor_pos.y() - tip_h // 2
+        x = anchor.mapToGlobal(QPoint(anchor.width() + self._anchor_gap, 0)).x()
+        # Prefer right of bar; flip left if it would leave the screen.
+        if x + tip_w > avail.right():
+            x = anchor.mapToGlobal(QPoint(0, 0)).x() - self._anchor_gap - tip_w
+        y = max(avail.top(), min(y, avail.bottom() - tip_h + 1))
+        x = max(avail.left(), min(x, avail.right() - tip_w + 1))
+        self.move(x, y)
+        if not self.isVisible():
+            self.show()
+            self.raise_()
+
+    def hide_tip(self) -> None:
+        self._last_text = ""
+        self.hide()
+
+    def _set_label_color(self, rgb: Rgb) -> None:
+        self._label.setStyleSheet(
+            f"color: rgb({rgb[0]}, {rgb[1]}, {rgb[2]}); "
+            "background: transparent; border: none;"
+        )
+
+    def paintEvent(self, event) -> None:  # noqa: N802, ARG002
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        bg = self._chrome.background
+        border = self._chrome.border
+        radius = float(self._chrome.border_radius)
+        inset = max(0.5, self._chrome.border_width / 2.0)
+        path = QPainterPath()
+        path.addRoundedRect(
+            QRectF(inset, inset, self.width() - 2 * inset, self.height() - 2 * inset),
+            radius,
+            radius,
+        )
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(*bg))
+        painter.drawPath(path)
+        if self._chrome.border_width > 0:
+            pen = QPen(QColor(*border))
+            pen.setWidth(self._chrome.border_width)
+            pen.setCosmetic(True)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPath(path)
 
 
 class EvaluationBarWidget(QWidget):
@@ -41,6 +217,13 @@ class EvaluationBarWidget(QWidget):
         self._division_marks_color = QColor(128, 128, 128)
         self._division_marks_width = 1
         self._division_marks_style = Qt.PenStyle.DashLine
+
+        self._value_tip = EvalBarValueTip(config, self)
+        self._hover_timer = QTimer(self)
+        self._hover_timer.setSingleShot(True)
+        self._hover_timer.timeout.connect(self._show_value_tip)
+        self.setMouseTracking(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         
         self._load_config()
         self._setup_ui()
@@ -80,7 +263,8 @@ class EvaluationBarWidget(QWidget):
             }
             return mapping.get(key, default)
         
-        self.width = eval_config.get("width", 30)
+        # Named bar_width so it does not shadow QWidget.width().
+        self.bar_width = int(eval_config.get("width", 30) or 30)
         scale_max = eval_config.get("scale_max", 10.0)
         # Safety check: ensure scale_max is never 0 or negative to prevent division by zero
         if scale_max <= 0:
@@ -106,7 +290,7 @@ class EvaluationBarWidget(QWidget):
             self._division_marks_style = _pen_style_from_cfg(division_cfg.get("style"), self._division_marks_style)
         
         # Set fixed width
-        self.setFixedWidth(self.width)
+        self.setFixedWidth(self.bar_width)
         
         # Setup animation timer
         self._animation_timer = QTimer(self)
@@ -115,8 +299,8 @@ class EvaluationBarWidget(QWidget):
     
     def _setup_ui(self) -> None:
         """Setup the widget UI."""
-        self.setMinimumSize(self.width, 100)
-        self.setMaximumSize(self.width, 16777215)  # Max height
+        self.setMinimumSize(self.bar_width, 100)
+        self.setMaximumSize(self.bar_width, 16777215)  # Max height
     
     def set_evaluation_model(self, model: EvaluationModel) -> None:
         """Set the evaluation model to observe.
@@ -179,6 +363,63 @@ class EvaluationBarWidget(QWidget):
         
         # Start animation to target value
         self._start_animation(target_value)
+        if self._value_tip.isVisible():
+            self._show_value_tip()
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        super().enterEvent(event)
+        if not self._value_tip.enabled:
+            return
+        delay = self._value_tip.hover_delay_ms
+        if delay <= 0:
+            self._show_value_tip()
+        else:
+            self._hover_timer.start(delay)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        self._hover_timer.stop()
+        self._value_tip.hide_tip()
+        super().leaveEvent(event)
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._hover_timer.stop()
+        self._value_tip.hide_tip()
+        super().hideEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        super().mouseMoveEvent(event)
+        if not self._value_tip.enabled:
+            return
+        # Keep the tip glued to the pointer while moving along the bar.
+        if self._value_tip.isVisible():
+            self._show_value_tip(cursor_global=event.globalPosition().toPoint())
+        elif not self._hover_timer.isActive():
+            self._hover_timer.start(self._value_tip.hover_delay_ms)
+
+    def _show_value_tip(self, cursor_global: Optional[QPoint] = None) -> None:
+        model = self._evaluation_model
+        if model is None or not self.underMouse():
+            return
+        text = model.format_display(self._value_tip.decimals)
+        self._value_tip.present(
+            self,
+            text,
+            sign=self._evaluation_sign(model),
+            cursor_global=cursor_global,
+        )
+
+    @staticmethod
+    def _evaluation_sign(model: EvaluationModel) -> int:
+        """+1 white advantage, -1 black advantage, 0 equal."""
+        if model.is_mate:
+            if model.mate_moves > 0:
+                return 1
+            if model.mate_moves < 0:
+                return -1
+            return 1 if model.centipawns >= 0 else -1
+        if abs(model.centipawns) < 0.5:
+            return 0
+        return 1 if model.centipawns > 0 else -1
     
     def _start_animation(self, target_value: float) -> None:
         """Start animation to target value.

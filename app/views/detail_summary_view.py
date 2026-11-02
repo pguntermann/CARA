@@ -49,6 +49,11 @@ from app.views.widgets.move_link_popup import (
     position_board_arrows,
     uci_from_san,
 )
+from app.views.widgets.kpi_explain_popup import (
+    HoverableKpiValueLabel,
+    KpiExplainPopup,
+    build_kpi_tip,
+)
 
 if TYPE_CHECKING:
     from app.controllers.game_summary_controller import GameSummaryController
@@ -1254,6 +1259,292 @@ PIE_CLASSIFICATION_CATEGORY_ORDER: Tuple[str, ...] = (
     "Blunder",
 )
 
+PHASE_ACCURACY_BAR_ORDER: Tuple[str, ...] = ("Opening", "Middlegame", "Endgame")
+
+
+class PhaseAccuracyBarChartWidget(QWidget):
+    """Dual-ring phase meters: Opening / Middlegame / Endgame with White (outer) & Black (inner)."""
+
+    def __init__(self, config: Dict[str, Any], parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.config = config
+        ui_config = config.get("ui", {})
+        panel_config = ui_config.get("panels", {}).get("detail", {})
+        summary_config = panel_config.get("summary", {})
+        chart_config = summary_config.get("phase_accuracy_bar_chart", {})
+        curve_config = summary_config.get("accuracy_curve", {})
+
+        self._height = int(chart_config.get("height", 176))
+        self.background_color = QColor(
+            *chart_config.get(
+                "background_color",
+                curve_config.get("background_color", [30, 30, 35]),
+            )
+        )
+        self.grid_color = QColor(
+            *chart_config.get("grid_color", curve_config.get("grid_color", [60, 60, 65]))
+        )
+        self.text_color = QColor(
+            *chart_config.get("text_color", curve_config.get("text_color", [200, 200, 200]))
+        )
+        self.white_ring_color = QColor(
+            *chart_config.get(
+                "white_bar_color",
+                curve_config.get("white_line_color", [255, 255, 255]),
+            )
+        )
+        self.black_ring_color = QColor(
+            *chart_config.get(
+                "black_bar_color",
+                curve_config.get("black_line_color", [200, 130, 130]),
+            )
+        )
+        self.padding = chart_config.get("padding", [16, 8, 16, 8])
+        self.meter_spacing = int(chart_config.get("meter_spacing", 14))
+        self.ring_stroke = float(chart_config.get("ring_stroke", 7.0))
+        self.ring_gap = float(chart_config.get("ring_gap", 5.0))
+        self.track_alpha = float(chart_config.get("track_alpha", 0.2))
+        self.track_alpha = max(0.05, min(0.5, self.track_alpha))
+        self.show_legend = bool(chart_config.get("show_legend", False))
+        self.show_value_labels = bool(chart_config.get("show_value_labels", True))
+        self.font_family = resolve_font_family(
+            chart_config.get("font_family", curve_config.get("font_family", "Helvetica Neue"))
+        )
+        self.font_size = int(
+            scale_font_size(chart_config.get("font_size", curve_config.get("font_size", 10)))
+        )
+        self.min_font_size = int(
+            scale_font_size(chart_config.get("min_font_size", curve_config.get("min_font_size", 8)))
+        )
+        self._delta_font_size = int(
+            scale_font_size(chart_config.get("delta_font_size", self.font_size + 3))
+        )
+        self._white_label = str(chart_config.get("white_legend_label", "White"))
+        self._black_label = str(chart_config.get("black_legend_label", "Black"))
+
+        self._white: Dict[str, float] = {}
+        self._black: Dict[str, float] = {}
+        self._meter_hits: List[Dict[str, Any]] = []
+        self._hover_phase: Optional[str] = None
+
+        self.setMinimumHeight(self._height)
+        self.setFixedHeight(self._height)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMouseTracking(True)
+
+    def set_data(self, white: Dict[str, float], black: Dict[str, float]) -> None:
+        self._white = {k: float(v) for k, v in (white or {}).items()}
+        self._black = {k: float(v) for k, v in (black or {}).items()}
+        self.update()
+
+    def _hover_tooltip_text(self, phase: str) -> str:
+        wa = float(self._white.get(phase, 0.0))
+        ba = float(self._black.get(phase, 0.0))
+        delta = wa - ba
+        sign = "+" if delta >= 0 else ""
+        return (
+            f"{phase}\n"
+            f"{self._white_label}: {wa:.1f}%\n"
+            f"{self._black_label}: {ba:.1f}%\n"
+            f"Difference: {sign}{delta:.1f} pp"
+        )
+
+    def _phase_at(self, px: float, py: float) -> Optional[str]:
+        for hit in self._meter_hits:
+            dx = px - float(hit["cx"])
+            dy = py - float(hit["cy"])
+            if math.hypot(dx, dy) <= float(hit["radius"]):
+                return str(hit["phase"])
+        return None
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        phase = self._phase_at(event.position().x(), event.position().y())
+        changed = phase != self._hover_phase
+        self._hover_phase = phase
+        if phase:
+            QToolTip.showText(
+                event.globalPosition().toPoint(),
+                self._hover_tooltip_text(phase),
+                self,
+                QRect(),
+                4000,
+            )
+        else:
+            QToolTip.hideText()
+        if changed:
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:
+        self._hover_phase = None
+        QToolTip.hideText()
+        self.update()
+        super().leaveEvent(event)
+
+    @staticmethod
+    def _draw_ring_arc(
+        painter: QPainter,
+        cx: float,
+        cy: float,
+        radius: float,
+        stroke: float,
+        color: QColor,
+        accuracy: float,
+        track_color: QColor,
+    ) -> None:
+        rect = QRectF(cx - radius, cy - radius, 2.0 * radius, 2.0 * radius)
+        track_pen = QPen(track_color, stroke)
+        track_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(track_pen)
+        painter.drawEllipse(rect)
+
+        span = max(0.0, min(100.0, accuracy)) / 100.0 * 360.0
+        if span <= 0.05:
+            return
+        arc_pen = QPen(color, stroke)
+        arc_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(arc_pen)
+        # Qt: 0° at 3 o'clock, positive counter-clockwise. Start at 12 o'clock, sweep clockwise.
+        painter.drawArc(rect, 90 * 16, int(-span * 16))
+
+    def paintEvent(self, event) -> None:  # noqa: ARG002
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        width = self.width()
+        height = self.height()
+        painter.fillRect(0, 0, width, height, self.background_color)
+
+        phases = [p for p in PHASE_ACCURACY_BAR_ORDER if p in self._white or p in self._black]
+        if not phases:
+            painter.setPen(self.text_color)
+            painter.setFont(QFont(self.font_family, self.font_size))
+            painter.drawText(QRectF(0, 0, width, height), Qt.AlignmentFlag.AlignCenter, "No data")
+            return
+
+        pad_l = float(self.padding[0] if len(self.padding) > 0 else 16)
+        pad_t = float(self.padding[1] if len(self.padding) > 1 else 8)
+        pad_r = float(self.padding[2] if len(self.padding) > 2 else 16)
+        pad_b = float(self.padding[3] if len(self.padding) > 3 else 8)
+
+        font = QFont(self.font_family, self.font_size)
+        small = QFont(self.font_family, self.min_font_size)
+        delta_font = QFont(self.font_family, self._delta_font_size)
+        delta_font.setBold(True)
+        fm = QFontMetrics(font)
+        sfm = QFontMetrics(small)
+
+        legend_h = float(self.font_size + 12) if self.show_legend else 0.0
+        caption_h = float(fm.height() + sfm.height() + 10)
+        body_top = pad_t + legend_h
+        body_h = max(40.0, height - body_top - pad_b - caption_h)
+        body_w = max(1.0, width - pad_l - pad_r)
+        n = len(phases)
+        cell_w = (body_w - self.meter_spacing * max(0, n - 1)) / max(1, n)
+        self._meter_hits = []
+
+        if self.show_legend:
+            painter.setFont(font)
+            lx = pad_l
+            ly = pad_t + 2
+            for label, color in (
+                (f"{self._white_label} (outer)", self.white_ring_color),
+                (f"{self._black_label} (inner)", self.black_ring_color),
+            ):
+                painter.setPen(QPen(color, 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+                painter.drawLine(QPointF(lx, ly + 7), QPointF(lx + 14, ly + 7))
+                painter.setPen(self.text_color)
+                painter.drawText(int(lx + 18), int(ly + 11), label)
+                lx += 18 + fm.horizontalAdvance(label) + 18
+
+        for i, phase in enumerate(phases):
+            cell_x = pad_l + i * (cell_w + self.meter_spacing)
+            hovered = self._hover_phase == phase
+            dimmed = self._hover_phase is not None and not hovered
+
+            cx = cell_x + cell_w / 2.0
+            cy = body_top + body_h / 2.0
+            max_r = min(cell_w, body_h) / 2.0 - 2.0
+            stroke = self.ring_stroke
+            outer_r = max_r - stroke / 2.0
+            inner_r = outer_r - stroke - self.ring_gap
+            if inner_r < stroke:
+                inner_r = max(stroke, outer_r * 0.62)
+                stroke = min(stroke, (outer_r - inner_r) * 0.45)
+            # Hit only the ring disc (not gaps/captions between meters).
+            self._meter_hits.append(
+                {
+                    "phase": phase,
+                    "cx": cx,
+                    "cy": cy,
+                    "radius": outer_r + stroke / 2.0,
+                }
+            )
+            if hovered:
+                outer_r *= 1.04
+                inner_r *= 1.04
+
+            wa = max(0.0, min(100.0, float(self._white.get(phase, 0.0))))
+            ba = max(0.0, min(100.0, float(self._black.get(phase, 0.0))))
+            delta = wa - ba
+
+            white_c = QColor(self.white_ring_color)
+            black_c = QColor(self.black_ring_color)
+            if dimmed:
+                white_c.setAlpha(90)
+                black_c.setAlpha(90)
+
+            track = QColor(self.grid_color)
+            track.setAlphaF(self.track_alpha * (0.45 if dimmed else 1.0))
+
+            self._draw_ring_arc(painter, cx, cy, outer_r, stroke, white_c, wa, track)
+            self._draw_ring_arc(painter, cx, cy, inner_r, stroke, black_c, ba, track)
+
+            # Center delta
+            sign = "+" if delta >= 0 else ""
+            delta_text = f"{sign}{delta:.0f}"
+            dcolor = QColor(self.white_ring_color if delta >= 0 else self.black_ring_color)
+            if dimmed:
+                dcolor.setAlpha(110)
+            painter.setFont(delta_font)
+            painter.setPen(dcolor)
+            dfm = QFontMetrics(delta_font)
+            painter.drawText(
+                QRectF(cx - 40, cy - dfm.height() / 2.0 - 2, 80, dfm.height() + 4),
+                int(Qt.AlignmentFlag.AlignCenter),
+                delta_text,
+            )
+            painter.setFont(small)
+            muted = QColor(self.text_color)
+            muted.setAlpha(160 if not dimmed else 90)
+            painter.setPen(muted)
+            painter.drawText(
+                QRectF(cx - 40, cy + dfm.height() / 2.0 - 2, 80, sfm.height() + 2),
+                int(Qt.AlignmentFlag.AlignCenter),
+                "pp",
+            )
+
+            # Captions under meter
+            label_color = QColor(self.text_color)
+            if dimmed:
+                label_color.setAlpha(120)
+            caption_y = body_top + body_h + 2
+            painter.setFont(font)
+            painter.setPen(label_color)
+            painter.drawText(
+                QRectF(cell_x, caption_y, cell_w, fm.height()),
+                int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop),
+                phase,
+            )
+            if self.show_value_labels:
+                painter.setFont(small)
+                painter.setPen(muted)
+                painter.drawText(
+                    QRectF(cell_x, caption_y + fm.height(), cell_w, sfm.height() + 2),
+                    int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop),
+                    f"{self._white_label[0]} {wa:.0f}%  ·  {self._black_label[0]} {ba:.0f}%",
+                )
+
 
 class PieChartWidget(QWidget):
     """Widget for displaying a pie chart."""
@@ -1270,8 +1561,8 @@ class PieChartWidget(QWidget):
         Args:
             config: Configuration dictionary.
             parent: Parent widget.
-            classification_pie_options: Optional ``player_stats.move_classification_pie`` block
-                (Player Stats only). When unset, behavior matches the legacy single pie.
+            classification_pie_options: Optional ``move_classification_pie`` overlay block
+                (Player Stats or Game Summary). When unset, behavior matches the legacy single pie.
         """
         super().__init__(parent)
         self.config = config
@@ -1414,13 +1705,18 @@ class PieChartWidget(QWidget):
         self.update()
 
     def set_opponent_data(self, data: Optional[Dict[str, int]]) -> None:
-        """Opponent move-classification counts (Player Stats hover overlay). Pass None to clear."""
+        """Comparison move-classification counts for the hover overlay. Pass None to clear."""
         if data:
             self._opponent_data = {k: int(v) for k, v in data.items()}
         else:
             self._opponent_data = None
         self._sync_mouse_tracking()
         self.update()
+
+    def set_comparison_labels(self, player_label: str, opponent_label: str) -> None:
+        """Set hover tooltip labels for this pie vs the comparison pie."""
+        self._player_label = str(player_label) if player_label else "Player"
+        self._opponent_label = str(opponent_label) if opponent_label else "Opponent"
 
     def _category_color(self, category: str) -> QColor:
         key = category.lower().replace(" ", "_")
@@ -1571,38 +1867,46 @@ class PieChartWidget(QWidget):
         self._ring_span_anim.setEndValue(t)
         self._ring_span_anim.start()
 
-    def _update_hover_from_pos(self, px: float, py: float) -> None:
+    def _update_hover_from_pos(self, px: float, py: float, global_pos: Optional[QPoint] = None) -> None:
         if not self._can_hover_slice():
-            self.setToolTip("")
+            QToolTip.hideText()
             self.unsetCursor()
             return
         cat = self._category_at_point(px, py)
         if cat != self._hover_category:
-            prev = self._hover_category
             self._hover_category = cat
             oc = int(self._opponent_data.get(cat, 0)) if cat and self._opponent_data else 0
             if cat:
                 self._opponent_ring_category = cat
-                self.setToolTip(self._hover_tooltip_text(cat))
                 target = self._opponent_span_deg_for_category(cat) if oc > 0 else 0.0
                 self._start_ring_span_anim(target)
             else:
-                self.setToolTip("")
+                QToolTip.hideText()
                 self.unsetCursor()
                 self._start_ring_span_anim(0.0)
-        elif cat:
-            self.setToolTip(self._hover_tooltip_text(cat))
+        if cat and global_pos is not None:
+            QToolTip.showText(
+                global_pos,
+                self._hover_tooltip_text(cat),
+                self,
+                QRect(),
+                4000,
+            )
+        elif not cat:
+            QToolTip.hideText()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if self._interaction_active():
             p = event.position()
-            self._update_hover_from_pos(p.x(), p.y())
+            self._update_hover_from_pos(
+                p.x(), p.y(), event.globalPosition().toPoint()
+            )
         super().mouseMoveEvent(event)
 
     def leaveEvent(self, event: QEvent) -> None:
         self._hover_category = None
         self._start_ring_span_anim(0.0)
-        self.setToolTip("")
+        QToolTip.hideText()
         self.unsetCursor()
         super().leaveEvent(event)
 
@@ -1716,6 +2020,7 @@ class DetailSummaryView(QWidget):
         self._highlight_mini_boards: List[MiniChessBoardWidget] = []
         self._highlights_mode_buttons: Dict[str, QToolButton] = {}
         self._move_link_popup: Optional[MoveLinkPopup] = None
+        self._kpi_explain_popup: Optional[KpiExplainPopup] = None
         highlights_cfg = (
             self.config.get("ui", {})
             .get("panels", {})
@@ -1812,6 +2117,8 @@ class DetailSummaryView(QWidget):
         scroll_area.setWidget(self.content_widget)
         scroll_area.verticalScrollBar().valueChanged.connect(self._hide_move_link_popup)
         scroll_area.horizontalScrollBar().valueChanged.connect(self._hide_move_link_popup)
+        scroll_area.verticalScrollBar().valueChanged.connect(self._hide_kpi_explain_popup)
+        scroll_area.horizontalScrollBar().valueChanged.connect(self._hide_kpi_explain_popup)
         splitter.addWidget(scroll_area)
         
         # Configure splitter sizes and stretch factors from config
@@ -2073,6 +2380,7 @@ class DetailSummaryView(QWidget):
     
     def hideEvent(self, event) -> None:  # noqa: N802
         self._hide_move_link_popup()
+        self._hide_kpi_explain_popup()
         super().hideEvent(event)
 
     def _ensure_move_link_popup(self) -> MoveLinkPopup:
@@ -2084,6 +2392,18 @@ class DetailSummaryView(QWidget):
 
     def _hide_move_link_popup(self, *_args) -> None:
         popup = self._move_link_popup
+        if popup is not None:
+            popup.hide()
+
+    def _ensure_kpi_explain_popup(self) -> KpiExplainPopup:
+        popup = self._kpi_explain_popup
+        if popup is None:
+            popup = KpiExplainPopup(self.config, self)
+            self._kpi_explain_popup = popup
+        return popup
+
+    def _hide_kpi_explain_popup(self, *_args) -> None:
+        popup = self._kpi_explain_popup
         if popup is not None:
             popup.hide()
 
@@ -2143,6 +2463,7 @@ class DetailSummaryView(QWidget):
     def _clear_content(self) -> None:
         """Clear all content widgets except placeholder."""
         self._hide_move_link_popup()
+        self._hide_kpi_explain_popup()
         self.accuracy_curve = None
         # Clear widgets safely to prevent accessing deleted widgets
         while self.content_layout.count() > 1:  # Keep placeholder
@@ -2267,8 +2588,9 @@ class DetailSummaryView(QWidget):
         self._add_section_header("Move Classification", header_font, header_text_color)
         classification_layout = QHBoxLayout()
         classification_layout.setSpacing(player_spacing)
-        
-        # White pie chart - defensive check for None stats
+
+        white_pie_data: Optional[Dict[str, int]] = None
+        black_pie_data: Optional[Dict[str, int]] = None
         if self.current_summary and self.current_summary.white_stats:
             white_pie_data = {
                 'Book Move': self.current_summary.white_stats.book_moves or 0,
@@ -2280,14 +2602,6 @@ class DetailSummaryView(QWidget):
                 'Miss': self.current_summary.white_stats.misses or 0,
                 'Blunder': self.current_summary.white_stats.blunders or 0,
             }
-            white_pie_widget = self._create_classification_widget(
-                white_name, white_pie_data, self.current_summary.white_stats,
-                text_color, label_font, section_bg_color, border_color,
-                is_white=True
-            )
-            classification_layout.addWidget(white_pie_widget, 1)
-        
-        # Black pie chart - defensive check for None stats
         if self.current_summary and self.current_summary.black_stats:
             black_pie_data = {
                 'Book Move': self.current_summary.black_stats.book_moves or 0,
@@ -2299,10 +2613,28 @@ class DetailSummaryView(QWidget):
                 'Miss': self.current_summary.black_stats.misses or 0,
                 'Blunder': self.current_summary.black_stats.blunders or 0,
             }
+
+        # White pie chart - defensive check for None stats
+        if white_pie_data is not None and self.current_summary and self.current_summary.white_stats:
+            white_pie_widget = self._create_classification_widget(
+                white_name, white_pie_data, self.current_summary.white_stats,
+                text_color, label_font, section_bg_color, border_color,
+                is_white=True,
+                opponent_pie_data=black_pie_data,
+                player_legend_label="White",
+                opponent_legend_label="Black",
+            )
+            classification_layout.addWidget(white_pie_widget, 1)
+
+        # Black pie chart - defensive check for None stats
+        if black_pie_data is not None and self.current_summary and self.current_summary.black_stats:
             black_pie_widget = self._create_classification_widget(
                 black_name, black_pie_data, self.current_summary.black_stats,
                 text_color, label_font, section_bg_color, border_color,
-                is_white=False
+                is_white=False,
+                opponent_pie_data=white_pie_data,
+                player_legend_label="Black",
+                opponent_legend_label="White",
             )
             classification_layout.addWidget(black_pie_widget, 1)
         
@@ -2341,6 +2673,35 @@ class DetailSummaryView(QWidget):
             self.content_layout.addSpacing(max(6, int(player_spacing)))
         else:
             self.accuracy_curve = None
+
+        # Grouped White/Black accuracy bars by phase (between curve and tables)
+        bar_cfg = summary_config.get("phase_accuracy_bar_chart", {})
+        can_show_phase_bars = (
+            bool(bar_cfg.get("enabled", True))
+            and self.current_summary is not None
+            and self.current_summary.white_opening
+            and self.current_summary.white_middlegame
+            and self.current_summary.white_endgame
+            and self.current_summary.black_opening
+            and self.current_summary.black_middlegame
+            and self.current_summary.black_endgame
+        )
+        if can_show_phase_bars:
+            phase_bars = PhaseAccuracyBarChartWidget(self.config)
+            phase_bars.set_data(
+                {
+                    "Opening": float(self.current_summary.white_opening.accuracy or 0.0),
+                    "Middlegame": float(self.current_summary.white_middlegame.accuracy or 0.0),
+                    "Endgame": float(self.current_summary.white_endgame.accuracy or 0.0),
+                },
+                {
+                    "Opening": float(self.current_summary.black_opening.accuracy or 0.0),
+                    "Middlegame": float(self.current_summary.black_middlegame.accuracy or 0.0),
+                    "Endgame": float(self.current_summary.black_endgame.accuracy or 0.0),
+                },
+            )
+            self.content_layout.addWidget(phase_bars)
+            self.content_layout.addSpacing(max(6, int(player_spacing)))
 
         phase_layout = QHBoxLayout()
         phase_layout.setSpacing(player_spacing)
@@ -2565,16 +2926,25 @@ class DetailSummaryView(QWidget):
         
         # ACPL - defensive check for None/invalid values
         avg_cpl = stats.average_cpl if stats.average_cpl is not None else 0.0
-        self._add_stat_row(grid, 0, "Average CPL:", f"{avg_cpl:.1f}", label_font, value_font, text_color,
-                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_row(
+            grid, 0, "Average CPL:", f"{avg_cpl:.1f}", label_font, value_font, text_color,
+            value_alignment=Qt.AlignmentFlag.AlignRight,
+            kpi_id="average_cpl", kpi_value=float(avg_cpl),
+        )
         # Accuracy - defensive check for None/invalid values
         accuracy = stats.accuracy if stats.accuracy is not None else 0.0
-        self._add_stat_row(grid, 1, "Accuracy:", f"{accuracy:.1f}%", label_font, value_font, text_color,
-                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_row(
+            grid, 1, "Accuracy:", f"{accuracy:.1f}%", label_font, value_font, text_color,
+            value_alignment=Qt.AlignmentFlag.AlignRight,
+            kpi_id="accuracy", kpi_value=float(accuracy),
+        )
         # Estimated Elo - defensive check for None/invalid values
         est_elo = stats.estimated_elo if stats.estimated_elo is not None else 0
-        self._add_stat_row(grid, 2, "Est. Elo:", str(est_elo), label_font, value_font, text_color,
-                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_row(
+            grid, 2, "Est. Elo:", str(est_elo), label_font, value_font, text_color,
+            value_alignment=Qt.AlignmentFlag.AlignRight,
+            kpi_id="estimated_elo", kpi_value=float(est_elo),
+        )
         self._add_stat_separator(grid, 3, elo_separator_cfg, border_color)
         # Total Moves - defensive check for None/invalid values
         total_moves = stats.total_moves if stats.total_moves is not None else 0
@@ -2590,8 +2960,11 @@ class DetailSummaryView(QWidget):
                            value_alignment=Qt.AlignmentFlag.AlignRight)
         # Blunder Rate - defensive check for None/invalid values
         blunder_rate = stats.blunder_rate if stats.blunder_rate is not None else 0.0
-        self._add_stat_row(grid, 7, "Blunder Rate:", f"{blunder_rate:.1f}%", label_font, value_font, text_color,
-                           value_alignment=Qt.AlignmentFlag.AlignRight)
+        self._add_stat_row(
+            grid, 7, "Blunder Rate:", f"{blunder_rate:.1f}%", label_font, value_font, text_color,
+            value_alignment=Qt.AlignmentFlag.AlignRight,
+            kpi_id="blunder_rate", kpi_value=float(blunder_rate),
+        )
         
         layout.addLayout(grid)
         layout.addStretch()
@@ -2646,9 +3019,20 @@ class DetailSummaryView(QWidget):
         wrap_layout.addWidget(line)
         grid.addWidget(wrap, row, 0, 1, 2)
 
-    def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
-                     label_font: QFont, value_font: QFont, text_color: QColor,
-                     value_alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignLeft) -> None:
+    def _add_stat_row(
+        self,
+        grid: QGridLayout,
+        row: int,
+        label_text: str,
+        value_text: str,
+        label_font: QFont,
+        value_font: QFont,
+        text_color: QColor,
+        value_alignment: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignLeft,
+        *,
+        kpi_id: Optional[str] = None,
+        kpi_value: Optional[float] = None,
+    ) -> None:
         """Add a statistics row to a grid.
         
         Args:
@@ -2660,22 +3044,41 @@ class DetailSummaryView(QWidget):
             value_font: Font for value.
             text_color: Text color.
             value_alignment: Horizontal alignment for the value label.
+            kpi_id: Optional KPI tip id for hover explanation popup.
+            kpi_value: Numeric value for the KPI scale marker.
         """
         label = QLabel(label_text)
         label.setFont(label_font)
         label.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
         grid.addWidget(label, row, 0)
-        
-        value = QLabel(value_text)
+
+        tip = None
+        if kpi_id is not None and kpi_value is not None:
+            tip = build_kpi_tip(kpi_id, float(kpi_value), value_text, self.config)
+        if tip is not None:
+            value: QLabel = HoverableKpiValueLabel(value_text)
+            value.attach_kpi_tip(tip, self._ensure_kpi_explain_popup())
+        else:
+            value = QLabel(value_text)
         value.setFont(value_font)
         value.setAlignment(value_alignment | Qt.AlignmentFlag.AlignVCenter)
         value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none;")
         grid.addWidget(value, row, 1)
     
-    def _create_classification_widget(self, player_name: str, pie_data: Dict[str, int], stats,
-                                     text_color: QColor, label_font: QFont,
-                                     bg_color: QColor, border_color: QColor,
-                                     is_white: bool = True) -> QWidget:
+    def _create_classification_widget(
+        self,
+        player_name: str,
+        pie_data: Dict[str, int],
+        stats,
+        text_color: QColor,
+        label_font: QFont,
+        bg_color: QColor,
+        border_color: QColor,
+        is_white: bool = True,
+        opponent_pie_data: Optional[Dict[str, int]] = None,
+        player_legend_label: str = "White",
+        opponent_legend_label: str = "Black",
+    ) -> QWidget:
         """Create a widget with pie chart and move counts.
         
         Args:
@@ -2686,6 +3089,9 @@ class DetailSummaryView(QWidget):
             label_font: Font for labels.
             bg_color: Background color.
             border_color: Border color.
+            opponent_pie_data: Other side's classification counts for hover comparison.
+            player_legend_label: Hover tooltip label for this pie.
+            opponent_legend_label: Hover tooltip label for the comparison pie.
             
         Returns:
             QWidget with pie chart and counts.
@@ -2748,9 +3154,16 @@ class DetailSummaryView(QWidget):
         """)
         layout.addWidget(name_label)
         
-        # Pie chart
-        pie_chart = PieChartWidget(self.config)
+        # Pie chart (optional White/Black comparison hover overlay)
+        mcp_opts = summary_config.get('move_classification_pie')
+        pie_chart = PieChartWidget(
+            self.config,
+            classification_pie_options=mcp_opts if isinstance(mcp_opts, dict) else None,
+        )
         pie_chart.set_data(pie_data)
+        if isinstance(mcp_opts, dict):
+            pie_chart.set_comparison_labels(player_legend_label, opponent_legend_label)
+            pie_chart.set_opponent_data(opponent_pie_data)
         layout.addWidget(pie_chart)
         
         # Move counts list

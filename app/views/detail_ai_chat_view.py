@@ -705,7 +705,7 @@ class DetailAIChatView(QWidget):
         """Add a message to the chat display.
         
         Args:
-            role: Message role ("user", "ai", or "system").
+            role: Message role ("user", "ai", "system", or "error").
             content: Message content.
         """
         if role == "separator":
@@ -717,6 +717,7 @@ class DetailAIChatView(QWidget):
         user_config = message_config.get('user', {})
         ai_config = message_config.get('ai', {})
         system_config = message_config.get('system', {})
+        error_config = message_config.get('error', {})
         
         if role == "user":
             bg_color = user_config.get('background_color', [60, 80, 120])
@@ -726,6 +727,10 @@ class DetailAIChatView(QWidget):
             bg_color = ai_config.get('background_color', [50, 50, 55])
             text_color = ai_config.get('text_color', [200, 200, 200])
             align = Qt.AlignmentFlag.AlignLeft
+        elif role == "error":
+            bg_color = error_config.get('background_color', [90, 35, 40])
+            text_color = error_config.get('text_color', [255, 200, 200])
+            align = Qt.AlignmentFlag.AlignCenter
         else:  # system
             bg_color = system_config.get('background_color', [45, 45, 50])
             text_color = system_config.get('text_color', [150, 150, 150])
@@ -1012,7 +1017,7 @@ class DetailAIChatView(QWidget):
         Args:
             error_message: Error message to display.
         """
-        self._add_message("system", f"Error: {error_message}")
+        self._add_message("error", f"Error: {error_message}")
     
     def _tip_for_notation(self, notation: str) -> Optional[MoveLinkTip]:
         controller = self._ai_chat_controller

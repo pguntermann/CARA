@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QGridLayout, QSizePolicy, QComboBox, QPushButton, QApplication,
     QGraphicsOpacityEffect, QMenu, QTreeWidget, QTreeWidgetItem, QToolButton, QToolTip,
     QSlider,
+    QCheckBox,
 )
 from PyQt6.QtCore import (
     Qt,
@@ -35,8 +36,14 @@ from PyQt6.QtGui import (
     QContextMenuEvent,
     QMouseEvent,
     QResizeEvent,
+    QAction,
 )
-from app.utils.themed_icon import themed_icon_from_svg, SVG_ZOOM_IN, SVG_ZOOM_OUT
+from app.controllers.regex_editor_controller import RegexEditorController
+from app.services.database_search_service import DatabaseSearchService
+from app.utils.themed_icon import themed_icon_from_svg, SVG_REGEX, SVG_ZOOM_IN, SVG_ZOOM_OUT
+from app.views.dialogs.regex_editor_dialog import edit_regex
+from app.views.style.line_edit import generate_line_edit_stylesheet
+from app.views.widgets.regex_syntax import RegexPatternLine, regex_token_colors
 from app.views.detail_summary_view import PieChartWidget
 from typing import Callable, Dict, Any, Optional, List, Tuple, TYPE_CHECKING
 from app.models.database_model import DatabaseModel
@@ -45,6 +52,11 @@ from app.models.game_model import GameModel
 from app.controllers.game_controller import GameController
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.services.player_stats_service import merged_player_stats_time_series_chart_cfg
+from app.views.widgets.kpi_explain_popup import (
+    HoverableKpiValueLabel,
+    KpiExplainPopup,
+    build_kpi_tip,
+)
 
 if TYPE_CHECKING:
     from app.controllers.player_stats_controller import PlayerStatsController
@@ -2552,6 +2564,7 @@ class DetailPlayerStatsView(QWidget):
         )
         self._bulk_analysis_blocks_stats_ui = False
         self._stats_recalculation_ui_pending = False
+        self._regex_validation_error = ""
 
         self._player_stats_section_wrappers: Dict[str, QWidget] = {}
         # Body-only sections add a separate QSpacerItem for bottom spacing; keep a handle so
@@ -2830,6 +2843,9 @@ class DetailPlayerStatsView(QWidget):
         
         self.scroll_area.setWidget(self.content_widget)
         layout.addWidget(self.scroll_area)
+        self._kpi_explain_popup: Optional[KpiExplainPopup] = None
+        self.scroll_area.verticalScrollBar().valueChanged.connect(self._hide_kpi_explain_popup)
+        self.scroll_area.horizontalScrollBar().valueChanged.connect(self._hide_kpi_explain_popup)
         
         # Install event filter on scroll area to monitor width changes
         self.scroll_area.installEventFilter(self)
@@ -2906,11 +2922,14 @@ class DetailPlayerStatsView(QWidget):
             if not self._database_controller and hasattr(self._stats_controller, '_database_controller'):
                 self._database_controller = self._stats_controller._database_controller
             
-            # Initialize source selection from controller
+            # Initialize source selection from controller.
+            # The controller often already has this source, so it does not emit
+            # source_selection_changed. The combo change still has to unlock Regex.
             source_index = stats_controller.get_source_selection()
             if hasattr(self, 'source_combo'):
                 if source_index != self.source_combo.currentIndex():
                     self.source_combo.setCurrentIndex(source_index)
+            self._sync_player_regex_enabled()
             
             # Populate player dropdown if selection section already exists and source is not None
             if source_index != 0:
@@ -2942,9 +2961,15 @@ class DetailPlayerStatsView(QWidget):
             lbl.setText(self.placeholder_text_calculating_stats)
             lbl.show()
             return
+        regex_error = getattr(self, "_regex_validation_error", "")
+        if regex_error:
+            lbl.setText(regex_error)
+            lbl.show()
+            return
         lbl.hide()
 
     def _handle_stats_recalculation_started(self) -> None:
+        self._regex_validation_error = ""
         self._stats_recalculation_ui_pending = True
         self._sync_player_stats_activity_label()
         # During theme switches the view can briefly show only the header + activity label.
@@ -2962,7 +2987,7 @@ class DetailPlayerStatsView(QWidget):
 
     def _on_active_game_changed(self, game) -> None:
         """Handle active game change - auto-select player if available."""
-        if not game:
+        if not game or self._player_regex_mode():
             return
         
         # Try to auto-select player from active game
@@ -3475,10 +3500,8 @@ class DetailPlayerStatsView(QWidget):
         self._update_player_stats_visibility_hint()
 
     def _clear_content(self) -> None:
-        """Clear all content widgets except placeholder and player selection."""
-        # Don't clear - we want to keep player selection section visible
-        # This method is called when stats are unavailable, but we still want player selection
-        pass
+        """Remove calculated sections and leave the player selection in place."""
+        self._clear_stats_sections()
     
     def _clear_stats_sections(self) -> None:
         """Clear only the stats sections (coverage banner, overview, phases, patterns).
@@ -3486,6 +3509,7 @@ class DetailPlayerStatsView(QWidget):
         Keeps the player selection section visible.
         Also removes spacing items to prevent accumulation.
         """
+        self._hide_kpi_explain_popup()
         self._player_stats_section_wrappers.clear()
         self._player_stats_section_spacers.clear()
         self._player_stats_visibility_hint_label = None
@@ -4248,6 +4272,46 @@ class DetailPlayerStatsView(QWidget):
         # Set button height to match button styling
         self.player_combo.setMinimumHeight(button_height)
         self.player_combo.setMaximumHeight(button_height)
+
+        self._player_pattern_classifier = RegexEditorController(
+            self.config,
+            case_sensitive=False,
+            show_replace=False,
+            replacement="",
+        )
+        self.player_regex_input = RegexPatternLine(
+            regex_token_colors(self.config),
+            self._player_pattern_classifier.classify,
+            object_name="playerRegexPattern",
+        )
+        self.player_regex_input.setPlaceholderText("Regular expression")
+        self.player_regex_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.player_regex_input.setVisible(False)
+        self.player_regex_input.returnPressed.connect(self._apply_player_regex)
+        self._install_player_regex_editor_action()
+        self._style_player_regex_input(combo_text, font_family, font_size, combo_bg, combo_border, combo_focus)
+        self.player_regex_input.setFixedHeight(int(button_height))
+        self.player_regex_input.set_line_metrics(pad_h=self._player_regex_pad_h, border_width=self._player_regex_border_width)
+        player_row.addWidget(self.player_regex_input, 1)
+
+        self.player_regex_check = QCheckBox("Regex")
+        self.player_regex_check.setToolTip("Match player names with a regular expression.")
+        self.player_regex_check.setFont(label_font)
+        from app.utils.path_resolver import get_app_resource_path
+
+        StyleManager.style_checkboxes(
+            [self.player_regex_check],
+            self.config,
+            combo_text,
+            font_family,
+            font_size,
+            combo_bg,
+            combo_border,
+            get_app_resource_path("app/resources/icons/checkmark.svg"),
+        )
+        self.player_regex_check.toggled.connect(self._on_player_regex_toggled)
+        player_row.addWidget(self.player_regex_check)
+        self._sync_player_regex_enabled()
         
         # Refresh button removed - dropdown auto-refreshes when databases change
         
@@ -4282,6 +4346,135 @@ class DetailPlayerStatsView(QWidget):
             if source_index != 0:
                 QTimer.singleShot(100, lambda: self._stats_controller._schedule_dropdown_update())
     
+    def _player_regex_mode(self) -> bool:
+        check = getattr(self, "player_regex_check", None)
+        return bool(check is not None and check.isChecked())
+
+    def _source_is_none(self) -> bool:
+        combo = getattr(self, "source_combo", None)
+        if combo is None:
+            return True
+        try:
+            return combo.currentIndex() <= 0
+        except RuntimeError:
+            return True
+
+    def _sync_player_regex_enabled(self) -> None:
+        """A name pattern needs a data source. Until then the field stays inactive."""
+        enabled = not self._source_is_none()
+        check = getattr(self, "player_regex_check", None)
+        field = getattr(self, "player_regex_input", None)
+        if check is not None:
+            check.setEnabled(enabled)
+        if field is not None:
+            field.setEnabled(enabled)
+        if not enabled:
+            self._regex_validation_error = ""
+
+    def _install_player_regex_editor_action(self) -> None:
+        editor_cfg = self.config.get("ui", {}).get("dialogs", {}).get("regex_editor", {})
+        if not isinstance(editor_cfg, dict):
+            editor_cfg = {}
+        action_cfg = editor_cfg.get("find_action", {})
+        if not isinstance(action_cfg, dict):
+            action_cfg = {}
+        icon_svg = str(action_cfg.get("icon_svg") or SVG_REGEX)
+        tint = action_cfg.get("icon_tint", [200, 200, 200])
+        if not isinstance(tint, (list, tuple)) or len(tint) < 3:
+            tint = [200, 200, 200]
+        px = max(1, int(action_cfg.get("icon_px", 16)))
+        icon = QAction(self.player_regex_input)
+        icon.setIcon(themed_icon_from_svg(icon_svg, tint))
+        icon.setToolTip(str(editor_cfg.get("open_tooltip", "Edit regular expression")))
+        icon.triggered.connect(self._open_player_regex_editor)
+        icon.setVisible(True)
+        self._player_regex_action = icon
+        self.player_regex_input.set_editor_action(icon, px)
+
+    def _style_player_regex_input(
+        self,
+        text_color: List[int],
+        font_family: str,
+        font_size: float,
+        bg_color: List[int],
+        border_color: List[int],
+        focus_border: List[int],
+    ) -> None:
+        line_edit = self.config.get("ui", {}).get("styles", {}).get("line_edit", {})
+        if not isinstance(line_edit, dict):
+            line_edit = {}
+        padding = line_edit.get("padding", [8, 4])
+        pad_h = int(padding[0]) if isinstance(padding, list) and padding else 8
+        border_width = int(line_edit.get("border_width", 1))
+        sheet = generate_line_edit_stylesheet(
+            self.config,
+            text_color,
+            font_family,
+            font_size,
+            bg_color,
+            border_color,
+            focus_border,
+            border_width=border_width,
+            border_radius=int(line_edit.get("border_radius", 3)),
+            padding=[0, 0],
+            hover_border_offset=int(line_edit.get("hover_border_offset", 20)),
+            disabled_brightness_factor=float(line_edit.get("disabled_brightness_factor", 0.5)),
+        ).replace("QLineEdit", "QPlainTextEdit#playerRegexPattern")
+        font = self.player_regex_input.font()
+        font.setFamily(font_family)
+        font.setPointSizeF(float(font_size))
+        self.player_regex_input.set_line_style(sheet, font)
+        self._player_regex_pad_h = pad_h
+        self._player_regex_border_width = border_width
+
+    def _on_player_regex_toggled(self, checked: bool) -> None:
+        """Swap the name list for a pattern field. Stats update when the pattern is applied."""
+        self.player_combo.setVisible(not checked)
+        self.player_regex_input.setVisible(checked)
+        self.player_regex_input.set_highlighting(checked)
+        if checked:
+            self._apply_player_regex()
+            return
+        self._regex_validation_error = ""
+        if self._stats_controller:
+            self._stats_controller.set_player_selection(None)
+        self._sync_player_stats_activity_label()
+
+    def _apply_player_regex(self) -> None:
+        """Use the pattern for statistics. Invalid patterns stay on the status line."""
+        if not self._player_regex_mode() or self._source_is_none():
+            return
+        pattern = self.player_regex_input.text()
+        error = DatabaseSearchService.regex_pattern_error(pattern)
+        self._regex_validation_error = error
+        if not self._stats_controller:
+            self._sync_player_stats_activity_label()
+            return
+        if error:
+            self._stats_controller.set_player_selection(None)
+            self._sync_player_stats_activity_label()
+            return
+        self._stats_controller.set_player_selection(pattern, name_is_regex=True)
+
+    def _open_player_regex_editor(self) -> None:
+        if self._source_is_none() or not self.player_regex_input.isEnabled():
+            return
+        # The selection frame paints a border on every QFrame. Parenting the
+        # editor there would draw that border through the dialog.
+        result = edit_regex(
+            self.config,
+            pattern=self.player_regex_input.text(),
+            replacement="",
+            case_sensitive=False,
+            show_replace=False,
+            parent=self.window(),
+        )
+        if result is None:
+            return
+        self.player_regex_input.setText(result.pattern)
+        self.player_regex_input.set_highlighting(True)
+        self._apply_player_regex()
+
     def _on_player_activated(self, index: int) -> None:
         """Handle player selection from dropdown (user clicked on item)."""
         if index < 0:
@@ -4290,6 +4483,8 @@ class DetailPlayerStatsView(QWidget):
     
     def _on_player_selected(self, index: int = -1) -> None:
         """Handle player selection from combo box."""
+        if self._player_regex_mode():
+            return
         if not self._stats_controller or not hasattr(self, 'player_combo') or not self.player_combo:
             return
         
@@ -4572,8 +4767,11 @@ class DetailPlayerStatsView(QWidget):
         if index < 0:
             index = self.source_combo.currentIndex()
         
-        # Call controller method to handle source selection
+        # Call controller method to handle source selection.
+        # A theme rebuild sets the same source again, and the controller then
+        # ignores it. Enable Regex from the combo either way.
         self._stats_controller.set_source_selection(index)
+        self._sync_player_regex_enabled()
         self._sync_player_stats_activity_label()
     
     
@@ -4615,8 +4813,12 @@ class DetailPlayerStatsView(QWidget):
         except RuntimeError:
             return
         
-        # If no players found, show placeholder and return
+        # If no players found, show placeholder and return.
+        # A regex selection is not a dropdown name, so a refresh must leave it alone.
         if not players_with_analyzed:
+            if self._player_regex_mode():
+                self.player_combo.currentIndexChanged.connect(self._on_player_selected)
+                return
             # Clear player selection in controller if one was set
             if self._stats_controller and self._stats_controller.get_current_player():
                 self._stats_controller.set_player_selection(None)
@@ -4644,7 +4846,7 @@ class DetailPlayerStatsView(QWidget):
                 display_text = f"{player_name} ({analyzed_count} analyzed, {game_count} total)"
                 self.player_combo.addItem(display_text, player_name)
                 
-                if current_player and player_name == current_player:
+                if current_player and player_name == current_player and not self._player_regex_mode():
                     current_player_found = True
                     current_player_analyzed = analyzed_count
                     current_player_total = game_count
@@ -4673,7 +4875,7 @@ class DetailPlayerStatsView(QWidget):
                     expected_text = f"{current_player} ({current_player_analyzed} analyzed, {current_player_total} total)"
                     if current_text != expected_text:
                         self.player_combo.setItemText(index, expected_text)
-            elif current_player:
+            elif current_player and not self._player_regex_mode():
                 # Player no longer in list, clear selection
                 self.player_combo.setCurrentIndex(-1)
                 self._stats_controller.set_player_selection(None) if self._stats_controller else None
@@ -4681,6 +4883,8 @@ class DetailPlayerStatsView(QWidget):
                 self._sync_player_stats_activity_label()
                 self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
                 self._clear_stats_sections()
+            elif self._player_regex_mode():
+                self.player_combo.setCurrentIndex(-1)
             else:
                 # No previous selection, ensure combo is empty and show placeholder
                 self.player_combo.setCurrentIndex(-1)
@@ -4701,6 +4905,13 @@ class DetailPlayerStatsView(QWidget):
         self._stats_recalculation_ui_pending = False
         self._sync_player_stats_activity_label()
         self._clear_stats_sections()
+        if self._source_is_none():
+            self._regex_validation_error = ""
+            self._set_disabled_placeholder_visible(True, self.placeholder_text_no_source)
+            return
+        if self._player_regex_mode() and self._regex_validation_error:
+            self._set_disabled_placeholder_visible(False)
+            return
         self._set_disabled_placeholder_visible(True, self.placeholder_text_no_player)
     
     def _on_source_selection_changed(self, index: int) -> None:
@@ -4723,6 +4934,7 @@ class DetailPlayerStatsView(QWidget):
                 'Loading players...'
             )
             self._set_disabled_placeholder_visible(True, loading_text)
+        self._sync_player_regex_enabled()
         self._sync_player_stats_activity_label()
     
     
@@ -4860,10 +5072,16 @@ class DetailPlayerStatsView(QWidget):
             accuracy_text = f"{accuracy:.1f}% (Min: {min_acc:.1f}%, Max: {max_acc:.1f}%)"
         else:
             accuracy_text = f"{accuracy:.1f}%"
-        self._add_stat_row(grid, 3, "Average Accuracy:", accuracy_text, label_font, value_font, text_color)
+        self._add_stat_row(
+            grid, 3, "Average Accuracy:", accuracy_text, label_font, value_font, text_color,
+            kpi_id="accuracy", kpi_value=float(accuracy), kpi_display=f"{accuracy:.1f}%",
+        )
         # Estimated Elo
         est_elo = stats.player_stats.estimated_elo if stats.player_stats.estimated_elo is not None else 0
-        self._add_stat_row(grid, 4, "Estimated Elo:", str(est_elo), label_font, value_font, text_color)
+        self._add_stat_row(
+            grid, 4, "Estimated Elo:", str(est_elo), label_font, value_font, text_color,
+            kpi_id="estimated_elo", kpi_value=float(est_elo), kpi_display=str(est_elo),
+        )
         # Average CPL (include per-game min/max if available)
         avg_cpl = stats.player_stats.average_cpl if stats.player_stats.average_cpl is not None else 0.0
         min_acpl = getattr(stats, "min_acpl", None)
@@ -4872,7 +5090,10 @@ class DetailPlayerStatsView(QWidget):
             cpl_text = f"{avg_cpl:.1f} (Min: {min_acpl:.1f}, Max: {max_acpl:.1f})"
         else:
             cpl_text = f"{avg_cpl:.1f}"
-        self._add_stat_row(grid, 5, "Average CPL:", cpl_text, label_font, value_font, text_color)
+        self._add_stat_row(
+            grid, 5, "Average CPL:", cpl_text, label_font, value_font, text_color,
+            kpi_id="average_cpl", kpi_value=float(avg_cpl), kpi_display=f"{avg_cpl:.1f}",
+        )
         # Best Move % (include per-game min/max if available)
         best_move_pct = stats.player_stats.best_move_percentage if stats.player_stats.best_move_percentage is not None else 0.0
         min_best = getattr(stats, "min_best_move_pct", None)
@@ -4899,7 +5120,10 @@ class DetailPlayerStatsView(QWidget):
             blunder_text = f"{blunder_rate:.1f}% (Min: {min_blunder:.1f}%, Max: {max_blunder:.1f}%)"
         else:
             blunder_text = f"{blunder_rate:.1f}%"
-        self._add_stat_row(grid, 8, "Blunder Rate:", blunder_text, label_font, value_font, text_color)
+        self._add_stat_row(
+            grid, 8, "Blunder Rate:", blunder_text, label_font, value_font, text_color,
+            kpi_id="blunder_rate", kpi_value=float(blunder_rate), kpi_display=f"{blunder_rate:.1f}%",
+        )
         
         # The grid itself has a stretch column between labels and values for flexible spacing
         # The grid widget will expand to fill available space, and the stretch column will shrink when width is reduced
@@ -6522,8 +6746,26 @@ class DetailPlayerStatsView(QWidget):
         if self._endgame_tree_increase_button is not None:
             self._endgame_tree_increase_button.setEnabled(can_increase)
     
+    def _ensure_kpi_explain_popup(self) -> KpiExplainPopup:
+        popup = self._kpi_explain_popup
+        if popup is None:
+            popup = KpiExplainPopup(self.config, self)
+            self._kpi_explain_popup = popup
+        return popup
+
+    def _hide_kpi_explain_popup(self, *_args) -> None:
+        popup = getattr(self, "_kpi_explain_popup", None)
+        if popup is not None:
+            popup.hide()
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._hide_kpi_explain_popup()
+        super().hideEvent(event)
+
     def _add_stat_row(self, grid: QGridLayout, row: int, label_text: str, value_text: str,
-                     label_font: QFont, value_font: QFont, text_color: QColor) -> None:
+                     label_font: QFont, value_font: QFont, text_color: QColor,
+                     *, kpi_id: Optional[str] = None, kpi_value: Optional[float] = None,
+                     kpi_display: Optional[str] = None) -> None:
         """Add a statistics row to a grid.
         
         Grid has 3 columns: 0=label (left), 1=stretch (flexible), 2=value (right)
@@ -6539,7 +6781,20 @@ class DetailPlayerStatsView(QWidget):
         
         # Column 1 is the stretch column - no widget needed, it's handled by column stretch
         
-        value = QLabel(value_text)
+        tip = None
+        if kpi_id is not None and kpi_value is not None:
+            tip = build_kpi_tip(
+                kpi_id,
+                float(kpi_value),
+                kpi_display if kpi_display is not None else value_text,
+                self.config,
+                value_label="Overall",
+            )
+        if tip is not None:
+            value: QLabel = HoverableKpiValueLabel(value_text)
+            value.attach_kpi_tip(tip, self._ensure_kpi_explain_popup())
+        else:
+            value = QLabel(value_text)
         value.setFont(value_font)
         value.setStyleSheet(f"color: rgb({text_color.red()}, {text_color.green()}, {text_color.blue()}); border: none; background: transparent;")
         value.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)

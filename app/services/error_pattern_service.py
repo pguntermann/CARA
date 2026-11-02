@@ -9,6 +9,7 @@ from app.services.game_summary_service import GameSummary, PlayerStatistics, Pha
 from app.controllers.game_controller import GameController
 from app.services.opening_service import OpeningService
 from app.services.missed_tactic_ranking import STATS_MISS_KIND_LABELS
+from app.services.player_name_match import player_is_white
 
 COVERAGE_CUTOFF_MIN = 5.0
 COVERAGE_CUTOFF_MAX = 95.0
@@ -141,6 +142,7 @@ class ErrorPatternService:
             self.min_pattern_games = max(1, int(pattern_config.get('min_pattern_games', 2)))
         except (TypeError, ValueError):
             self.min_pattern_games = 2
+        self._name_is_regex = False
 
     def _moves_for(
         self,
@@ -217,10 +219,17 @@ class ErrorPatternService:
     def _meets_game_floor(self, n_games: int) -> bool:
         return n_games >= self.min_pattern_games
 
-    @staticmethod
-    def _player_lost(game: GameData, player_name: str) -> bool:
+    def _side_is_white(self, game: GameData, player_name: str) -> bool:
+        return player_is_white(
+            getattr(game, "white", None),
+            getattr(game, "black", None),
+            player_name,
+            name_is_regex=self._name_is_regex,
+        )
+
+    def _player_lost(self, game: GameData, player_name: str) -> bool:
         result = (getattr(game, "result", None) or "").strip()
-        is_white = game.white == player_name
+        is_white = self._side_is_white(game, player_name)
         if is_white:
             return result == "0-1"
         return result == "1-0"
@@ -236,6 +245,7 @@ class ErrorPatternService:
         aggregated_stats: Optional[Any],
         game_summaries: List[GameSummary],
         precomputed_moves: Optional[List[Optional[List[MoveData]]]] = None,
+        name_is_regex: bool = False,
     ) -> List[ErrorPattern]:
         """Detect error patterns for a player.
 
@@ -251,6 +261,7 @@ class ErrorPatternService:
         Returns:
             List of ErrorPattern instances.
         """
+        self._name_is_regex = bool(name_is_regex)
         patterns: List[ErrorPattern] = []
         
         if not aggregated_stats or not games or not game_summaries:
@@ -315,12 +326,14 @@ class ErrorPatternService:
         player_name: str,
         games: List[GameData],
         precomputed_moves: Optional[List[Optional[List[MoveData]]]] = None,
+        name_is_regex: bool = False,
     ) -> List[ErrorPattern]:
         """Detect repeated slips in the same position across games.
 
         Shown in a dedicated Player Stats section (not gated by the Error Patterns
         coverage slider).
         """
+        self._name_is_regex = bool(name_is_regex)
         if not games:
             return []
         return self._detect_repeated_position_errors(
@@ -406,7 +419,7 @@ class ErrorPatternService:
             if i >= len(game_summaries):
                 continue
             summary = game_summaries[i]
-            is_white = game.white == player_name
+            is_white = self._side_is_white(game, player_name)
             misses = (
                 getattr(summary, "white_missed_tactics", None)
                 if is_white
@@ -474,7 +487,7 @@ class ErrorPatternService:
             summary = game_summaries[i]
             
             # Determine if player is white or black
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             
             moves = self._moves_for(i, game, precomputed_moves)
             if not moves:
@@ -583,7 +596,7 @@ class ErrorPatternService:
             if i >= len(game_summaries):
                 continue
             
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             summary = game_summaries[i]
             
             if phase == "opening":
@@ -617,7 +630,7 @@ class ErrorPatternService:
             if i >= len(game_summaries):
                 continue
 
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             summary = game_summaries[i]
 
             if is_white:
@@ -687,7 +700,7 @@ class ErrorPatternService:
         for i, game in enumerate(games):
             if i >= len(game_summaries):
                 continue
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             summary = game_summaries[i]
             player_stats = self._player_stats(summary, is_white)
             game_cpl = float(getattr(player_stats, "average_cpl", 0.0) or 0.0)
@@ -757,7 +770,7 @@ class ErrorPatternService:
         for i, game in enumerate(games):
             if i >= len(game_summaries):
                 continue
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             player_stats = self._player_stats(game_summaries[i], is_white)
             top3 = getattr(player_stats, "top3_move_percentage", None)
             if top3 is None:
@@ -800,7 +813,7 @@ class ErrorPatternService:
             if i >= len(game_summaries):
                 continue
             
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             summary = game_summaries[i]
             
             # Check if player had a winning position but lost or drew
@@ -879,7 +892,7 @@ class ErrorPatternService:
             if i >= len(game_summaries):
                 continue
             
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             summary = game_summaries[i]
             
             # Check if player was in a losing position
@@ -965,7 +978,7 @@ class ErrorPatternService:
         for i, game in enumerate(games):
             if i >= len(game_summaries):
                 continue
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             player_stats = self._player_stats(game_summaries[i], is_white)
             total_moves = int(getattr(player_stats, "total_moves", 0) or 0)
             if total_moves <= 0:
@@ -1023,7 +1036,7 @@ class ErrorPatternService:
             moves = self._moves_for(gi, game, precomputed_moves)
             if not moves:
                 continue
-            is_white = (game.white == player_name)
+            is_white = self._side_is_white(game, player_name)
             prev = None
             for i, move in enumerate(moves):
                 if is_white and (move.white_move or getattr(move, "white_move", None)):
