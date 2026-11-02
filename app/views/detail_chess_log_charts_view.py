@@ -12,6 +12,7 @@ The narrative panel is disabled (with an explanatory hint) when no LLM is config
 
 from __future__ import annotations
 
+import html
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from PyQt6.QtCore import QPoint, QRect, Qt
@@ -32,6 +33,7 @@ from PyQt6.QtWidgets import (
 )
 
 from app.controllers.chess_log_charts_controller import ChessLogChartsController
+from app.views.dialogs.message_dialog import MessageDialog
 from app.services.ai_service import TokenUsage
 from app.services.chess_log_narrative_service import sanitize_narrative_markdown
 from app.services.logging_service import LoggingService
@@ -74,7 +76,7 @@ class DetailChessLogChartsView(QWidget):
         self._last_vague_keys: Optional[FrozenSet[Tuple[Any, str, str, str]]] = None
         # Partial-fail notice from shallow_partial signal; consumed by the next
         # shallow_ready handler to show inline in the dialog rather than a
-        # separate QMessageBox.
+        # separate message dialog.
         self._pending_partial_message: Optional[str] = None
 
         self._build_ui()
@@ -681,15 +683,14 @@ class DetailChessLogChartsView(QWidget):
         if not self._controller:
             return
         if not shallow_keys and not vague_keys:
-            from PyQt6.QtWidgets import QMessageBox
             msgs = (self._config or {}).get("ui", {}).get("dialogs", {}).get(
                 "chess_log_messages", {}
             ).get("shallow_notes", {}).get("none_found", {})
             title = msgs.get("title", "Nothing Flagged")
             message = msgs.get("message_template", "No shallow notes or vague lessons found — great job.")
             if partial_notice:
-                message = f"{partial_notice}\n\n{message}"
-            QMessageBox.information(self, title, message)
+                message = f"{html.escape(partial_notice)}<br><br>{message}"
+            MessageDialog.show_information(self._config, title, message, self)
             return
         games = self._controller.resolve_games()
         chess_log_ctrl = self._controller.get_chess_log_controller()
@@ -722,8 +723,7 @@ class DetailChessLogChartsView(QWidget):
         self._shallow_status_label.setVisible(False)
         self._shallow_token_label.setText("")
         self._refresh_ai_state()
-        from PyQt6.QtWidgets import QMessageBox
-        QMessageBox.warning(self, "Check Logs Error", f"Could not classify notes:\n{message}")
+        MessageDialog.show_warning(self._config, "Check Logs Error", f"Could not classify notes:<br>{html.escape(message)}", self)
 
     def _on_shallow_partial(self, message: str) -> None:
         self._pending_partial_message = message
@@ -1169,12 +1169,7 @@ class DetailChessLogChartsView(QWidget):
         )
 
         if not self._last_narrative:
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(
-                self,
-                "No Narrative",
-                "Generate a Narrative Summary first.",
-            )
+            MessageDialog.show_information(self._config, "No Narrative", "Generate a Narrative Summary first.", self)
             return
 
         player_name = self._player_combo.itemData(self._player_combo.currentIndex()) or ""

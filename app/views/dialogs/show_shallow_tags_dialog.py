@@ -15,6 +15,7 @@ this session; it disappears on the next open.
 
 from __future__ import annotations
 
+import html
 from io import StringIO
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
@@ -44,6 +45,7 @@ from app.views.dialogs._tag_row_helpers import (
     node_info as _node_info_fn,
     ply_for_path as _ply_for_path_fn,
 )
+from app.views.dialogs.message_dialog import MessageDialog
 from app.views.dialogs.show_tags_dialog import _TagRowWidget, _PRESET_ORDER, _normalize_entries
 from app.views.style.style_manager import StyleManager
 
@@ -290,17 +292,12 @@ class ShowShallowTagsDialog(QDialog):
         return label
 
     def _show_help(self) -> None:
-        from PyQt6.QtWidgets import QMessageBox
-        from PyQt6.QtGui import QFont
         help_text = (
             self._config.get("ui", {}).get("dialogs", {})
             .get("shallow", {}).get("help_text", "")
         )
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Check Logs — Help")
-        msg.setText(help_text or "Check Logs help not configured.")
-        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg.exec()
+        help_html = html.escape(help_text or "Check Logs help not configured.").replace('\n', '<br>')
+        MessageDialog.show_information(self._config, "Check Logs — Help", help_html, self)
 
     def _setup_ui(self) -> None:
         # Read Chess Log display settings once (scale + arrow toggles).

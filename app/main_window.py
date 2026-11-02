@@ -1529,20 +1529,18 @@ class MainWindow(QMainWindow):
             return
         games = [g for g in db.get_all_games() if getattr(g, "has_chess_log_tags", False)]
         if not games:
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(self, "Shallow/Vague Logs", "No logged games in the active database.")
+            MessageDialog.show_information(self.config, "Shallow/Vague Logs", "No logged games in the active database.", self)
             return
         if not chess_log_controller.has_any_checked_answer(games):
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(
-                self, "Shallow/Vague Logs",
+            MessageDialog.show_information(
+                self.config, "Shallow/Vague Logs",
                 "No saved Check Logs results for this database. "
-                "Run Check Logs from the Chess Log Charts tab first."
+                "Run Check Logs from the Chess Log tab first.",
+                self,
             )
             return
         shallow_keys, vague_keys = chess_log_controller.get_shallow_vague_keys(games)
         if not shallow_keys and not vague_keys:
-            from PyQt6.QtWidgets import QMessageBox
             msgs = (self.config or {}).get("ui", {}).get("dialogs", {}).get(
                 "chess_log_messages", {}
             ).get("shallow_notes", {}).get("none_found", {})
@@ -1556,10 +1554,10 @@ class MainWindow(QMainWindow):
                 s = "s" if count_unchecked != 1 else ""
                 have = "haven't" if count_unchecked != 1 else "hasn't"
                 message = (
-                    f"{message}\n\n{count_unchecked} note{s} {have} been checked yet"
+                    f"{message}<br><br>{count_unchecked} note{s} {have} been checked yet"
                     " (new or edited since the last Check Logs). Run Check Logs to check them."
                 )
-            QMessageBox.information(self, title, message)
+            MessageDialog.show_information(self.config, title, message, self)
             return
         from app.views.dialogs.show_shallow_tags_dialog import ShowShallowTagsDialog
         dlg = ShowShallowTagsDialog(

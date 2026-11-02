@@ -3184,16 +3184,16 @@ class TestNothingFlaggedMessage(unittest.TestCase):
             return json.load(f)
 
     def test_all_checked_shows_nothing_flagged_message(self):
-        """All answers checked + nothing flagged → QMessageBox with exact config wording."""
+        """All answers checked + nothing flagged → MessageDialog with exact config wording."""
         from unittest.mock import patch
         from app.main_window import MainWindow
         game = self._make_checked_game()
         ctrl = self._make_ctrl_mock(has_checked=True, unchecked_count=0)
         fake = self._make_fake_window([game], ctrl, config=self._load_cfg())
-        with patch("PyQt6.QtWidgets.QMessageBox.information") as mock_info:
+        with patch("app.views.dialogs.message_dialog.MessageDialog.show_information") as mock_info:
             MainWindow._show_saved_shallow_logs(fake)
         mock_info.assert_called_once()
-        _, title, message = mock_info.call_args[0]
+        _config, title, message, _parent = mock_info.call_args[0]
         self.assertEqual(title, "Nothing Flagged")
         self.assertEqual(message, "No shallow notes or vague lessons found — great job.")
 
@@ -3204,14 +3204,14 @@ class TestNothingFlaggedMessage(unittest.TestCase):
         game = self._make_checked_game()
         ctrl = self._make_ctrl_mock(has_checked=True, unchecked_count=1)
         fake = self._make_fake_window([game], ctrl, config=self._load_cfg())
-        with patch("PyQt6.QtWidgets.QMessageBox.information") as mock_info:
+        with patch("app.views.dialogs.message_dialog.MessageDialog.show_information") as mock_info:
             MainWindow._show_saved_shallow_logs(fake)
         mock_info.assert_called_once()
-        _, title, message = mock_info.call_args[0]
+        _config, title, message, _parent = mock_info.call_args[0]
         self.assertEqual(title, "Nothing Flagged")
         expected = (
             "No shallow notes or vague lessons found — great job."
-            "\n\n1 note hasn't been checked yet"
+            "<br><br>1 note hasn't been checked yet"
             " (new or edited since the last Check Logs). Run Check Logs to check them."
         )
         self.assertEqual(message, expected)
@@ -3223,14 +3223,14 @@ class TestNothingFlaggedMessage(unittest.TestCase):
         game = self._make_checked_game()
         ctrl = self._make_ctrl_mock(has_checked=True, unchecked_count=3)
         fake = self._make_fake_window([game], ctrl, config=self._load_cfg())
-        with patch("PyQt6.QtWidgets.QMessageBox.information") as mock_info:
+        with patch("app.views.dialogs.message_dialog.MessageDialog.show_information") as mock_info:
             MainWindow._show_saved_shallow_logs(fake)
         mock_info.assert_called_once()
-        _, title, message = mock_info.call_args[0]
+        _config, title, message, _parent = mock_info.call_args[0]
         self.assertEqual(title, "Nothing Flagged")
         expected = (
             "No shallow notes or vague lessons found — great job."
-            "\n\n3 notes haven't been checked yet"
+            "<br><br>3 notes haven't been checked yet"
             " (new or edited since the last Check Logs). Run Check Logs to check them."
         )
         self.assertEqual(message, expected)
