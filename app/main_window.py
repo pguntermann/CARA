@@ -4108,10 +4108,6 @@ class MainWindow(QMainWindow):
         visibility = self._get_detail_panel_visibility()
         tab_widget = getattr(getattr(self, "detail_panel", None), "tab_widget", None)
 
-        # Capture current tab before any setTabVisible call; Qt may auto-advance the
-        # current index when the current tab is hidden, so we must record it now.
-        pre_hide_current = tab_widget.currentIndex() if tab_widget is not None else -1
-
         for unit in DETAIL_PANEL_VISIBILITY_UNITS:
             visible = bool(visibility.get(unit.id, True))
 
@@ -4139,37 +4135,17 @@ class MainWindow(QMainWindow):
 
             self._apply_unit_submenus(unit.id, visible)
 
-        self._ensure_visible_detail_tab(pre_hide_current=pre_hide_current)
+        self._ensure_visible_detail_tab()
 
-    def _ensure_visible_detail_tab(self, pre_hide_current: int = -1) -> None:
-        """If the current detail tab is hidden, switch to a visible fallback.
-
-        Args:
-            pre_hide_current: Tab index that was current *before* any ``setTabVisible``
-                calls in the caller.  Qt may auto-advance the current index when the
-                active tab is hidden; passing the pre-hide index lets us detect that
-                case even after the auto-advance.
-        """
+    def _ensure_visible_detail_tab(self) -> None:
+        """If the current detail tab is hidden, switch to a visible fallback."""
         if not hasattr(self, "detail_panel") or not hasattr(self.detail_panel, "tab_widget"):
             return
         tab_widget = self.detail_panel.tab_widget
         current = tab_widget.currentIndex()
-
-        # Determine whether a fallback is needed.  A fallback is needed if:
-        #   (a) the current tab is hidden, OR
-        #   (b) Qt already auto-advanced away from a tab that was just hidden
-        #       (pre_hide_current is now invisible at its original index).
-        needs_fallback = current < 0 or (
-            hasattr(tab_widget, "isTabVisible") and not tab_widget.isTabVisible(current)
-        )
-        if not needs_fallback and pre_hide_current >= 0 and pre_hide_current != current:
-            # Current has changed — check whether the original tab is now hidden.
-            if hasattr(tab_widget, "isTabVisible") and not tab_widget.isTabVisible(
-                pre_hide_current
-            ):
-                needs_fallback = True
-
-        if not needs_fallback:
+        if current >= 0 and (
+            not hasattr(tab_widget, "isTabVisible") or tab_widget.isTabVisible(current)
+        ):
             return
         # Prefer Moves List, then first visible tab.
         if self._switch_detail_tab_by_id("moves_list"):

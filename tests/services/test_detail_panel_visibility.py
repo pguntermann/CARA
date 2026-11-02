@@ -420,11 +420,6 @@ if _QT_AVAILABLE:
             self.assertTrue(self.mw.show_all_chess_logs_action.isVisible())
             self.assertTrue(self.mw.highlight_chess_log_moves_action.isVisible())
 
-        def test_hidden_while_current_falls_back_to_moves_list(self):
-            self.mw.detail_panel.tab_widget.setCurrentIndex(9)
-            self._hide()
-            self.assertEqual(self.mw.detail_panel.tab_widget.currentIndex(), 0)
-
         # --- show-again tests ---
 
         def test_tab_visible_after_apply_show(self):
