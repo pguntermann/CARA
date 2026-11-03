@@ -92,19 +92,25 @@ def aggregate(
     player: str,
     color_filter: str = "both",       # "white", "black", or "both"
     chart_cfg: Optional[Dict[str, Any]] = None,
+    get_tags_for_game: Optional[Callable[[Any], Dict[str, Any]]] = None,
 ) -> "AggregateResult":
     """Aggregate Chess Log moments into per-preset time series.
 
     Args:
-        games:        Games to scan (from Data Source selection).
-        player:       Player name to scope to (case-insensitive). Empty string
-                      skips player filtering — all moments in all games.
-        color_filter: "white" / "black" / "both" — further scope to games where
-                      the player had that color.
-        chart_cfg:    Optional config dict with ``target_progression_bins`` and
-                      ``ordinal_fallback_mode`` (same keys as Player Stats).
-                      Build via ``chart_cfg_with_chess_log_charts_overrides`` so
-                      the user's ``target_bins`` and ``binning_mode`` are applied.
+        games:            Games to scan (from Data Source selection).
+        player:           Player name to scope to (case-insensitive). Empty string
+                          skips player filtering — all moments in all games.
+        color_filter:     "white" / "black" / "both" — further scope to games where
+                          the player had that color.
+        chart_cfg:        Optional config dict with ``target_progression_bins`` and
+                          ``ordinal_fallback_mode`` (same keys as Player Stats).
+                          Build via ``chart_cfg_with_chess_log_charts_overrides`` so
+                          the user's ``target_bins`` and ``binning_mode`` are applied.
+        get_tags_for_game: When provided, called instead of
+                          ``ChessLogStorageService.load_resolved_paths`` to read
+                          moments for each game.  Pass a main-thread snapshot so
+                          the background worker never reads the controller cache
+                          directly across threads.
 
     Returns:
         AggregateResult with series mapping preset name → ChessLogPresetSeries
@@ -123,13 +129,16 @@ def aggregate(
     has_3x3: bool = False
 
     for game in games:
-        if not getattr(game, "has_chess_log_tags", False):
+        if get_tags_for_game is None and not getattr(game, "has_chess_log_tags", False):
             continue
 
         if not game_matches_player_color(game, player_cf, color_filter):
             continue
 
-        paths_data = ChessLogStorageService.load_resolved_paths(game)
+        if get_tags_for_game is not None:
+            paths_data = get_tags_for_game(game)
+        else:
+            paths_data = ChessLogStorageService.load_resolved_paths(game)
         ordinal = _game_date_ordinal_for_trends(game.date or "")
 
         game_has_clamp_cct = False
@@ -160,7 +169,10 @@ def aggregate(
     return AggregateResult(series=result, n_undated_clamp_cct=n_undated_clamp_cct, has_3x3=has_3x3)
 
 
-def get_all_players(games: List[GameData]) -> List[Tuple[str, int]]:
+def get_all_players(
+    games: List[GameData],
+    get_tags_for_game: Optional[Callable[[Any], Dict[str, Any]]] = None,
+) -> List[Tuple[str, int]]:
     """Return (name, tagged_game_count) for players with >= 2 games sharing the same preset.
 
     A player qualifies when any single preset (CLAMP, CCT, 3x3) has at
@@ -175,6 +187,14 @@ def get_all_players(games: List[GameData]) -> List[Tuple[str, int]]:
     credited — this avoids crediting both players equally for a game where only
     one side tagged moments.
 
+    Args:
+        games:            Games to scan.
+        get_tags_for_game: When provided, called instead of
+                          ``ChessLogStorageService.load_resolved_paths`` to read
+                          moments for each game.  Pass a main-thread snapshot so
+                          the background worker never reads the controller cache
+                          directly across threads.
+
     Cost: one ChessLogStorageService.load_tags() call per tagged game. Runs in
     a background worker; acceptable for typical datasets.
     """
@@ -183,9 +203,12 @@ def get_all_players(games: List[GameData]) -> List[Tuple[str, int]]:
     total_counts: Dict[str, int] = {}
 
     for game in games:
-        if not getattr(game, "has_chess_log_tags", False):
+        if get_tags_for_game is None and not getattr(game, "has_chess_log_tags", False):
             continue
-        paths_data = ChessLogStorageService.load_resolved_paths(game)
+        if get_tags_for_game is not None:
+            paths_data = get_tags_for_game(game)
+        else:
+            paths_data = ChessLogStorageService.load_resolved_paths(game)
         if not paths_data:
             continue
 

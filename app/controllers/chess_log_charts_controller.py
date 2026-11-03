@@ -60,9 +60,14 @@ class ChessLogPlayerDropdownWorker(QThread):
 
     players_ready = pyqtSignal(list)   # List[Tuple[str, int]]
 
-    def __init__(self, games: List[GameData]) -> None:
+    def __init__(
+        self,
+        games: List[GameData],
+        snapshot: Optional[Dict[int, Dict[str, Any]]] = None,
+    ) -> None:
         super().__init__()
         self._games = games
+        self._snapshot = snapshot  # {id(game): paths_data} captured on the main thread
         self._cancelled = False
         self._mutex = QMutex()
 
@@ -74,7 +79,11 @@ class ChessLogPlayerDropdownWorker(QThread):
         with QMutexLocker(self._mutex):
             if self._cancelled:
                 return
-        players = get_all_players(self._games)
+        if self._snapshot is not None:
+            snap = self._snapshot
+            players = get_all_players(self._games, get_tags_for_game=lambda g: snap.get(id(g), {}))
+        else:
+            players = get_all_players(self._games)
         with QMutexLocker(self._mutex):
             if not self._cancelled:
                 self.players_ready.emit(players)
@@ -103,6 +112,7 @@ class ChessLogAggregationWorker(QThread):
         compress_gap_max_segment_days: int = 28,
         progression_line_style: str = "smooth",
         progression_line_smooth_strength: float = 1.0,
+        snapshot: Optional[Dict[int, Dict[str, Any]]] = None,
     ) -> None:
         super().__init__()
         self._games = games
@@ -113,6 +123,7 @@ class ChessLogAggregationWorker(QThread):
         self._compress_gap_max_segment_days = compress_gap_max_segment_days
         self._progression_line_style = progression_line_style
         self._progression_line_smooth_strength = progression_line_smooth_strength
+        self._snapshot = snapshot  # {id(game): paths_data} captured on the main thread
         self._cancelled = False
         self._mutex = QMutex()
 
@@ -125,11 +136,17 @@ class ChessLogAggregationWorker(QThread):
             if self._cancelled:
                 return
         try:
+            if self._snapshot is not None:
+                snap = self._snapshot
+                get_tags = lambda g: snap.get(id(g), {})  # noqa: E731
+            else:
+                get_tags = None
             result = aggregate(
                 self._games,
                 player=self._player,
                 color_filter=self._color_filter,
                 chart_cfg=self._chart_cfg,
+                get_tags_for_game=get_tags,
             )
         except Exception as exc:
             with QMutexLocker(self._mutex):
@@ -410,6 +427,7 @@ class ChessLogNarrativeThread(QThread):
         config: Optional[Dict[str, Any]],
         timeout_seconds: int = 60,
         token_limit: Optional[int] = None,
+        snapshot: Optional[Dict[int, Dict[str, Any]]] = None,
     ) -> None:
         super().__init__()
         self._games = games
@@ -422,6 +440,7 @@ class ChessLogNarrativeThread(QThread):
         self._config = config
         self._timeout_seconds = timeout_seconds
         self._token_limit = token_limit
+        self._snapshot = snapshot  # {id(game): paths_data} captured on the main thread
         self._cancelled = False
         self._mutex = QMutex()
 
@@ -434,6 +453,11 @@ class ChessLogNarrativeThread(QThread):
             with QMutexLocker(self._mutex):
                 if self._cancelled:
                     return
+            if self._snapshot is not None:
+                snap = self._snapshot
+                get_tags = lambda g: snap.get(id(g), {})  # noqa: E731
+            else:
+                get_tags = None
             narrative_result = generate_narrative(
                 games=self._games,
                 provider=self._provider,
@@ -445,6 +469,7 @@ class ChessLogNarrativeThread(QThread):
                 config=self._config,
                 timeout_seconds=self._timeout_seconds,
                 token_limit=self._token_limit,
+                get_tags_for_game=get_tags,
             )
             with QMutexLocker(self._mutex):
                 if self._cancelled:
@@ -821,6 +846,7 @@ class ChessLogChartsController(QObject):
             self.narrative_failed.emit("No games in scope.")
             return
         self._cancel_narrative_thread()
+        snapshot = self._snapshot_tags(games)
         thread = ChessLogNarrativeThread(
             games=games,
             provider=provider,
@@ -832,6 +858,7 @@ class ChessLogChartsController(QObject):
             config=self._config,
             timeout_seconds=self.get_narrative_timeout_seconds(),
             token_limit=self._narrative_token_limit,
+            snapshot=snapshot,
         )
         thread.narrative_ready.connect(self._on_narrative_thread_ready)
         thread.narrative_failed.connect(self._on_narrative_thread_failed)
@@ -975,17 +1002,30 @@ class ChessLogChartsController(QObject):
 
     def _refresh_dropdown_and_charts(self) -> None:
         games = self._resolve_games()
-        self._start_dropdown_worker(games)
-        self._schedule_charts_refresh(games=games)
+        snapshot = self._snapshot_tags(games)
+        self._start_dropdown_worker(games, snapshot=snapshot)
+        self._schedule_charts_refresh(games=games, snapshot=snapshot)
+
+    def _snapshot_tags(self, games: List[GameData]) -> Dict[int, Dict[str, Any]]:
+        """Capture a main-thread snapshot of tags for all games.
+
+        Called before starting background workers so they never read the
+        controller cache directly across threads.  Returns {id(game): paths_data}.
+        """
+        return {id(g): self.get_tags_for_game(g) for g in games}
 
     def _schedule_charts_refresh(
-        self, games: Optional[List[GameData]] = None
+        self,
+        games: Optional[List[GameData]] = None,
+        snapshot: Optional[Dict[int, Dict[str, Any]]] = None,
     ) -> None:
         if self._source_selection == 0:
             return
         self.charts_loading.emit()
         if games is None:
             games = self._resolve_games()
+        if snapshot is None:
+            snapshot = self._snapshot_tags(games)
         new_key = frozenset(id(g) for g in games)
         if self._last_game_set_key is not None and new_key != self._last_game_set_key:
             self._clear_result_cache()
@@ -1004,6 +1044,7 @@ class ChessLogChartsController(QObject):
             compress_gap_max_segment_days=self._compress_gap_max_segment_days,
             progression_line_style=self._progression_line_style,
             progression_line_smooth_strength=self._progression_line_smooth_strength,
+            snapshot=snapshot,
         )
         worker.charts_updated.connect(self.charts_updated)
         worker.charts_unavailable.connect(self.charts_unavailable)
@@ -1012,9 +1053,15 @@ class ChessLogChartsController(QObject):
         self._agg_worker = worker
         worker.start()
 
-    def _start_dropdown_worker(self, games: List[GameData]) -> None:
+    def _start_dropdown_worker(
+        self,
+        games: List[GameData],
+        snapshot: Optional[Dict[int, Dict[str, Any]]] = None,
+    ) -> None:
         self._cancel_dropdown_worker()
-        worker = ChessLogPlayerDropdownWorker(games=games)
+        if snapshot is None:
+            snapshot = self._snapshot_tags(games)
+        worker = ChessLogPlayerDropdownWorker(games=games, snapshot=snapshot)
         worker.players_ready.connect(self._on_players_ready)
         worker.finished.connect(self._on_dropdown_worker_finished)
         self._dropdown_worker = worker

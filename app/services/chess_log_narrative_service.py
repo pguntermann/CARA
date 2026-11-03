@@ -18,7 +18,7 @@ always returns an empty flags list for backward compatibility with callers.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from app.models.database_model import GameData
 from app.services.ai_service import AIService, TokenUsage
@@ -83,14 +83,20 @@ def build_prompt(
     player: str = "",
     color_filter: str = "both",
     config: Optional[Dict[str, Any]] = None,
+    get_tags_for_game: Optional[Callable] = None,
 ) -> str:
     """Assemble the LLM prompt from the given games.
 
     Args:
-        games:         Games to draw data from (already filtered to the desired scope).
-        player:        Player name for scoping (empty = all players).
-        color_filter:  "white" / "black" / "both".
-        config:        App config dict; must contain prompts.chess_log.* keys.
+        games:            Games to draw data from (already filtered to the desired scope).
+        player:           Player name for scoping (empty = all players).
+        color_filter:     "white" / "black" / "both".
+        config:           App config dict; must contain prompts.chess_log.* keys.
+        get_tags_for_game: When provided, called instead of
+                          ``ChessLogStorageService.load_resolved_paths`` to read
+                          moments for each game.  Pass a main-thread snapshot so
+                          the background worker never reads the controller cache
+                          directly across threads.
 
     Returns:
         Formatted prompt string ready to send as the user message.
@@ -117,8 +123,15 @@ def build_prompt(
         if not _game_matches_player_color(game, player_cf, color_filter):
             continue
 
-        if getattr(game, "has_chess_log_tags", False):
-            paths_data = ChessLogStorageService.load_resolved_paths(game)
+        has_tags = (
+            bool(get_tags_for_game(game)) if get_tags_for_game is not None
+            else getattr(game, "has_chess_log_tags", False)
+        )
+        if has_tags:
+            if get_tags_for_game is not None:
+                paths_data = get_tags_for_game(game)
+            else:
+                paths_data = ChessLogStorageService.load_resolved_paths(game)
             for entries in paths_data.values():
                 has_3x3_notes = any(
                     e.get("preset") == "3x3" and (e.get("why") or "").strip()
@@ -149,6 +162,7 @@ def build_prompt(
         player=player or "",
         color_filter=color_filter,
         chart_cfg={"target_progression_bins": 4, "min_games_per_ordinal_bin": 1},
+        get_tags_for_game=get_tags_for_game,
     ).series
 
     glossary_block = _format_glossary(preset_names, cl_prompts["narrative_glossaries"])
@@ -198,6 +212,7 @@ def generate_narrative(
     config: Optional[Dict[str, Any]] = None,
     timeout_seconds: int = 60,
     token_limit: Optional[int] = None,
+    get_tags_for_game: Optional[Callable] = None,
 ) -> NarrativeResult:
     """Generate a narrative summary from the given games.
 
@@ -212,17 +227,27 @@ def generate_narrative(
         config:             Optional config dict forwarded to AIService.
         timeout_seconds:    Request timeout passed to AIService.send_message.
         token_limit:        Max tokens passed to AIService.send_message (None = AIService default).
+        get_tags_for_game:  When provided, called instead of
+                            ``ChessLogStorageService.load_resolved_paths`` to read
+                            moments for each game.  Pass a main-thread snapshot.
 
     Returns:
         NarrativeResult with success, text, shallow_flags (always []), usage, and model.
         On failure: success=False, text=error_message.
     """
     player_cf = (player or "").casefold().strip()
-    has_data = any(
-        getattr(g, "has_chess_log_tags", False)
-        for g in games
-        if _game_matches_player_color(g, player_cf, color_filter)
-    )
+    if get_tags_for_game is not None:
+        has_data = any(
+            bool(get_tags_for_game(g))
+            for g in games
+            if _game_matches_player_color(g, player_cf, color_filter)
+        )
+    else:
+        has_data = any(
+            getattr(g, "has_chess_log_tags", False)
+            for g in games
+            if _game_matches_player_color(g, player_cf, color_filter)
+        )
     if not has_data:
         return NarrativeResult(
             success=False,
@@ -247,6 +272,7 @@ def generate_narrative(
         player=player,
         color_filter=color_filter,
         config=config,
+        get_tags_for_game=get_tags_for_game,
     )
 
     thinking = AIService.disable_thinking_for(model)

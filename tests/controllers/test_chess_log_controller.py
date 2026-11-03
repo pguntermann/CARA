@@ -234,6 +234,58 @@ class TestShouldConfirmExtraMoment(unittest.TestCase):
         mock_dlg.assert_not_called()
 
 
+class TestStep3ClearedGameLog(unittest.TestCase):
+    """Failing test for issue #85 Step 3: cleared game → log → moment invisible.
+
+    Root cause: add_moment_at_active_path never sets game.has_chess_log_tags = True,
+    so multi-game views (Show All Games, Log column, charts) remain blind to the new
+    moment.  For a cleared game the symptom is especially visible: the game WAS shown
+    (has_chess_log_tags was True after the last save), then immediately disappeared when
+    the user cleared (clear_tags wrote the PGN and set it False), and never came back
+    after the new log.
+    """
+
+    def test_has_chess_log_tags_synced_after_log_on_cleared_game(self):
+        game = make_game()
+        ctrl, gm = make_controller(game)
+        ctrl._cached_game_id = id(game)
+        gm.active_game = game
+
+        with patch("app.controllers.chess_log_controller.encode_path", return_value="0.0.0"):
+            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "M", "why": ""}])
+        ctrl.save_tags_for_current_game()
+        self.assertTrue(game.has_chess_log_tags, "precondition: saved moment sets True")
+
+        ctrl.clear_tags_for_current_game()
+        self.assertFalse(game.has_chess_log_tags, "pending clear sets False immediately")
+
+        with patch("app.controllers.chess_log_controller.encode_path", return_value="0.0"):
+            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "C", "why": "new"}])
+
+        self.assertTrue(
+            game.has_chess_log_tags,
+            "logging on a cleared game must set has_chess_log_tags=True "
+            "(multi-game views filter on this attribute)",
+        )
+
+    def test_has_chess_log_tags_synced_after_first_log_on_new_game(self):
+        """Addendum: same bug on a brand-new game (never had moments)."""
+        game = make_game()
+        ctrl, gm = make_controller(game)
+        ctrl._cached_game_id = id(game)
+        gm.active_game = game
+
+        self.assertFalse(game.has_chess_log_tags, "precondition: new game starts False")
+
+        with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
+            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "M", "why": ""}])
+
+        self.assertTrue(
+            game.has_chess_log_tags,
+            "first log on a new game must set has_chess_log_tags=True",
+        )
+
+
 class TestSaveAndClear(unittest.TestCase):
     def test_save_persists_to_pgn(self):
         game = make_game()
@@ -246,16 +298,27 @@ class TestSaveAndClear(unittest.TestCase):
         loaded = ChessLogStorageService.load_tags(game)
         self.assertEqual(ChessLogStorageService.count_tags(loaded), 1)
 
-    def test_clear_removes_from_pgn(self):
+    def test_clear_pending_clears_in_memory_and_syncs_has_tags(self):
+        """clear_tags_for_current_game is pending: empties cache and sets has_chess_log_tags=False
+        immediately, but does NOT write through to PGN until save."""
         game = make_game()
         ctrl, gm = make_controller(game)
         ctrl._cached_game_id = id(game)
+        gm.active_game = game
         with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
             ctrl.add_moment_at_active_path([{"preset": "CCT", "cat": "C", "why": ""}])
         ctrl.save_tags_for_current_game()
+        self.assertTrue(ChessLogStorageService.has_chess_log_tags(game))
         ctrl.clear_tags_for_current_game()
-        self.assertFalse(ChessLogStorageService.has_chess_log_tags(game))
+        # In-memory cache is empty immediately.
         self.assertEqual(ctrl._cached_paths_data, {})
+        # has_chess_log_tags Python attribute is synced immediately via _write_store.
+        self.assertFalse(game.has_chess_log_tags)
+        # PGN is NOT yet changed — save required to remove headers from disk.
+        self.assertTrue(ChessLogStorageService.has_chess_log_tags(game))
+        # After saving, PGN headers are removed.
+        ctrl.save_tags_for_current_game()
+        self.assertFalse(ChessLogStorageService.has_chess_log_tags(game))
 
     def test_metadata_updated_emitted_on_save(self):
         game = make_game()
@@ -271,29 +334,25 @@ class TestSaveAndClear(unittest.TestCase):
         ctrl.clear_tags_for_current_game()
         gm.metadata_updated.emit.assert_called_once()
 
-    def test_clear_removes_game_from_dirty_games(self):
-        """clear_tags_for_current_game must pop the game from _dirty_games so
-        save_all_dirty_games doesn't re-save it with empty data."""
+    def test_clear_marks_game_dirty(self):
+        """clear_tags_for_current_game is pending — it adds the game to _dirty_games
+        so save_all_dirty_games will remove the PGN headers."""
         game = make_game()
         ctrl, gm = make_controller(game)
         ctrl._cached_game_id = id(game)
         gm.active_game = game
-        # Simulate the game having been made dirty via ShowTagsDialog.
-        ctrl._dirty_games[id(game)] = game
         ctrl.clear_tags_for_current_game()
-        self.assertNotIn(id(game), ctrl._dirty_games)
+        self.assertIn(id(game), ctrl._dirty_games)
 
-    def test_clear_does_not_appear_in_subsequent_save_all_count(self):
-        """After clearing, save_all_dirty_games must not count the cleared game."""
+    def test_clear_appears_in_subsequent_save_all(self):
+        """After clearing, save_all_dirty_games saves the pending clear (removes PGN headers)."""
         game = make_game()
         ctrl, gm = make_controller(game)
         ctrl._cached_game_id = id(game)
         gm.active_game = game
-        # Make dirty, then clear.
-        ctrl._dirty_games[id(game)] = game
         ctrl.clear_tags_for_current_game()
         saved, failed = ctrl.save_all_dirty_games()
-        self.assertEqual(saved, 0)
+        self.assertEqual(saved, 1)
         self.assertEqual(failed, 0)
 
 
@@ -786,7 +845,8 @@ class TestSaveCurrentGameDirtyState(unittest.TestCase):
         self.assertFalse(ctrl.has_dirty_games())
 
     def test_clear_active_game_leaves_inactive_game_dirty(self):
-        """Clearing the active game must not disturb an inactive game's dirty state."""
+        """Clearing the active game must not disturb an inactive game's dirty state.
+        The cleared game itself becomes dirty (pending clear) while B stays dirty."""
         game_a = make_game(1)
         game_b = make_game(2)
         ctrl, gm = make_controller(game_a)
@@ -808,10 +868,10 @@ class TestSaveCurrentGameDirtyState(unittest.TestCase):
         ctrl._on_active_game_changed(game_a)
         ctrl.clear_tags_for_current_game()
 
-        # A is clean
-        self.assertNotIn(id(game_a), ctrl._dirty_games)
+        # A is now dirty (pending clear) with empty cache.
+        self.assertIn(id(game_a), ctrl._dirty_games)
         self.assertEqual(ctrl._cached_paths_data, {})
-        # B is still dirty with its tag intact
+        # B is still dirty with its tag intact.
         self.assertIn(id(game_b), ctrl._dirty_games)
         b_data = ctrl._multi_cache.get(id(game_b), {})
         self.assertIn("0", b_data)
@@ -844,9 +904,10 @@ class TestSaveCurrentGameDirtyState(unittest.TestCase):
         self.assertIn("0", loaded)
         self.assertIn("1", loaded)
 
-    def test_clear_writes_to_pgn_immediately(self):
-        """clear_tags_for_current_game writes through to the PGN at once;
-        switching away and back does NOT restore the pre-clear data from disk."""
+    def test_clear_pending_switch_reload_stays_empty(self):
+        """clear_tags_for_current_game is pending: syncs has_chess_log_tags immediately
+        but does NOT write through to PGN.  Switching away and back restores the
+        empty cache (from multi_cache, not disk), so the pending clear is preserved."""
         game_a = make_game(1)
         game_b = make_game(2)
         ctrl, gm = make_controller(game_a)
@@ -858,11 +919,13 @@ class TestSaveCurrentGameDirtyState(unittest.TestCase):
         ctrl.save_tags_for_current_game()
         self.assertTrue(ChessLogStorageService.has_chess_log_tags(game_a))
 
-        # Clear A — writes through to PGN immediately, no separate save needed
+        # Clear A — pending, syncs has_chess_log_tags but does NOT remove PGN headers yet
         ctrl.clear_tags_for_current_game()
-        self.assertFalse(ChessLogStorageService.has_chess_log_tags(game_a))
+        self.assertFalse(game_a.has_chess_log_tags)
+        # PGN headers still present — save needed to remove them
+        self.assertTrue(ChessLogStorageService.has_chess_log_tags(game_a))
 
-        # Switch away and back — reload from disk must still show empty
+        # Switch away and back — cache promoted from multi_cache (empty), not from disk
         gm.active_game = game_b
         ctrl._on_active_game_changed(game_b)
         gm.active_game = game_a
@@ -891,9 +954,9 @@ class TestSwitchAndSaveAllIntegration(unittest.TestCase):
         ctrl._cached_paths_data = {"0": [ChessLogStorageService.make_entry("CLAMP", "M")]}
         ctrl.save_tags_for_current_game()
 
-        # Clear A (writes through, removes from _dirty_games)
+        # Clear A (pending — adds to _dirty_games)
         ctrl.clear_tags_for_current_game()
-        self.assertFalse(ctrl.has_dirty_games())
+        self.assertTrue(ctrl.has_dirty_games())
 
         # Tag a fresh moment on A — only _cached_paths_data is touched
         with patch("app.controllers.chess_log_controller.encode_path", return_value="1"):
@@ -1295,18 +1358,11 @@ class TestDbSwitchPreservesDirtyEdits(unittest.TestCase):
         self.assertIn(id(game), ctrl._multi_cache)
         self.assertEqual(ctrl._multi_cache[id(game)], {})
 
-        captured = {}
-
-        def fake_store(game_, data, config, nag_shown=False, **_kwargs):
-            captured["data"] = dict(data)
-            return True
-
-        with patch("app.controllers.chess_log_controller.ChessLogStorageService.store_tags",
-                   side_effect=fake_store):
-            saved, failed = ctrl.save_all_dirty_games()
+        saved, failed = ctrl.save_all_dirty_games()
 
         self.assertEqual((saved, failed), (1, 0))
-        self.assertEqual(captured["data"], {})  # tag payload empty — no moments
+        # Empty-data save calls clear_tags (removes headers), not store_tags.
+        self.assertFalse(ChessLogStorageService.has_chess_log_tags(game))
 
     def test_db_switch_then_back_then_save_persists_edits(self):
         game_a = make_game(1)
@@ -1466,6 +1522,8 @@ class TestSaveOrphanGuard(unittest.TestCase):
         """save_tags_for_current_game must pass _cached_original_paths[gid] as
         original_paths= to store_tags so the orphan guard is active."""
         ctrl, gm, game = self._make_ctrl_with_game()
+        # Put a moment in the cache so save goes through store_tags (not clear_tags).
+        ctrl._cached_paths_data = {"0": [ChessLogStorageService.make_entry("CLAMP", "M")]}
         # Inject a recognisable sentinel snapshot so we can verify identity.
         sentinel = {"sentinel": [ChessLogStorageService.make_entry("CLAMP", "M")]}
         ctrl._cached_original_paths[id(game)] = sentinel
@@ -2553,6 +2611,189 @@ class TestLogThisMomentCheckHash(unittest.TestCase):
                     "check_hash", e,
                     "check_hash must not be present in fresh entry from add_moment_at_active_path",
                 )
+
+
+# ---------------------------------------------------------------------------
+# Issue #85 — end-to-end sequences
+# ---------------------------------------------------------------------------
+
+class TestIssue85EndToEnd(unittest.TestCase):
+    """End-to-end coverage for the two sequences described in issue #85.
+
+    Sequence 1: Log → (pending, don't save) → has_chess_log_tags True immediately;
+                aggregate() snapshot sees the moment; Save All persists.
+
+    Sequence 2: Log → Save → Clear → (pending) → has_chess_log_tags False immediately;
+                aggregate() snapshot sees empty; Log again → has_chess_log_tags True;
+                Save All persists only the new moment.
+    """
+
+    def _make_ctrl(self, game):
+        ctrl, gm = make_controller(game)
+        gm.active_game = game
+        ctrl._cached_game_id = id(game)
+        return ctrl, gm
+
+    def test_sequence_1_pending_log_visible_to_snapshot(self):
+        """Sequence 1: log without saving — has_chess_log_tags goes True immediately
+        and an aggregate() snapshot from the controller shows the moment."""
+        from app.services.chess_log_stats_service import aggregate
+
+        game = make_game()
+        game.white = "Alice"
+        game.black = "Bob"
+        game.date = "2026.08.24"
+        ctrl, gm = self._make_ctrl(game)
+
+        self.assertFalse(game.has_chess_log_tags, "precondition: new game starts False")
+
+        with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
+            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "M", "why": ""}])
+
+        self.assertTrue(game.has_chess_log_tags, "pending log must set has_chess_log_tags=True")
+
+        # Snapshot the controller (as a worker would) and pass to aggregate().
+        snapshot = {id(game): ctrl.get_tags_for_game(game)}
+        result = aggregate(
+            [game],
+            player="Alice",
+            color_filter="both",
+            get_tags_for_game=lambda g: snapshot.get(id(g), {}),
+        )
+        self.assertIn("CLAMP", result.series, "snapshot must expose the pending moment to aggregate()")
+        total = sum(b.total for b in result.series["CLAMP"].bins)
+        self.assertEqual(total, 1, "one moment in CLAMP series")
+
+        # Save All must persist the moment.
+        ctrl._dirty_games[id(game)] = game  # simulate Rule B flush on game-switch
+        saved, failed = ctrl.save_all_dirty_games()
+        self.assertEqual((saved, failed), (1, 0))
+        loaded = ChessLogStorageService.load_tags(game)
+        self.assertIn("0", loaded)
+
+    def test_sequence_2_clear_then_relog_visible_everywhere(self):
+        """Sequence 2: log → save → clear (pending) → relog → has_chess_log_tags
+        reflects every step; aggregate() snapshot sees the new moment, not the old one."""
+        from app.services.chess_log_stats_service import aggregate
+
+        game = make_game()
+        game.white = "Alice"
+        game.black = "Bob"
+        game.date = "2026.08.24"
+        ctrl, gm = self._make_ctrl(game)
+
+        # Log first moment and save.
+        with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
+            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "M", "why": "first"}])
+        ctrl.save_tags_for_current_game()
+        self.assertTrue(game.has_chess_log_tags, "after save: True")
+
+        # Clear (pending).
+        ctrl.clear_tags_for_current_game()
+        self.assertFalse(game.has_chess_log_tags, "pending clear must set False immediately")
+
+        # Snapshot at this point: should be empty.
+        snap_empty = {id(game): ctrl.get_tags_for_game(game)}
+        result_empty = aggregate(
+            [game],
+            player="Alice",
+            color_filter="both",
+            get_tags_for_game=lambda g: snap_empty.get(id(g), {}),
+        )
+        self.assertEqual(result_empty.series, {}, "snapshot after clear shows no moments")
+
+        # Log a new moment (still before saving the clear).
+        with patch("app.controllers.chess_log_controller.encode_path", return_value="1"):
+            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "C", "why": "second"}])
+        self.assertTrue(game.has_chess_log_tags, "re-logging after clear must set True again")
+
+        # Snapshot after re-log: should contain only the new moment.
+        snap_new = {id(game): ctrl.get_tags_for_game(game)}
+        result_new = aggregate(
+            [game],
+            player="Alice",
+            color_filter="both",
+            get_tags_for_game=lambda g: snap_new.get(id(g), {}),
+        )
+        self.assertIn("CLAMP", result_new.series)
+        clamp_entries = {
+            cat: cnt
+            for b in result_new.series["CLAMP"].bins
+            for cat, cnt in b.counts.items()
+        }
+        self.assertEqual(clamp_entries.get("C", 0), 1, "new moment C is in snapshot")
+        self.assertEqual(clamp_entries.get("M", 0), 0, "old moment M is NOT in snapshot")
+
+        # Save All: persists the pending state (clear + new moment).
+        ctrl._dirty_games[id(game)] = game
+        saved, failed = ctrl.save_all_dirty_games()
+        self.assertEqual((saved, failed), (1, 0))
+        loaded = ChessLogStorageService.load_tags(game)
+        self.assertNotIn("0", loaded, "cleared moment must not be in PGN")
+        self.assertIn("1", loaded, "new moment must be in PGN")
+        self.assertEqual(loaded["1"][0]["why"], "second")
+
+
+# ---------------------------------------------------------------------------
+# Structural test: only _write_store may update cached stores / has_chess_log_tags
+# ---------------------------------------------------------------------------
+
+class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
+    """Verify that the public edit methods route through _write_store.
+
+    _write_store is the single write-path that atomically updates the cache,
+    syncs game.has_chess_log_tags, and bumps the version counter.  Bypassing
+    it would leave those fields inconsistent.  This test instruments _write_store
+    to record every call and verifies that each edit method calls it exactly once.
+    """
+
+    def _make_ctrl(self, game):
+        ctrl, gm = make_controller(game)
+        gm.active_game = game
+        ctrl._cached_game_id = id(game)
+        return ctrl, gm
+
+    def _patched_ctrl(self, game):
+        ctrl, gm = self._make_ctrl(game)
+        calls = []
+        original_ws = ctrl._write_store
+
+        def recording_write_store(g, gid, new_data):
+            calls.append((g, gid, dict(new_data)))
+            original_ws(g, gid, new_data)
+
+        ctrl._write_store = recording_write_store
+        return ctrl, gm, calls
+
+    def test_add_moment_calls_write_store(self):
+        game = make_game()
+        ctrl, gm, calls = self._patched_ctrl(game)
+        with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
+            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "M", "why": ""}])
+        self.assertEqual(len(calls), 1, "add_moment_at_active_path must call _write_store once")
+
+    def test_clear_calls_write_store(self):
+        game = make_game()
+        ctrl, gm, calls = self._patched_ctrl(game)
+        ctrl.clear_tags_for_current_game()
+        self.assertEqual(len(calls), 1, "clear_tags_for_current_game must call _write_store once")
+        self.assertEqual(calls[0][2], {}, "_write_store called with empty data for clear")
+
+    def test_replace_entries_at_path_calls_write_store(self):
+        game = make_game()
+        ctrl, gm, calls = self._patched_ctrl(game)
+        ctrl.replace_entries_at_path(
+            "0", "CLAMP", [{"preset": "CLAMP", "cat": "M", "why": ""}]
+        )
+        self.assertEqual(len(calls), 1, "replace_entries_at_path must call _write_store once")
+
+    def test_replace_entries_at_path_for_game_calls_write_store(self):
+        game = make_game()
+        ctrl, gm, calls = self._patched_ctrl(game)
+        ctrl.replace_entries_at_path_for_game(
+            game, "0", "CLAMP", [{"preset": "CLAMP", "cat": "M", "why": ""}]
+        )
+        self.assertEqual(len(calls), 1, "replace_entries_at_path_for_game must call _write_store once")
 
 
 if __name__ == "__main__":

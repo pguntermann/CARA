@@ -155,30 +155,38 @@ class ChessLogController:
         path_key = encode_path(self._game_controller.get_game_model().get_active_path())
         tagged = [ChessLogStorageService.make_entry(e["preset"], e["cat"], e.get("why", "")) for e in entries]
         preset_of_new = tagged[0].get("preset") if tagged else None
-        if path_key in self._cached_paths_data:
+        new_data = dict(self._cached_paths_data)
+        if path_key in new_data:
             if preset_of_new:
-                kept = [e for e in self._cached_paths_data[path_key] if e.get("preset") != preset_of_new]
-                self._cached_paths_data[path_key] = kept + tagged
+                kept = [e for e in new_data[path_key] if e.get("preset") != preset_of_new]
+                new_data[path_key] = kept + tagged
             else:
-                self._cached_paths_data[path_key].extend(tagged)
+                new_data[path_key] = list(new_data[path_key]) + tagged
         else:
-            self._cached_paths_data[path_key] = tagged
-        self._cache_version_by_game[id(game)] = self._cache_version_by_game.get(id(game), 0) + 1
+            new_data[path_key] = tagged
+        self._write_store(game, id(game), new_data)
         return True
 
     def save_tags_for_current_game(self) -> bool:
-        """Persist the in-memory cache to the active game's PGN tag."""
+        """Persist the in-memory cache to the active game's PGN tag.
+
+        When the cache is empty (after a pending clear), calls clear_tags to
+        remove Chess Log headers rather than leaving an empty payload in the PGN.
+        """
         game = self._game_controller.get_game_model().active_game
         if game is None:
             return False
         gid = id(game)
         check_run = self._pending_check_runs.pop(gid, None)
-        ok = ChessLogStorageService.store_tags(
-            game, self._cached_paths_data, self.config,
-            nag_shown=self._nag_shown_by_game.get(self._cached_game_id, False),
-            original_paths=self._cached_original_paths.get(gid),
-            check_run=check_run,
-        )
+        if not self._cached_paths_data:
+            ok = ChessLogStorageService.clear_tags(game)
+        else:
+            ok = ChessLogStorageService.store_tags(
+                game, self._cached_paths_data, self.config,
+                nag_shown=self._nag_shown_by_game.get(self._cached_game_id, False),
+                original_paths=self._cached_original_paths.get(gid),
+                check_run=check_run,
+            )
         if ok:
             self._dirty_games.pop(gid, None)
             # Refresh the snapshot from disk — NOT from the paths_data we passed
@@ -191,23 +199,21 @@ class ChessLogController:
         return ok
 
     def clear_tags_for_current_game(self) -> bool:
-        """Clear all moments for the active game (in-memory; needs save to persist)."""
+        """Mark all moments for the active game as cleared (pending — save to persist).
+
+        Does NOT write the PGN immediately.  Call save_tags_for_current_game() or
+        save_all_dirty_games() to persist.  Consistent with add_moment_at_active_path.
+        """
         game = self._game_controller.get_game_model().active_game
         if game is None:
             return False
-        self._cached_paths_data = {}
-        ok = ChessLogStorageService.clear_tags(game)
-        if ok:
-            # clear_tags writes the final state immediately, so nothing is left to
-            # save for this game — remove it from _dirty_games to prevent
-            # save_all_dirty_games from saving it again with empty data.
-            self._dirty_games.pop(id(game), None)
-            # On-disk tag is gone; refresh the snapshot to match.
-            self._cached_original_paths[id(game)] = {}
-            self._cache_version_by_game[id(game)] = self._cache_version_by_game.get(id(game), 0) + 1
-            self._game_controller.get_game_model().metadata_updated.emit()
-            self._mark_database_unsaved(game)
-        return ok
+        gid = id(game)
+        self._write_store(game, gid, {})
+        self._dirty_games[gid] = game
+        self._cached_original_paths[gid] = self._cached_original_paths.get(gid, {})
+        self._game_controller.get_game_model().metadata_updated.emit()
+        self._mark_database_unsaved(game)
+        return True
 
     def game_has_any_tags(self) -> bool:
         """Return True if the current game has any tagged entries across any preset."""
@@ -239,18 +245,18 @@ class ChessLogController:
             )
             for e in entries
         ]
-        if path_key in self._cached_paths_data:
-            kept = [e for e in self._cached_paths_data[path_key] if e.get("preset") != preset]
+        new_data = dict(self._cached_paths_data)
+        if path_key in new_data:
+            kept = [e for e in new_data[path_key] if e.get("preset") != preset]
             merged = kept + tagged
             if merged:
-                self._cached_paths_data[path_key] = merged
+                new_data[path_key] = merged
             else:
-                del self._cached_paths_data[path_key]
+                del new_data[path_key]
         elif tagged:
-            self._cached_paths_data[path_key] = tagged
+            new_data[path_key] = tagged
         if self._cached_game is not None:
-            gid = id(self._cached_game)
-            self._cache_version_by_game[gid] = self._cache_version_by_game.get(gid, 0) + 1
+            self._write_store(self._cached_game, id(self._cached_game), new_data)
 
     def get_tags_for_game(self, game) -> Dict[str, List[Dict[str, Any]]]:
         """Return moments for any game (orphan-filtered copy).
@@ -297,26 +303,27 @@ class ChessLogController:
             for e in entries
         ]
         if gid == self._cached_game_id:
-            data = self._cached_paths_data
+            base = self._cached_paths_data
         else:
             if gid not in self._multi_cache:
                 loaded = ChessLogStorageService.load_tags(game)
                 self._multi_cache[gid] = loaded
                 self._cached_original_paths[gid] = dict(loaded)
-            data = self._multi_cache[gid]
+            base = self._multi_cache[gid]
 
-        if path_key in data:
-            kept = [e for e in data[path_key] if e.get("preset") != preset]
+        new_data = dict(base)
+        if path_key in new_data:
+            kept = [e for e in new_data[path_key] if e.get("preset") != preset]
             merged = kept + tagged
             if merged:
-                data[path_key] = merged
+                new_data[path_key] = merged
             else:
-                del data[path_key]
+                del new_data[path_key]
         elif tagged:
-            data[path_key] = tagged
+            new_data[path_key] = tagged
 
+        self._write_store(game, gid, new_data)
         self._dirty_games[gid] = game
-        self._cache_version_by_game[gid] = self._cache_version_by_game.get(gid, 0) + 1
 
     def save_games(self, games: Iterable) -> Tuple[int, int]:
         """Persist the given games' Chess Log data and mark each DB unsaved.
@@ -478,12 +485,15 @@ class ChessLogController:
         # When present, store_tags writes the new run info; when absent (None),
         # store_tags auto-preserves whatever _check_run is already in the PGN.
         check_run = self._pending_check_runs.pop(gid, None)
-        ok = ChessLogStorageService.store_tags(
-            game, data, self.config,
-            nag_shown=self._nag_shown_by_game.get(gid, False),
-            original_paths=self._cached_original_paths.get(gid),
-            check_run=check_run,
-        )
+        if not data:
+            ok = ChessLogStorageService.clear_tags(game)
+        else:
+            ok = ChessLogStorageService.store_tags(
+                game, data, self.config,
+                nag_shown=self._nag_shown_by_game.get(gid, False),
+                original_paths=self._cached_original_paths.get(gid),
+                check_run=check_run,
+            )
         if ok:
             self._cached_original_paths[gid] = ChessLogStorageService.load_tags(game)
             self._cache_version_by_game[gid] = self._cache_version_by_game.get(gid, 0) + 1
@@ -690,6 +700,46 @@ class ChessLogController:
             db_model = self._database_controller.find_database_model_for_game(game)
             if db_model:
                 self._database_controller.mark_database_unsaved(db_model)
+        except Exception:
+            pass
+
+    def _write_store(
+        self,
+        game,
+        gid: int,
+        new_data: Dict[str, List[Dict[str, Any]]],
+    ) -> None:
+        """Update a game's Chess Log store in-memory and sync all dependent state.
+
+        This is the ONLY method that may write _cached_paths_data, _multi_cache[gid],
+        or game.has_chess_log_tags for user-visible operations (Log, Clear, Edit).
+        Bumps the version counter and emits dataChanged on the Log column when the
+        has_chess_log_tags flag transitions.
+        """
+        old_has = getattr(game, "has_chess_log_tags", False)
+        if gid == self._cached_game_id:
+            self._cached_paths_data = dict(new_data)
+        else:
+            self._multi_cache[gid] = dict(new_data)
+        game.has_chess_log_tags = ChessLogStorageService.count_tags(new_data) > 0
+        self._cache_version_by_game[gid] = self._cache_version_by_game.get(gid, 0) + 1
+        if old_has != game.has_chess_log_tags:
+            self._notify_database_row_changed(game)
+
+    def _notify_database_row_changed(self, game) -> None:
+        """Emit dataChanged for the game's Log column in the database panel."""
+        if self._database_controller is None:
+            return
+        try:
+            from PyQt6.QtCore import Qt
+            db_model = self._database_controller.find_database_model_for_game(game)
+            if db_model is None:
+                return
+            row = db_model.find_game(game)
+            if row is None:
+                return
+            idx = db_model.index(row, db_model.COL_LOG)
+            db_model.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole])
         except Exception:
             pass
 
