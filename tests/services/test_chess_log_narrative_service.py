@@ -92,7 +92,7 @@ class TestBuildPromptCategoryCounts(unittest.TestCase):
         game = _make_game(entries_per_path={
             "0": [_clamp("C"), _clamp("L"), _clamp("C")],
         })
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("CLAMP", prompt)
         # New format: percentages, not raw "C:N" counts
         self.assertIn("%", prompt)
@@ -102,7 +102,7 @@ class TestBuildPromptCategoryCounts(unittest.TestCase):
 
     def test_uncategorized_labelled_in_prompt(self):
         game = _make_game(entries_per_path={"0": [_clamp("")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("uncategorized", prompt.lower())
 
     def test_multiple_presets_both_in_prompt(self):
@@ -110,13 +110,13 @@ class TestBuildPromptCategoryCounts(unittest.TestCase):
             "0": [_clamp("M")],
             "0.0": [_cct("Checks")],
         })
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("CLAMP", prompt)
         self.assertIn("CCT", prompt)
 
     def test_no_moments_produces_no_moments_placeholder(self):
         game = _make_game()  # no tags
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("no moments tagged", prompt)
 
 
@@ -130,12 +130,12 @@ class TestBuildPromptWhyNotes(unittest.TestCase):
         game = _make_game(entries_per_path={
             "0": [_clamp("C", "I rushed without checking the whole board")],
         })
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("rushed without checking", prompt)
 
     def test_empty_why_not_in_prompt(self):
         game = _make_game(entries_per_path={"0": [_clamp("C", "")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertNotIn("C/uncategorized", prompt)
         # No why-notes section body (only the placeholder)
         self.assertIn("no notes written", prompt)
@@ -144,7 +144,7 @@ class TestBuildPromptWhyNotes(unittest.TestCase):
         game = _make_game(entries_per_path={
             "0": [_clamp("L", "I miscounted the tempo")],
         })
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("CLAMP/L", prompt)
 
 
@@ -156,12 +156,12 @@ class TestBuildPromptGameNotes(unittest.TestCase):
 
     def test_game_note_present_in_prompt(self):
         game = _make_game(notes="Played aggressively but missed the counterplay.")
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("aggressively", prompt)
 
     def test_no_game_notes_shows_placeholder(self):
         game = _make_game()
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("no whole-game notes", prompt)
 
 
@@ -176,7 +176,7 @@ class TestBuildPromptPlayerFilter(unittest.TestCase):
                         entries_per_path={"0": [_clamp("C", "note from alice")]})
         g2 = _make_game(white="Carlos", black="Dave",
                         entries_per_path={"0": [_clamp("L", "note from carlos")]})
-        prompt = build_prompt([g1, g2], player="Alice", config=_CONFIG)
+        prompt = build_prompt([g1, g2], player="Alice", config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("note from alice", prompt)
         self.assertNotIn("note from carlos", prompt)
 
@@ -185,7 +185,7 @@ class TestBuildPromptPlayerFilter(unittest.TestCase):
                         entries_per_path={"0": [_clamp("C", "alice note")]})
         g2 = _make_game(white="Carlos", black="Dave",
                         entries_per_path={"0": [_clamp("L", "carlos note")]})
-        prompt = build_prompt([g1, g2], player="", config=_CONFIG)
+        prompt = build_prompt([g1, g2], player="", config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("alice note", prompt)
         self.assertIn("carlos note", prompt)
 
@@ -198,7 +198,7 @@ class TestBuildPromptGlossary(unittest.TestCase):
 
     def test_clamp_glossary_emitted_when_clamp_data_present(self):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("Checks", prompt)
         self.assertIn("Loose Pieces and Squares", prompt)
         self.assertIn("Alignments", prompt)
@@ -208,19 +208,19 @@ class TestBuildPromptGlossary(unittest.TestCase):
     def test_clamp_glossary_uses_verbatim_source_text(self):
         # Guards against future paraphrase drift by pinning distinctive phrases
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("knight's reach", prompt)
         self.assertIn("handing them one", prompt)
         self.assertIn("boxed in by their candidate move", prompt)
 
     def test_no_glossary_when_no_data(self):
         game = _make_game()  # no tags → no preset in data
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertNotIn("## Glossary", prompt)
 
     def test_glossary_only_for_presets_in_data(self):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("## Glossary — CLAMP", prompt)
         self.assertNotIn("## Glossary — CCT", prompt)
         self.assertNotIn("## Glossary — 3x3", prompt)
@@ -252,7 +252,7 @@ class TestBuildPromptTrendCounts(unittest.TestCase):
             _make_game(date=d, entries_per_path={"0": [_clamp(cat)]})
             for d, cat in dates_and_cats
         ]
-        prompt = build_prompt(games, config=_CONFIG)
+        prompt = build_prompt(games, config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         # Multiple "N moments)" occurrences confirm trend structure, not flat totals
         self.assertGreaterEqual(prompt.count("moments)"), 2)
         # "Bin 1", "Bin 2", etc. must not appear — periods use calendar labels.
@@ -267,7 +267,7 @@ class TestBuildPromptTrendCounts(unittest.TestCase):
         # PGN "????.??.??" → _game_date_ordinal_for_trends returns None
         # → aggregate skips the game → series_map empty → fallback to flat counts
         game = _make_game(date="????.??.??", entries_per_path={"0": [_clamp("C")]})
-        prompt = build_prompt([game], config=_CONFIG)  # must not raise
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)  # must not raise
         self.assertIn("trend data unavailable", prompt)
         self.assertIn("CLAMP", prompt)
 
@@ -280,12 +280,12 @@ class TestBuildPromptNoteNormalization(unittest.TestCase):
 
     def test_note_normalization_instruction_present(self):
         game = _make_game(notes="Played aggressively but missed the counterplay.")
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("illustrative color only", prompt)
 
     def test_note_normalization_precedes_whole_game_notes_section(self):
         game = _make_game(notes="Some game note.")
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         norm_idx = prompt.lower().find("illustrative color only")
         notes_idx = prompt.find("## Whole-game notes")
         self.assertGreater(notes_idx, norm_idx,
@@ -350,7 +350,7 @@ class TestSystemPromptInstructions(unittest.TestCase):
             _make_game(date=d, entries_per_path={"0": [_clamp(cat)]})
             for d, cat in dates_and_cats
         ]
-        prompt = build_prompt(games, config=_CONFIG)
+        prompt = build_prompt(games, config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertNotIn("Bin 1", prompt)
         self.assertNotIn("Bin 2", prompt)
         # Real month names are present
@@ -366,7 +366,7 @@ class TestBuildPromptNarrativeInstruction(unittest.TestCase):
 
     def test_narrative_step_asks_for_three_sections_in_order(self):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("## Patterns & Recurrent Themes", prompt)
         self.assertIn("## Tactical Breakdown", prompt)
         self.assertIn("## Key Takeaways", prompt)
@@ -443,6 +443,7 @@ class TestGenerateNarrative(unittest.TestCase):
             api_key="sk-test",
             base_url_override=None,
             config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
 
         self.assertTrue(result.success)
@@ -463,6 +464,7 @@ class TestGenerateNarrative(unittest.TestCase):
             api_key="sk-test",
             base_url_override=None,
             config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
 
         self.assertFalse(result.success)
@@ -482,6 +484,7 @@ class TestGenerateNarrative(unittest.TestCase):
             api_key="sk-test",
             base_url_override=None,
             config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
 
         call_args = mock_service.send_message.call_args
@@ -502,6 +505,7 @@ class TestGenerateNarrative(unittest.TestCase):
             api_key="sk-test",
             base_url_override=None,
             config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
 
         call_args = mock_service.send_message.call_args
@@ -522,6 +526,7 @@ class TestGenerateNarrative(unittest.TestCase):
             api_key="",
             base_url_override="http://localhost:11434",
             config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
 
         call_args = mock_service.send_message.call_args
@@ -536,6 +541,7 @@ class TestGenerateNarrative(unittest.TestCase):
             api_key="sk-test",
             base_url_override=None,
             config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
         self.assertFalse(result.success)
         self.assertIn("No Chess Log data", result.text)
@@ -555,6 +561,7 @@ class TestGenerateNarrative(unittest.TestCase):
             base_url_override=None,
             timeout_seconds=120,
             config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
 
         call_kwargs = mock_service.send_message.call_args[1]
@@ -574,6 +581,7 @@ class TestGenerateNarrative(unittest.TestCase):
             base_url_override=None,
             token_limit=4000,
             config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
 
         call_kwargs = mock_service.send_message.call_args[1]
@@ -688,7 +696,7 @@ class TestFormatTrendCounts(unittest.TestCase):
 
     def test_calendar_label_instruction_in_prompt(self):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn('"Bin N"', prompt)
         self.assertIn("never", prompt.lower())
 
@@ -711,7 +719,7 @@ class TestBuildPromptNoCap(unittest.TestCase):
         # All must appear in the assembled prompt.
         entries = [_clamp("C", f"unique why note index {i}") for i in range(50)]
         game = _make_game(entries_per_path={"0": entries})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         for i in range(50):
             self.assertIn(f"unique why note index {i}", prompt,
                           msg=f"Note {i} missing — input cap may still be active")
@@ -727,7 +735,7 @@ class TestBuildPromptNoCap(unittest.TestCase):
             )
             for i in range(12)
         ]
-        prompt = build_prompt(games, config=_CONFIG)
+        prompt = build_prompt(games, config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         for i in range(12):
             self.assertIn(f"game level note index {i}", prompt,
                           msg=f"Game note {i} missing — input cap may still be active")
@@ -841,6 +849,7 @@ class TestGenerateNarrativeThinkingGating(unittest.TestCase):
                 api_key="sk-test",
                 base_url_override=None,
                 config=_CONFIG,
+                get_tags_for_game=ChessLogStorageService.load_resolved_paths,
             )
         return captured.get("thinking")
 
@@ -873,27 +882,27 @@ class TestCCTGlossary(unittest.TestCase):
 
     def test_cct_glossary_appears_when_cct_data_present(self):
         game = _make_game(entries_per_path={"0": [_cct("Checks")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("## Glossary — CCT", prompt)
 
     def test_cct_glossary_threats_definition_verbatim(self):
         game = _make_game(entries_per_path={"0": [_cct("Threats")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("forces the opponent to respond defensively on their very next turn", prompt)
 
     def test_cct_glossary_checks_wording(self):
         game = _make_game(entries_per_path={"0": [_cct("Checks")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("C — Checks: A checking move", prompt)
 
     def test_cct_glossary_captures_wording(self):
         game = _make_game(entries_per_path={"0": [_cct("Captures")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("C — Captures: A piece or square left undefended", prompt)
 
     def test_cct_glossary_absent_when_no_cct_data(self):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertNotIn("## Glossary — CCT", prompt)
 
 
@@ -905,12 +914,12 @@ class Test3x3StructureBlock(unittest.TestCase):
 
     def test_3x3_block_appears_when_3x3_data_present(self):
         game = _make_game(entries_per_path={"0": [_threex("Why1", "I saw a threat")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("## Why-note structure — 3x3", prompt)
 
     def test_3x3_block_contains_exact_studer_questions(self):
         game = _make_game(entries_per_path={"0": [_threex("Why1", "text")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("1. Why did I choose that move?", prompt)
         self.assertIn("2. Why is my move not ideal?", prompt)
         self.assertIn("3. Why is the better move better than my chosen move?", prompt)
@@ -918,7 +927,7 @@ class Test3x3StructureBlock(unittest.TestCase):
 
     def test_3x3_block_questions_in_order(self):
         game = _make_game(entries_per_path={"0": [_threex("Why2", "text")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         idx1 = prompt.find("1. Why did I choose that move?")
         idx2 = prompt.find("2. Why is my move not ideal?")
         idx3 = prompt.find("3. Why is the better move better than my chosen move?")
@@ -929,12 +938,12 @@ class Test3x3StructureBlock(unittest.TestCase):
 
     def test_3x3_block_studer_attribution_present(self):
         game = _make_game(entries_per_path={"0": [_threex("Why3", "text")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("GM Noel Studer", prompt)
 
     def test_3x3_block_absent_when_no_3x3_data(self):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertNotIn("## Why-note structure — 3x3", prompt)
 
     def test_3x3_structure_block_constant_matches_questions(self):
@@ -973,7 +982,7 @@ class Test3x3NarrativePromptBuilding(unittest.TestCase):
                 _threex("Why4", "I will slow down and check for pins"),
             ],
         })
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         # Structure block present
         self.assertIn("## Why-note structure — 3x3", prompt)
         # All four answers flow through _format_why_notes
@@ -991,7 +1000,7 @@ class Test3x3NarrativePromptBuilding(unittest.TestCase):
             entries_per_path={"0": [_threex("Why1", "I rushed the attack")]},
             notes="Overall I played too fast in the middlegame.",
         )
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("Overall I played too fast in the middlegame.", prompt)
 
 
@@ -1075,6 +1084,7 @@ class TestNarrativeMissingConfig(unittest.TestCase):
             api_key="sk-test",
             base_url_override=None,
             config={},
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
         self.assertFalse(result.success)
         self.assertIn("config.json", result.text)
@@ -1088,6 +1098,7 @@ class TestNarrativeMissingConfig(unittest.TestCase):
             api_key="sk-test",
             base_url_override=None,
             config=None,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
         )
         self.assertFalse(result.success)
         self.assertIn("config.json", result.text)
@@ -1201,7 +1212,7 @@ class TestBuildPromptExcludesOrphans(unittest.TestCase):
                 "99999": [_clamp("M", "ghost note")],   # orphan
             },
         )
-        prompt = build_prompt([game], config=_CONFIG)
+        prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("real note", prompt)
         self.assertNotIn("ghost note", prompt)
 

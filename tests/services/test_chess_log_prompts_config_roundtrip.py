@@ -1,6 +1,6 @@
 """Golden-fixture tests for Chess Log prompt assembly.
 
-Captures the EXACT text produced by build_prompt() and the classifier
+Captures the EXACT text produced by build_prompt(get_tags_for_game=ChessLogStorageService.load_resolved_paths) and the classifier
 prompt builder before any production strings move to config.json.  When
 config.json gets the prompts in commit 6, these fixtures are the acceptance
 gate: assembled prompts must be byte-identical before and after the move.
@@ -214,7 +214,7 @@ class TestFullPromptClampOnly(unittest.TestCase):
 
     def test_full_prompt(self):
         games = self._make_games()
-        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG)
+        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         _assert_or_write("full_prompt_clamp_only", prompt)
 
 
@@ -246,7 +246,7 @@ class TestFullPromptCctOnly(unittest.TestCase):
 
     def test_full_prompt(self):
         games = self._make_games()
-        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG)
+        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         _assert_or_write("full_prompt_cct_only", prompt)
 
 
@@ -294,7 +294,7 @@ class TestFullPrompt3x3AllWhys(unittest.TestCase):
 
     def test_full_prompt(self):
         games = self._make_games()
-        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG)
+        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         _assert_or_write("full_prompt_3x3_all_whys", prompt)
 
 
@@ -326,7 +326,7 @@ class TestFullPrompt3x3BlankWhy2Why3(unittest.TestCase):
 
     def test_full_prompt(self):
         games = self._make_games()
-        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG)
+        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         _assert_or_write("full_prompt_3x3_blank_why2_why3", prompt)
 
 
@@ -359,7 +359,7 @@ class TestFullPromptWithGameNotes(unittest.TestCase):
 
     def test_full_prompt(self):
         games = self._make_games()
-        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG)
+        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         _assert_or_write("full_prompt_with_game_notes", prompt)
 
 
@@ -395,7 +395,7 @@ class TestFullPromptMixedPresets(unittest.TestCase):
 
     def test_full_prompt(self):
         games = self._make_games()
-        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG)
+        prompt = build_prompt(games, player="Alice", color_filter="white", config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         _assert_or_write("full_prompt_mixed_presets", prompt)
 
 

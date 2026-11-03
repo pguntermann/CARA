@@ -2623,8 +2623,10 @@ class TestChessLogAggregationWorkerReasonCodes(unittest.TestCase):
         from PyQt6.QtCore import QEventLoop
         reasons = []
         skipped = []
+        snapshot = {id(g): ChessLogStorageService.load_resolved_paths(g) for g in games}
         worker = ChessLogAggregationWorker(
-            games=games, player=player, color_filter="both", chart_cfg={}
+            games=games, player=player, color_filter="both", chart_cfg={},
+            snapshot=snapshot,
         )
         worker.charts_unavailable.connect(reasons.append)
         worker.charts_skipped.connect(skipped.append)
@@ -2667,8 +2669,11 @@ class TestChessLogAggregationWorkerReasonCodes(unittest.TestCase):
         from PyQt6.QtCore import QEventLoop
         updated = []
         skipped = []
+        games = [self._dated_clamp_game()]
+        snapshot = {id(g): ChessLogStorageService.load_resolved_paths(g) for g in games}
         worker = ChessLogAggregationWorker(
-            games=[self._dated_clamp_game()], player="Alice", color_filter="both", chart_cfg={}
+            games=games, player="Alice", color_filter="both", chart_cfg={},
+            snapshot=snapshot,
         )
         worker.charts_updated.connect(updated.append)
         worker.charts_skipped.connect(skipped.append)
@@ -2683,8 +2688,10 @@ class TestChessLogAggregationWorkerReasonCodes(unittest.TestCase):
         from PyQt6.QtCore import QEventLoop
         skipped = []
         games = [self._dated_clamp_game(), self._undated_clamp_game(), self._undated_clamp_game()]
+        snapshot = {id(g): ChessLogStorageService.load_resolved_paths(g) for g in games}
         worker = ChessLogAggregationWorker(
-            games=games, player="Alice", color_filter="both", chart_cfg={}
+            games=games, player="Alice", color_filter="both", chart_cfg={},
+            snapshot=snapshot,
         )
         worker.charts_skipped.connect(skipped.append)
         loop = QEventLoop()

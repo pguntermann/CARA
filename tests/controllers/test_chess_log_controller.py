@@ -1939,8 +1939,12 @@ class TestSaveModel(unittest.TestCase):
         self.assertIn("moment edit", all_whys)
         self.assertIn("dialog edit", all_whys)
 
-    def test_clear_tags_marks_db_unsaved(self):
-        """Plan test 8: clear_tags_for_current_game still marks DB unsaved."""
+    def test_clear_tags_does_not_mark_db_unsaved(self):
+        """Plan test 8: clear_tags_for_current_game is pending — does NOT mark DB unsaved.
+
+        Consistent with add_moment_at_active_path: neither pending op marks the DB
+        unsaved. _mark_database_unsaved fires only on the subsequent save.
+        """
         game = make_game()
         ctrl, gm, dc, db_model = self._make_controller_with_db(game)
         gm.active_game = game
@@ -1954,7 +1958,7 @@ class TestSaveModel(unittest.TestCase):
 
         ctrl.clear_tags_for_current_game()
 
-        dc.mark_database_unsaved.assert_called_once_with(db_model)
+        dc.mark_database_unsaved.assert_not_called()
 
 
 class TestF2RuleBFalseUnsaved(unittest.TestCase):
@@ -2665,7 +2669,6 @@ class TestIssue85EndToEnd(unittest.TestCase):
         self.assertEqual(total, 1, "one moment in CLAMP series")
 
         # Save All must persist the moment.
-        ctrl._dirty_games[id(game)] = game  # simulate Rule B flush on game-switch
         saved, failed = ctrl.save_all_dirty_games()
         self.assertEqual((saved, failed), (1, 0))
         loaded = ChessLogStorageService.load_tags(game)
@@ -2725,7 +2728,6 @@ class TestIssue85EndToEnd(unittest.TestCase):
         self.assertEqual(clamp_entries.get("M", 0), 0, "old moment M is NOT in snapshot")
 
         # Save All: persists the pending state (clear + new moment).
-        ctrl._dirty_games[id(game)] = game
         saved, failed = ctrl.save_all_dirty_games()
         self.assertEqual((saved, failed), (1, 0))
         loaded = ChessLogStorageService.load_tags(game)
@@ -2739,61 +2741,177 @@ class TestIssue85EndToEnd(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
-    """Verify that the public edit methods route through _write_store.
+    """Source-level guard: no code in app/ bypasses the _write_store contract.
 
-    _write_store is the single write-path that atomically updates the cache,
-    syncs game.has_chess_log_tags, and bumps the version counter.  Bypassing
-    it would leave those fields inconsistent.  This test instruments _write_store
-    to record every call and verifies that each edit method calls it exactly once.
+    Scans app/**/*.py and asserts that restricted patterns appear only in
+    their allowlisted files.  A test failure means a new caller was added
+    outside the allowlist — either update the allowlist with justification
+    or route through the approved path.
+
+    Allowlist:
+      store_tags / clear_tags  — only chess_log_controller.py (save methods)
+                                 and chess_log_storage_service.py (definitions)
+      game.has_chess_log_tags= — only chess_log_controller.py (_write_store)
+                                 and chess_log_storage_service.py (load/store/clear)
     """
 
-    def _make_ctrl(self, game):
-        ctrl, gm = make_controller(game)
+    # Patterns and the file-name suffixes that may contain them.
+    _RULES = [
+        (
+            r"ChessLogStorageService\.(store_tags|clear_tags)\s*\(",
+            ["chess_log_controller.py", "chess_log_storage_service.py"],
+            "ChessLogStorageService.store_tags / clear_tags called outside allowlist",
+        ),
+        (
+            r"\bgame\.has_chess_log_tags\s*=",
+            ["chess_log_controller.py", "chess_log_storage_service.py"],
+            "game.has_chess_log_tags assigned outside allowlist",
+        ),
+    ]
+
+    @classmethod
+    def _app_py_files(cls):
+        import glob
+        app_dir = _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))), "app"
+        )
+        return sorted(glob.glob(_os.path.join(app_dir, "**", "*.py"), recursive=True))
+
+    def _violations(self, pattern, allowed_suffixes):
+        import re
+        hits = []
+        for path in self._app_py_files():
+            if any(path.endswith(s) for s in allowed_suffixes):
+                continue
+            with open(path, encoding="utf-8") as fh:
+                for lineno, line in enumerate(fh, 1):
+                    if re.search(pattern, line) and not line.lstrip().startswith("#"):
+                        hits.append((path, lineno, line.rstrip()))
+        return hits
+
+    def test_store_and_clear_tags_only_in_allowlist(self):
+        pattern, allowed, msg = self._RULES[0]
+        violations = self._violations(pattern, allowed)
+        if violations:
+            detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
+            self.fail(f"{msg}:\n{detail}")
+
+    def test_has_chess_log_tags_assignment_only_in_allowlist(self):
+        pattern, allowed, msg = self._RULES[1]
+        violations = self._violations(pattern, allowed)
+        if violations:
+            detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
+            self.fail(f"{msg}:\n{detail}")
+
+
+# ---------------------------------------------------------------------------
+# Integration test: Log column in a real DatabaseModel reflects pending state
+# ---------------------------------------------------------------------------
+
+import os as _os
+import sys as _sys
+import subprocess as _subprocess
+
+_os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+def _qt_available() -> bool:
+    probe = (
+        "import os; os.environ.setdefault('QT_QPA_PLATFORM','offscreen'); "
+        "from PyQt6.QtWidgets import QApplication; a = QApplication([]); print('ok')"
+    )
+    try:
+        result = _subprocess.run(
+            [_sys.executable, "-c", probe],
+            capture_output=True, timeout=10,
+            cwd=_os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+        )
+        return result.returncode == 0 and b"ok" in result.stdout
+    except Exception:
+        return False
+
+
+_QT_OK = _qt_available()
+
+
+@unittest.skipUnless(_QT_OK, "Qt not available in this environment")
+class TestLogColumnRealDatabaseModel(unittest.TestCase):
+    """Prove the Log column reflects pending Log and pending Clear without a save.
+
+    Uses a real DatabaseModel so the full chain is exercised:
+        _write_store → game.has_chess_log_tags → DatabaseModel.data(COL_LOG)
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from PyQt6.QtWidgets import QApplication
+        cls._app = QApplication.instance() or QApplication(_sys.argv)
+        from app.models.database_model import DatabaseModel
+        cls.DatabaseModel = DatabaseModel
+
+    def _make_ctrl_with_real_db(self, game):
+        db_model = self.DatabaseModel()
+        db_model.add_game(game, mark_unsaved=False, tags=[])
+
+        pm = MagicMock()
+        pm.active_database_changed = MagicMock()
+        pm.active_database_changed.connect = MagicMock()
+        pm.active_database_changed.disconnect = MagicMock()
+
+        dc = MagicMock()
+        dc.find_database_model_for_game.return_value = db_model
+        dc.get_panel_model.return_value = pm
+
+        gm = make_game_model_mock(game)
         gm.active_game = game
+        gc = make_game_controller_mock(gm)
+
+        ctrl = ChessLogController({}, gc, database_controller=dc)
         ctrl._cached_game_id = id(game)
-        return ctrl, gm
+        return ctrl, gm, db_model
 
-    def _patched_ctrl(self, game):
-        ctrl, gm = self._make_ctrl(game)
-        calls = []
-        original_ws = ctrl._write_store
+    def _col_log_value(self, db_model, game):
+        from PyQt6.QtCore import Qt
+        row = db_model.find_game(game)
+        idx = db_model.index(row, db_model.COL_LOG)
+        return db_model.data(idx, Qt.ItemDataRole.DisplayRole)
 
-        def recording_write_store(g, gid, new_data):
-            calls.append((g, gid, dict(new_data)))
-            original_ws(g, gid, new_data)
-
-        ctrl._write_store = recording_write_store
-        return ctrl, gm, calls
-
-    def test_add_moment_calls_write_store(self):
+    def test_pending_log_shows_checkmark_in_log_column(self):
+        """add_moment_at_active_path sets has_chess_log_tags=True; Log column shows ✓."""
         game = make_game()
-        ctrl, gm, calls = self._patched_ctrl(game)
+        ctrl, gm, db_model = self._make_ctrl_with_real_db(game)
+
+        self.assertEqual(self._col_log_value(db_model, game), "",
+                         "precondition: Log column empty before any moment")
+
         with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
             ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "M", "why": ""}])
-        self.assertEqual(len(calls), 1, "add_moment_at_active_path must call _write_store once")
 
-    def test_clear_calls_write_store(self):
+        self.assertTrue(game.has_chess_log_tags,
+                        "has_chess_log_tags must be True after pending Log")
+        self.assertEqual(self._col_log_value(db_model, game), "✓",
+                         "Log column must show ✓ after pending Log (no save required)")
+
+    def test_pending_clear_removes_checkmark_in_log_column(self):
+        """clear_tags_for_current_game sets has_chess_log_tags=False; Log column shows empty."""
         game = make_game()
-        ctrl, gm, calls = self._patched_ctrl(game)
+        ChessLogStorageService.store_tags(
+            game,
+            {"0": [ChessLogStorageService.make_entry("CLAMP", "M")]},
+            {},
+        )
+        ctrl, gm, db_model = self._make_ctrl_with_real_db(game)
+        ctrl._load_into_cache(game)
+
+        self.assertEqual(self._col_log_value(db_model, game), "✓",
+                         "precondition: Log column shows ✓ after store_tags")
+
         ctrl.clear_tags_for_current_game()
-        self.assertEqual(len(calls), 1, "clear_tags_for_current_game must call _write_store once")
-        self.assertEqual(calls[0][2], {}, "_write_store called with empty data for clear")
 
-    def test_replace_entries_at_path_calls_write_store(self):
-        game = make_game()
-        ctrl, gm, calls = self._patched_ctrl(game)
-        ctrl.replace_entries_at_path(
-            "0", "CLAMP", [{"preset": "CLAMP", "cat": "M", "why": ""}]
-        )
-        self.assertEqual(len(calls), 1, "replace_entries_at_path must call _write_store once")
-
-    def test_replace_entries_at_path_for_game_calls_write_store(self):
-        game = make_game()
-        ctrl, gm, calls = self._patched_ctrl(game)
-        ctrl.replace_entries_at_path_for_game(
-            game, "0", "CLAMP", [{"preset": "CLAMP", "cat": "M", "why": ""}]
-        )
-        self.assertEqual(len(calls), 1, "replace_entries_at_path_for_game must call _write_store once")
+        self.assertFalse(game.has_chess_log_tags,
+                         "has_chess_log_tags must be False after pending Clear")
+        self.assertEqual(self._col_log_value(db_model, game), "",
+                         "Log column must show empty after pending Clear (no save required)")
 
 
 if __name__ == "__main__":

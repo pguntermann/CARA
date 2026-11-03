@@ -79,11 +79,8 @@ class ChessLogPlayerDropdownWorker(QThread):
         with QMutexLocker(self._mutex):
             if self._cancelled:
                 return
-        if self._snapshot is not None:
-            snap = self._snapshot
-            players = get_all_players(self._games, get_tags_for_game=lambda g: snap.get(id(g), {}))
-        else:
-            players = get_all_players(self._games)
+        snap = self._snapshot
+        players = get_all_players(self._games, get_tags_for_game=lambda g: snap.get(id(g), {}))
         with QMutexLocker(self._mutex):
             if not self._cancelled:
                 self.players_ready.emit(players)
@@ -136,17 +133,13 @@ class ChessLogAggregationWorker(QThread):
             if self._cancelled:
                 return
         try:
-            if self._snapshot is not None:
-                snap = self._snapshot
-                get_tags = lambda g: snap.get(id(g), {})  # noqa: E731
-            else:
-                get_tags = None
+            snap = self._snapshot
             result = aggregate(
                 self._games,
                 player=self._player,
                 color_filter=self._color_filter,
                 chart_cfg=self._chart_cfg,
-                get_tags_for_game=get_tags,
+                get_tags_for_game=lambda g: snap.get(id(g), {}),
             )
         except Exception as exc:
             with QMutexLocker(self._mutex):
@@ -453,11 +446,7 @@ class ChessLogNarrativeThread(QThread):
             with QMutexLocker(self._mutex):
                 if self._cancelled:
                     return
-            if self._snapshot is not None:
-                snap = self._snapshot
-                get_tags = lambda g: snap.get(id(g), {})  # noqa: E731
-            else:
-                get_tags = None
+            snap = self._snapshot
             narrative_result = generate_narrative(
                 games=self._games,
                 provider=self._provider,
@@ -469,7 +458,7 @@ class ChessLogNarrativeThread(QThread):
                 config=self._config,
                 timeout_seconds=self._timeout_seconds,
                 token_limit=self._token_limit,
-                get_tags_for_game=get_tags,
+                get_tags_for_game=lambda g: snap.get(id(g), {}),
             )
             with QMutexLocker(self._mutex):
                 if self._cancelled:

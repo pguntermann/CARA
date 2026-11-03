@@ -212,7 +212,6 @@ class ChessLogController:
         self._dirty_games[gid] = game
         self._cached_original_paths[gid] = self._cached_original_paths.get(gid, {})
         self._game_controller.get_game_model().metadata_updated.emit()
-        self._mark_database_unsaved(game)
         return True
 
     def game_has_any_tags(self) -> bool:
@@ -740,8 +739,11 @@ class ChessLogController:
                 return
             idx = db_model.index(row, db_model.COL_LOG)
             db_model.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DisplayRole])
-        except Exception:
-            pass
+        except Exception as exc:
+            from app.services.logging_service import LoggingService
+            LoggingService.get_instance().warning(
+                f"_notify_database_row_changed failed for game {getattr(game, 'game_number', '?')}: {exc}"
+            )
 
     def _resolved_view(
         self,

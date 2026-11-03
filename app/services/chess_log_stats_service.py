@@ -92,7 +92,8 @@ def aggregate(
     player: str,
     color_filter: str = "both",       # "white", "black", or "both"
     chart_cfg: Optional[Dict[str, Any]] = None,
-    get_tags_for_game: Optional[Callable[[Any], Dict[str, Any]]] = None,
+    *,
+    get_tags_for_game: Callable[[Any], Dict[str, Any]],
 ) -> "AggregateResult":
     """Aggregate Chess Log moments into per-preset time series.
 
@@ -106,11 +107,11 @@ def aggregate(
                           ``ordinal_fallback_mode`` (same keys as Player Stats).
                           Build via ``chart_cfg_with_chess_log_charts_overrides`` so
                           the user's ``target_bins`` and ``binning_mode`` are applied.
-        get_tags_for_game: When provided, called instead of
-                          ``ChessLogStorageService.load_resolved_paths`` to read
-                          moments for each game.  Pass a main-thread snapshot so
-                          the background worker never reads the controller cache
-                          directly across threads.
+        get_tags_for_game: Called to read moments for each game.  Pass a
+                          main-thread snapshot so the background worker never
+                          reads the controller cache directly across threads.
+                          Use ``ChessLogStorageService.load_resolved_paths`` for
+                          disk-based reads (tests, CLI tools).
 
     Returns:
         AggregateResult with series mapping preset name → ChessLogPresetSeries
@@ -129,16 +130,12 @@ def aggregate(
     has_3x3: bool = False
 
     for game in games:
-        if get_tags_for_game is None and not getattr(game, "has_chess_log_tags", False):
-            continue
-
         if not game_matches_player_color(game, player_cf, color_filter):
             continue
 
-        if get_tags_for_game is not None:
-            paths_data = get_tags_for_game(game)
-        else:
-            paths_data = ChessLogStorageService.load_resolved_paths(game)
+        paths_data = get_tags_for_game(game)
+        if not paths_data:
+            continue
         ordinal = _game_date_ordinal_for_trends(game.date or "")
 
         game_has_clamp_cct = False
@@ -171,7 +168,8 @@ def aggregate(
 
 def get_all_players(
     games: List[GameData],
-    get_tags_for_game: Optional[Callable[[Any], Dict[str, Any]]] = None,
+    *,
+    get_tags_for_game: Callable[[Any], Dict[str, Any]],
 ) -> List[Tuple[str, int]]:
     """Return (name, tagged_game_count) for players with >= 2 games sharing the same preset.
 
@@ -189,26 +187,21 @@ def get_all_players(
 
     Args:
         games:            Games to scan.
-        get_tags_for_game: When provided, called instead of
-                          ``ChessLogStorageService.load_resolved_paths`` to read
-                          moments for each game.  Pass a main-thread snapshot so
-                          the background worker never reads the controller cache
-                          directly across threads.
+        get_tags_for_game: Called to read moments for each game.  Pass a
+                          main-thread snapshot so the background worker never
+                          reads the controller cache directly across threads.
+                          Use ``ChessLogStorageService.load_resolved_paths`` for
+                          disk-based reads (tests, CLI tools).
 
-    Cost: one ChessLogStorageService.load_tags() call per tagged game. Runs in
-    a background worker; acceptable for typical datasets.
+    Cost: one callable call per game. Runs in a background worker; acceptable
+    for typical datasets.
     """
     # per_preset_counts[player][preset] = number of games with that preset
     per_preset_counts: Dict[str, Dict[str, int]] = {}
     total_counts: Dict[str, int] = {}
 
     for game in games:
-        if get_tags_for_game is None and not getattr(game, "has_chess_log_tags", False):
-            continue
-        if get_tags_for_game is not None:
-            paths_data = get_tags_for_game(game)
-        else:
-            paths_data = ChessLogStorageService.load_resolved_paths(game)
+        paths_data = get_tags_for_game(game)
         if not paths_data:
             continue
 
