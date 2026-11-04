@@ -2624,116 +2624,303 @@ class TestLogThisMomentCheckHash(unittest.TestCase):
 class TestIssue85EndToEnd(unittest.TestCase):
     """End-to-end coverage for the two sequences described in issue #85.
 
-    Sequence 1: Log → (pending, don't save) → has_chess_log_tags True immediately;
-                aggregate() snapshot sees the moment; Save All persists.
-
-    Sequence 2: Log → Save → Clear → (pending) → has_chess_log_tags False immediately;
-                aggregate() snapshot sees empty; Log again → has_chess_log_tags True;
-                Save All persists only the new moment.
+    All interactions use the public controller API (what menus call).
+    Private controller state is never set directly in these tests;
+    game switches are driven via _on_active_game_changed, which is what
+    the active_game_changed signal triggers in production.
     """
 
-    def _make_ctrl(self, game):
-        ctrl, gm = make_controller(game)
+    # --- helpers ---
+
+    def _make_ctrl(self, games):
+        """Return (ctrl, gm, dc) with no private controller state pre-set."""
+        gm = make_game_model_mock()
+        gc = make_game_controller_mock(gm)
+        db_model = MagicMock()
+        db_model.get_all_games.return_value = list(games)
+        pm = MagicMock()
+        pm.get_all_database_models.return_value = [db_model]
+        pm.active_database_changed = MagicMock()
+        pm.active_database_changed.connect = MagicMock()
+        pm.active_database_changed.disconnect = MagicMock()
+        dc = MagicMock()
+        dc.get_panel_model.return_value = pm
+        dc.find_database_model_for_game.return_value = db_model
+        ctrl = ChessLogController({}, gc, database_controller=dc)
+        return ctrl, gm, dc
+
+    def _switch_to(self, ctrl, gm, game):
+        """Simulate what active_game_changed fires: update active_game and reload cache."""
         gm.active_game = game
-        ctrl._cached_game_id = id(game)
-        return ctrl, gm
+        ctrl._on_active_game_changed(game)
 
-    def test_sequence_1_pending_log_visible_to_snapshot(self):
-        """Sequence 1: log without saving — has_chess_log_tags goes True immediately
-        and an aggregate() snapshot from the controller shows the moment."""
+    def _assert_game(self, ctrl, game, mem, flag, disk, dirty, label):
+        """Assert the four observable views for a game.
+
+        mem:   expected count_tags from get_tags_for_game (in-memory / Show All)
+        flag:  expected game.has_chess_log_tags (Log column)
+        disk:  expected count_tags from load_tags (PGN on disk / close-reopen)
+        dirty: expected bool(id(game) in ctrl._dirty_games) (pending save)
+
+        load_tags has the side effect of setting game.has_chess_log_tags to the
+        disk value.  To avoid clobbering the in-memory flag, the disk count is
+        read via a temporary GameData so the original game object is untouched.
+        """
+        actual_mem = ChessLogStorageService.count_tags(ctrl.get_tags_for_game(game))
+        actual_flag = game.has_chess_log_tags  # capture before any load_tags side-effect
+        _tmp = GameData(game_number=game.game_number, pgn=game.pgn or "")
+        actual_disk = ChessLogStorageService.count_tags(ChessLogStorageService.load_tags(_tmp))
+        actual_dirty = id(game) in ctrl._dirty_games
+        self.assertEqual(actual_mem, mem, f"{label}: in-memory count")
+        self.assertEqual(actual_flag, flag, f"{label}: has_chess_log_tags")
+        self.assertEqual(actual_disk, disk, f"{label}: disk count")
+        self.assertEqual(actual_dirty, dirty, f"{label}: in dirty_games")
+
+    # --- sequence 1 ---
+
+    def test_sequence_1_three_game_clear_log_cycle(self):
+        """Three pre-tagged games: edit+save → clear all three → switch-away/back
+        → save all → log on game2 → save all → simulate close+reopen.
+
+        Exercises the full pending-clear + pending-log lifecycle across multiple
+        games with game switches between each step.
+        """
         from app.services.chess_log_stats_service import aggregate
 
-        game = make_game()
-        game.white = "Alice"
-        game.black = "Bob"
-        game.date = "2026.08.24"
-        ctrl, gm = self._make_ctrl(game)
+        # Fixture: 3 pre-tagged games, 1 CLAMP/M moment each at path "0".
+        game1, game2, game3 = make_game(1), make_game(2), make_game(3)
+        for game in (game1, game2, game3):
+            game.white = "Alice"
+            game.black = "Bob"
+            game.date = "2026.01.01"
+            ChessLogStorageService.store_tags(
+                game,
+                {"0": [ChessLogStorageService.make_entry("CLAMP", "M", "initial")]},
+                {},
+            )
 
-        self.assertFalse(game.has_chess_log_tags, "precondition: new game starts False")
+        ctrl, gm, dc = self._make_ctrl([game1, game2, game3])
 
-        with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
-            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "M", "why": ""}])
+        # Switch to game1; sanity-check fixture.
+        self._switch_to(ctrl, gm, game1)
 
-        self.assertTrue(game.has_chess_log_tags, "pending log must set has_chess_log_tags=True")
+        # Simulate "open Show All + Charts": populate multi-cache for all games.
+        for g in (game1, game2, game3):
+            ctrl.get_tags_for_game(g)
 
-        # Snapshot the controller (as a worker would) and pass to aggregate().
-        snapshot = {id(game): ctrl.get_tags_for_game(game)}
-        result = aggregate(
-            [game],
-            player="Alice",
-            color_filter="both",
-            get_tags_for_game=lambda g: snapshot.get(id(g), {}),
+        for i, g in enumerate((game1, game2, game3), 1):
+            self._assert_game(ctrl, g, mem=1, flag=True, disk=1, dirty=False,
+                              label=f"fixture: game{i}")
+
+        # --- Step 2: edit+save game1 (simulates ShowTags dialog Save) ---
+        ctrl.replace_entries_at_path_for_game(
+            game1, "0", "CLAMP",
+            [ChessLogStorageService.make_entry("CLAMP", "M", "edited text")],
         )
-        self.assertIn("CLAMP", result.series, "snapshot must expose the pending moment to aggregate()")
-        total = sum(b.total for b in result.series["CLAMP"].bins)
-        self.assertEqual(total, 1, "one moment in CLAMP series")
+        dc.mark_database_unsaved.reset_mock()
+        ctrl.save_games([game1])
 
-        # Save All must persist the moment.
-        saved, failed = ctrl.save_all_dirty_games()
-        self.assertEqual((saved, failed), (1, 0))
-        loaded = ChessLogStorageService.load_tags(game)
-        self.assertIn("0", loaded)
+        self._assert_game(ctrl, game1, mem=1, flag=True, disk=1, dirty=False,
+                          label="after edit+save game1")
+        self.assertEqual(dc.mark_database_unsaved.call_count, 1,
+                         "edit+save marks DB unsaved once")
+        self.assertEqual(
+            ChessLogStorageService.load_tags(game1)["0"][0]["why"], "edited text",
+            "edit persisted in PGN",
+        )
 
-    def test_sequence_2_clear_then_relog_visible_everywhere(self):
-        """Sequence 2: log → save → clear (pending) → relog → has_chess_log_tags
-        reflects every step; aggregate() snapshot sees the new moment, not the old one."""
-        from app.services.chess_log_stats_service import aggregate
+        # --- Step 3: clear all 3 games with switches ---
+        dc.mark_database_unsaved.reset_mock()
 
-        game = make_game()
-        game.white = "Alice"
-        game.black = "Bob"
-        game.date = "2026.08.24"
-        ctrl, gm = self._make_ctrl(game)
-
-        # Log first moment and save.
-        with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
-            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "M", "why": "first"}])
-        ctrl.save_tags_for_current_game()
-        self.assertTrue(game.has_chess_log_tags, "after save: True")
-
-        # Clear (pending).
+        # Clear game1 (currently active).
         ctrl.clear_tags_for_current_game()
-        self.assertFalse(game.has_chess_log_tags, "pending clear must set False immediately")
+        self._assert_game(ctrl, game1, mem=0, flag=False, disk=1, dirty=True,
+                          label="clear game1 pending")
 
-        # Snapshot at this point: should be empty.
-        snap_empty = {id(game): ctrl.get_tags_for_game(game)}
-        result_empty = aggregate(
-            [game],
-            player="Alice",
-            color_filter="both",
-            get_tags_for_game=lambda g: snap_empty.get(id(g), {}),
-        )
-        self.assertEqual(result_empty.series, {}, "snapshot after clear shows no moments")
+        # Switch to game2 and clear it.
+        self._switch_to(ctrl, gm, game2)
+        ctrl.clear_tags_for_current_game()
+        self._assert_game(ctrl, game2, mem=0, flag=False, disk=1, dirty=True,
+                          label="clear game2 pending")
 
-        # Log a new moment (still before saving the clear).
+        # Switch to game3 and clear it.
+        self._switch_to(ctrl, gm, game3)
+        ctrl.clear_tags_for_current_game()
+        self._assert_game(ctrl, game3, mem=0, flag=False, disk=1, dirty=True,
+                          label="clear game3 pending")
+
+        # game1 and game2 must still be pending: switching didn't save them.
+        self._assert_game(ctrl, game1, mem=0, flag=False, disk=1, dirty=True,
+                          label="game1 still pending after game3 switch")
+        self._assert_game(ctrl, game2, mem=0, flag=False, disk=1, dirty=True,
+                          label="game2 still pending after game3 switch")
+        # Clears are pending — DB must NOT yet be marked unsaved.
+        dc.mark_database_unsaved.assert_not_called()
+
+        # --- Step 4: switch away and back to verify pending clear survives ---
+        self._switch_to(ctrl, gm, game1)
+        self._switch_to(ctrl, gm, game2)
+        self._assert_game(ctrl, game2, mem=0, flag=False, disk=1, dirty=True,
+                          label="game2 after switch-away/back — pending clear preserved")
+        self.assertTrue(ctrl.has_dirty_games(),
+                        "has_dirty_games() True while clears pending")
+        self.assertTrue(ctrl.has_unsaved_changes(),
+                        "has_unsaved_changes() True for active game2 (disk has 1, cache has 0)")
+
+        # --- Step 5: save all — commits all pending clears ---
+        dc.mark_database_unsaved.reset_mock()
+        saved, failed = ctrl.save_all_dirty_games()
+        self.assertEqual((saved, failed), (3, 0),
+                         "save_all saves all 3 pending clears")
+
+        for i, g in enumerate((game1, game2, game3), 1):
+            self._assert_game(ctrl, g, mem=0, flag=False, disk=0, dirty=False,
+                              label=f"after save_all: game{i}")
+        self.assertEqual(dc.mark_database_unsaved.call_count, 3,
+                         "DB marked unsaved once per game")
+        self.assertFalse(ctrl.has_dirty_games())
+        self.assertFalse(ctrl.has_unsaved_changes())
+
+        # --- Step 6: log on game2 (still active) ---
+        dc.mark_database_unsaved.reset_mock()
         with patch("app.controllers.chess_log_controller.encode_path", return_value="1"):
-            ctrl.add_moment_at_active_path([{"preset": "CLAMP", "cat": "C", "why": "second"}])
-        self.assertTrue(game.has_chess_log_tags, "re-logging after clear must set True again")
+            ctrl.add_moment_at_active_path(
+                [{"preset": "CLAMP", "cat": "C", "why": "new moment"}]
+            )
 
-        # Snapshot after re-log: should contain only the new moment.
-        snap_new = {id(game): ctrl.get_tags_for_game(game)}
-        result_new = aggregate(
-            [game],
+        self._assert_game(ctrl, game2, mem=1, flag=True, disk=0, dirty=False,
+                          label="after log on game2 (pending)")
+        self.assertTrue(ctrl.game_has_any_tags(),
+                        "game_has_any_tags() True after pending log")
+        self.assertTrue(ctrl.has_unsaved_changes(),
+                        "has_unsaved_changes() True after pending log")
+        dc.mark_database_unsaved.assert_not_called()
+
+        # Aggregate snapshot (Charts tab) sees the pending moment.
+        snap = {id(g): ctrl.get_tags_for_game(g) for g in (game1, game2, game3)}
+        result = aggregate(
+            [game1, game2, game3],
             player="Alice",
             color_filter="both",
-            get_tags_for_game=lambda g: snap_new.get(id(g), {}),
+            get_tags_for_game=lambda g: snap.get(id(g), {}),
         )
-        self.assertIn("CLAMP", result_new.series)
-        clamp_entries = {
-            cat: cnt
-            for b in result_new.series["CLAMP"].bins
-            for cat, cnt in b.counts.items()
-        }
-        self.assertEqual(clamp_entries.get("C", 0), 1, "new moment C is in snapshot")
-        self.assertEqual(clamp_entries.get("M", 0), 0, "old moment M is NOT in snapshot")
+        self.assertIn("CLAMP", result.series,
+                      "aggregate snapshot exposes pending log to Charts")
+        self.assertEqual(
+            sum(b.total for b in result.series["CLAMP"].bins), 1,
+            "exactly 1 moment in CLAMP series",
+        )
 
-        # Save All: persists the pending state (clear + new moment).
+        # --- Step 7: save all, then simulate close+reopen on game2 ---
+        dc.mark_database_unsaved.reset_mock()
+        saved, failed = ctrl.save_all_dirty_games()
+        self.assertEqual((saved, failed), (1, 0),
+                         "save_all saves only game2 (pending log)")
+        self._assert_game(ctrl, game2, mem=1, flag=True, disk=1, dirty=False,
+                          label="after save_all: game2 saved")
+        self.assertEqual(dc.mark_database_unsaved.call_count, 1,
+                         "DB marked unsaved once for game2")
+
+        # Simulate close+reopen: construct a fresh GameData from the saved PGN.
+        saved_pgn = game2.pgn
+        self.assertTrue(saved_pgn, "game2.pgn non-empty after save")
+        new_game2 = GameData(game_number=2, pgn=saved_pgn)
+        reopened = ChessLogStorageService.load_tags(new_game2)
+        self.assertEqual(
+            ChessLogStorageService.count_tags(reopened), 1,
+            "reopened game2: exactly 1 moment",
+        )
+        self.assertEqual(
+            reopened.get("1", [{}])[0].get("why"), "new moment",
+            "reopened game2: contains the new moment",
+        )
+        self.assertNotIn("0", reopened,
+                         "old path '0' absent in reopened game2 (cleared before relog)")
+
+    # --- sequence 2 ---
+
+    def test_sequence_2_pending_log_and_clear_lifecycle(self):
+        """Single game: log (pending) → save all → clear (pending) → switch-away/back
+        → save all.
+
+        Verifies that pending Log and pending Clear both survive game switches and
+        that all observable views reflect the correct state at each step.
+        """
+        # Fixture: 1 fresh game (no tags) + a dummy for the switch-away.
+        game = make_game(1)
+        game.white = "Alice"
+        game.black = "Bob"
+        game.date = "2026.01.01"
+        dummy = make_game(2)   # used as switch-away target only
+
+        ctrl, gm, dc = self._make_ctrl([game, dummy])
+        self._switch_to(ctrl, gm, game)
+
+        self._assert_game(ctrl, game, mem=0, flag=False, disk=0, dirty=False,
+                          label="initial state")
+        self.assertFalse(ctrl.has_unsaved_changes(), "no changes at start")
+
+        # --- Step 1: log → pending, check all views ---
+        dc.mark_database_unsaved.reset_mock()
+        with patch("app.controllers.chess_log_controller.encode_path", return_value="0"):
+            ctrl.add_moment_at_active_path(
+                [{"preset": "CLAMP", "cat": "M", "why": "first"}]
+            )
+
+        self._assert_game(ctrl, game, mem=1, flag=True, disk=0, dirty=False,
+                          label="after log (pending)")
+        self.assertTrue(ctrl.game_has_any_tags(),
+                        "game_has_any_tags() True after pending log")
+        self.assertTrue(ctrl.has_unsaved_changes(),
+                        "has_unsaved_changes() True after pending log")
+        self.assertFalse(ctrl.has_dirty_games(),
+                         "has_dirty_games() False — pending log uses single-game cache")
+        dc.mark_database_unsaved.assert_not_called()
+
+        # --- Step 2: save all ---
+        dc.mark_database_unsaved.reset_mock()
         saved, failed = ctrl.save_all_dirty_games()
         self.assertEqual((saved, failed), (1, 0))
+
+        self._assert_game(ctrl, game, mem=1, flag=True, disk=1, dirty=False,
+                          label="after save_all")
+        self.assertFalse(ctrl.has_unsaved_changes())
+        self.assertEqual(dc.mark_database_unsaved.call_count, 1)
         loaded = ChessLogStorageService.load_tags(game)
-        self.assertNotIn("0", loaded, "cleared moment must not be in PGN")
-        self.assertIn("1", loaded, "new moment must be in PGN")
-        self.assertEqual(loaded["1"][0]["why"], "second")
+        self.assertEqual(loaded.get("0", [{}])[0].get("why"), "first",
+                         "first moment persisted in PGN")
+
+        # --- Step 3: clear → switch-away → switch-back ---
+        dc.mark_database_unsaved.reset_mock()
+        ctrl.clear_tags_for_current_game()
+
+        self._assert_game(ctrl, game, mem=0, flag=False, disk=1, dirty=True,
+                          label="after pending clear")
+        self.assertTrue(ctrl.has_dirty_games(),
+                        "has_dirty_games() True after pending clear")
+        self.assertTrue(ctrl.has_unsaved_changes(),
+                        "has_unsaved_changes() True (disk has 1, cache has 0)")
+        dc.mark_database_unsaved.assert_not_called()
+
+        # Switch away (to dummy) and back — pending clear must survive.
+        self._switch_to(ctrl, gm, dummy)
+        self._switch_to(ctrl, gm, game)
+
+        self._assert_game(ctrl, game, mem=0, flag=False, disk=1, dirty=True,
+                          label="after switch-away/back — pending clear preserved")
+        self.assertTrue(ctrl.has_unsaved_changes(),
+                        "has_unsaved_changes() still True after switch-away/back")
+
+        # --- Step 4: save all — commits the pending clear ---
+        dc.mark_database_unsaved.reset_mock()
+        saved, failed = ctrl.save_all_dirty_games()
+        self.assertEqual((saved, failed), (1, 0))
+
+        self._assert_game(ctrl, game, mem=0, flag=False, disk=0, dirty=False,
+                          label="after save_all (clear committed)")
+        self.assertFalse(ctrl.has_unsaved_changes())
+        self.assertFalse(ctrl.has_dirty_games())
+        self.assertEqual(dc.mark_database_unsaved.call_count, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -2743,29 +2930,91 @@ class TestIssue85EndToEnd(unittest.TestCase):
 class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
     """Source-level guard: no code in app/ bypasses the _write_store contract.
 
-    Scans app/**/*.py and asserts that restricted patterns appear only in
-    their allowlisted files.  A test failure means a new caller was added
-    outside the allowlist — either update the allowlist with justification
-    or route through the approved path.
+    Scans app/**/*.py with AST-based function-level analysis and asserts that
+    restricted patterns appear only in their allowlisted (file, function) pairs.
+    A test failure means a new caller was added outside the allowlist — either
+    add an entry with a justification or route through the approved path.
 
-    Allowlist:
-      store_tags / clear_tags  — only chess_log_controller.py (save methods)
-                                 and chess_log_storage_service.py (definitions)
-      game.has_chess_log_tags= — only chess_log_controller.py (_write_store)
-                                 and chess_log_storage_service.py (load/store/clear)
+    _ALLOWLIST_REASONS documents why each (file, function) pair is legitimate.
+    _RULES maps each pattern to the frozenset of allowed pairs.
     """
 
-    # Patterns and the file-name suffixes that may contain them.
+    # Reasons for each (filename_suffix, function_name) pair.
+    # Each entry justifies why that function may contain the matched pattern.
+    _ALLOWLIST_REASONS = {
+        ("chess_log_controller.py", "_save_single_game"):
+            "saves dirty games (Save All / save_games paths)",
+        ("chess_log_controller.py", "save_tags_for_current_game"):
+            "Save button path: persists the active game's cache to PGN",
+        ("chess_log_controller.py", "_write_store"):
+            "sole authorized write path for _cached_paths_data, _multi_cache, and has_chess_log_tags",
+        ("chess_log_controller.py", "_load_into_cache"):
+            "disk load / multi-cache promotion when a game becomes active",
+        ("chess_log_controller.py", "_on_active_game_changed"):
+            "Rule B: flushes + prunes caches on game switch",
+        ("chess_log_controller.py", "_on_active_database_changed"):
+            "flushes + prunes caches on database switch",
+        ("chess_log_controller.py", "get_tags_for_game"):
+            "lazy load from disk into multi-cache on first peek",
+        ("chess_log_controller.py", "replace_entries_at_path_for_game"):
+            "lazy load from disk into multi-cache on first edit",
+        ("chess_log_controller.py", "_prune_dirty_games_against_open_databases"):
+            "removes stale multi-cache entries for closed databases",
+        ("chess_log_storage_service.py", "store_tags"):
+            "own definition; sets has_chess_log_tags after writing",
+        ("chess_log_storage_service.py", "clear_tags"):
+            "own definition; sets has_chess_log_tags = False after clearing",
+        ("chess_log_storage_service.py", "load_tags"):
+            "sets has_chess_log_tags as side effect of loading",
+    }
+
+    # Rules: (regex_pattern, frozenset_of_allowed_keys, failure_message).
+    # Each key is a (filename_suffix, function_name) pair from _ALLOWLIST_REASONS.
     _RULES = [
         (
             r"ChessLogStorageService\.(store_tags|clear_tags)\s*\(",
-            ["chess_log_controller.py", "chess_log_storage_service.py"],
+            frozenset({
+                ("chess_log_controller.py", "_save_single_game"),
+                ("chess_log_controller.py", "save_tags_for_current_game"),
+                ("chess_log_storage_service.py", "store_tags"),
+                ("chess_log_storage_service.py", "clear_tags"),
+            }),
             "ChessLogStorageService.store_tags / clear_tags called outside allowlist",
         ),
         (
             r"\bgame\.has_chess_log_tags\s*=",
-            ["chess_log_controller.py", "chess_log_storage_service.py"],
+            frozenset({
+                ("chess_log_controller.py", "_write_store"),
+                ("chess_log_storage_service.py", "load_tags"),
+                ("chess_log_storage_service.py", "store_tags"),
+                ("chess_log_storage_service.py", "clear_tags"),
+            }),
             "game.has_chess_log_tags assigned outside allowlist",
+        ),
+        (
+            r"self\._cached_paths_data\s*=",
+            frozenset({
+                ("chess_log_controller.py", "_write_store"),
+                ("chess_log_controller.py", "_load_into_cache"),
+                ("chess_log_controller.py", "_on_active_game_changed"),
+                ("chess_log_controller.py", "_on_active_database_changed"),
+            }),
+            "_cached_paths_data assigned outside allowlist",
+        ),
+        (
+            r"self\._multi_cache\[.*\]\s*="
+            r"|del\s+self\._multi_cache\["
+            r"|self\._multi_cache\.(?:pop|clear|update|setdefault)\s*\(",
+            frozenset({
+                ("chess_log_controller.py", "get_tags_for_game"),
+                ("chess_log_controller.py", "replace_entries_at_path_for_game"),
+                ("chess_log_controller.py", "_write_store"),
+                ("chess_log_controller.py", "_load_into_cache"),
+                ("chess_log_controller.py", "_on_active_game_changed"),
+                ("chess_log_controller.py", "_on_active_database_changed"),
+                ("chess_log_controller.py", "_prune_dirty_games_against_open_databases"),
+            }),
+            "_multi_cache mutated outside allowlist",
         ),
     ]
 
@@ -2777,28 +3026,78 @@ class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
         )
         return sorted(glob.glob(_os.path.join(app_dir, "**", "*.py"), recursive=True))
 
-    def _violations(self, pattern, allowed_suffixes):
+    @staticmethod
+    def _build_line_to_func(source: str) -> dict:
+        """Map each line number to the name of the innermost function containing it.
+
+        Lines outside any function map to '<module>'.  Innermost wins when
+        functions are nested (sort outer functions first so inner ones overwrite).
+        """
+        import ast
+
+        try:
+            tree = ast.parse(source)
+        except SyntaxError:
+            return {}
+
+        funcs = []
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                end = getattr(node, "end_lineno", node.lineno)
+                funcs.append((node.name, node.lineno, end, end - node.lineno))
+
+        # Sort descending by span: outer first, inner (smaller span) overwrites.
+        funcs.sort(key=lambda x: x[3], reverse=True)
+        line_to_func: dict = {}
+        for fname, start, end, _span in funcs:
+            for lineno in range(start, end + 1):
+                line_to_func[lineno] = fname
+        return line_to_func
+
+    def _violations(self, pattern, allowlist):
         import re
+
         hits = []
         for path in self._app_py_files():
-            if any(path.endswith(s) for s in allowed_suffixes):
-                continue
             with open(path, encoding="utf-8") as fh:
-                for lineno, line in enumerate(fh, 1):
-                    if re.search(pattern, line) and not line.lstrip().startswith("#"):
-                        hits.append((path, lineno, line.rstrip()))
+                source = fh.read()
+            line_to_func = self._build_line_to_func(source)
+            filename = _os.path.basename(path)
+            for lineno, line in enumerate(source.split("\n"), 1):
+                if not re.search(pattern, line):
+                    continue
+                if line.lstrip().startswith("#"):
+                    continue
+                func_name = line_to_func.get(lineno, "<module>")
+                if (filename, func_name) in allowlist:
+                    continue
+                hits.append((path, lineno, line.rstrip()))
         return hits
 
     def test_store_and_clear_tags_only_in_allowlist(self):
-        pattern, allowed, msg = self._RULES[0]
-        violations = self._violations(pattern, allowed)
+        pattern, allowlist, msg = self._RULES[0]
+        violations = self._violations(pattern, allowlist)
         if violations:
             detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
             self.fail(f"{msg}:\n{detail}")
 
     def test_has_chess_log_tags_assignment_only_in_allowlist(self):
-        pattern, allowed, msg = self._RULES[1]
-        violations = self._violations(pattern, allowed)
+        pattern, allowlist, msg = self._RULES[1]
+        violations = self._violations(pattern, allowlist)
+        if violations:
+            detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
+            self.fail(f"{msg}:\n{detail}")
+
+    def test_cached_paths_data_assignment_only_in_allowlist(self):
+        pattern, allowlist, msg = self._RULES[2]
+        violations = self._violations(pattern, allowlist)
+        if violations:
+            detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
+            self.fail(f"{msg}:\n{detail}")
+
+    def test_multi_cache_mutation_only_in_allowlist(self):
+        pattern, allowlist, msg = self._RULES[3]
+        violations = self._violations(pattern, allowlist)
         if violations:
             detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
             self.fail(f"{msg}:\n{detail}")

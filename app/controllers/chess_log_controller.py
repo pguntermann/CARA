@@ -505,12 +505,23 @@ class ChessLogController:
         return bool(self._dirty_games)
 
     def has_unsaved_changes(self) -> bool:
-        """Return True if in-memory cache differs from what's stored in the PGN."""
+        """Return True if in-memory cache differs from what's stored in the PGN.
+
+        Compares against _cached_original_paths (captured at load/save time) to
+        avoid calling load_tags(), which has the side effect of setting
+        game.has_chess_log_tags to the disk value and clobbering a pending Clear.
+        Falls back to bool(_cached_paths_data) when no snapshot is available.
+        """
         game = self._game_controller.get_game_model().active_game
         if game is None:
             return False
-        stored = ChessLogStorageService.load_tags(game)
-        return self._cached_paths_data != stored
+        gid = id(game)
+        if gid != self._cached_game_id:
+            return False
+        original = self._cached_original_paths.get(gid)
+        if original is None:
+            return bool(self._cached_paths_data)
+        return self._cached_paths_data != original
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -654,20 +665,21 @@ class ChessLogController:
                 del self._cache_version_by_game[gid]
 
     def _outgoing_has_real_edits(self) -> bool:
-        """True iff the current outgoing-game cache differs from its on-disk tag.
+        """True iff the current outgoing-game cache differs from its on-disk snapshot.
 
-        Compares against load_tags(self._cached_game) rather than
-        has_unsaved_changes(), because the game model's active_game may already
-        be None (close/clear) or the newly-switched game by the time this
-        handler runs.
+        Compares against _cached_original_paths (captured at load/save time) instead
+        of calling load_tags() directly.  load_tags() has the side effect of setting
+        game.has_chess_log_tags to the disk value, which clobbers a pending Clear's
+        False flag and makes the Log column flicker back to ✓ after a game switch.
+        Falls back to bool(_cached_paths_data) when no snapshot is available.
         """
         if self._cached_game is None:
             return False
-        try:
-            stored = ChessLogStorageService.load_tags(self._cached_game)
-        except Exception:
+        gid = id(self._cached_game)
+        original = self._cached_original_paths.get(gid)
+        if original is None:
             return bool(self._cached_paths_data)
-        return self._cached_paths_data != stored
+        return self._cached_paths_data != original
 
     def _prune_dirty_games_against_open_databases(self) -> None:
         """Drop _dirty_games (and companion dicts) for games no longer in any
