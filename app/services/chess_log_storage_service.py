@@ -72,17 +72,15 @@ class ChessLogStorageService:
 
         Returns {path_key: [entry, ...]}. Returns {} on missing tag, checksum
         mismatch (also strips the corrupt tags), or any error.
-        Sets game.has_chess_log_tags as a side effect.
+        Does NOT modify game.has_chess_log_tags — this is a pure read.
         """
         if game is None:
             return {}
         if not hasattr(game, "pgn") or game.pgn is None:
-            game.has_chess_log_tags = False
             return {}
         try:
             chess_game = chess.pgn.read_game(StringIO(game.pgn))
             if not chess_game or ChessLogStorageService.TAG_NAME not in chess_game.headers:
-                game.has_chess_log_tags = False
                 return {}
             encoded = chess_game.headers[ChessLogStorageService.TAG_NAME]
             json_text = decode_and_decompress_to_str(encoded)
@@ -93,18 +91,14 @@ class ChessLogStorageService:
                         "Chess Log checksum mismatch — removing corrupt tags."
                     )
                     ChessLogStorageService._remove_chess_log_tags(game)
-                    game.has_chess_log_tags = False
                     return {}
             payload = json.loads(json_text)
             paths_data: Dict[str, List[Dict[str, Any]]] = payload.get("paths", {})
-            game.has_chess_log_tags = ChessLogStorageService.count_tags(paths_data) > 0
             return paths_data
         except ValueError:
             ChessLogStorageService._remove_chess_log_tags(game)
-            game.has_chess_log_tags = False
             return {}
         except Exception:
-            game.has_chess_log_tags = False
             return {}
 
     @staticmethod

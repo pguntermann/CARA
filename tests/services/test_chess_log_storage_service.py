@@ -153,8 +153,8 @@ class TestChecksumCorruptionRecovery(unittest.TestCase):
         )
         result = ChessLogStorageService.load_tags(game)
         self.assertEqual(result, {})
-        self.assertFalse(game.has_chess_log_tags)
-        # Tags should have been stripped
+        # Tags should have been stripped from the PGN.
+        # Note: load_tags is a pure read and does not update game.has_chess_log_tags.
         self.assertFalse(ChessLogStorageService.has_chess_log_tags(game))
 
     def test_corrupt_payload_strips_tags_returns_empty(self):

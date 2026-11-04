@@ -2661,15 +2661,10 @@ class TestIssue85EndToEnd(unittest.TestCase):
         flag:  expected game.has_chess_log_tags (Log column)
         disk:  expected count_tags from load_tags (PGN on disk / close-reopen)
         dirty: expected bool(id(game) in ctrl._dirty_games) (pending save)
-
-        load_tags has the side effect of setting game.has_chess_log_tags to the
-        disk value.  To avoid clobbering the in-memory flag, the disk count is
-        read via a temporary GameData so the original game object is untouched.
         """
         actual_mem = ChessLogStorageService.count_tags(ctrl.get_tags_for_game(game))
-        actual_flag = game.has_chess_log_tags  # capture before any load_tags side-effect
-        _tmp = GameData(game_number=game.game_number, pgn=game.pgn or "")
-        actual_disk = ChessLogStorageService.count_tags(ChessLogStorageService.load_tags(_tmp))
+        actual_flag = game.has_chess_log_tags
+        actual_disk = ChessLogStorageService.count_tags(ChessLogStorageService.load_tags(game))
         actual_dirty = id(game) in ctrl._dirty_games
         self.assertEqual(actual_mem, mem, f"{label}: in-memory count")
         self.assertEqual(actual_flag, flag, f"{label}: has_chess_log_tags")
@@ -2964,9 +2959,9 @@ class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
             "own definition; sets has_chess_log_tags after writing",
         ("chess_log_storage_service.py", "clear_tags"):
             "own definition; sets has_chess_log_tags = False after clearing",
-        ("chess_log_storage_service.py", "load_tags"):
-            "sets has_chess_log_tags as side effect of loading",
     }
+    # Initial flag value is set by pgn_service.py:976 via GameData.__init__ at database
+    # open time (not a game.has_chess_log_tags= assignment; uses local variable + constructor).
 
     # Rules: (regex_pattern, frozenset_of_allowed_keys, failure_message).
     # Each key is a (filename_suffix, function_name) pair from _ALLOWLIST_REASONS.
@@ -2985,7 +2980,6 @@ class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
             r"\bgame\.has_chess_log_tags\s*=",
             frozenset({
                 ("chess_log_controller.py", "_write_store"),
-                ("chess_log_storage_service.py", "load_tags"),
                 ("chess_log_storage_service.py", "store_tags"),
                 ("chess_log_storage_service.py", "clear_tags"),
             }),
@@ -3087,6 +3081,24 @@ class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
         if violations:
             detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
             self.fail(f"{msg}:\n{detail}")
+
+    def test_load_tags_does_not_set_has_chess_log_tags(self):
+        """load_tags is a pure read — it must not write game.has_chess_log_tags."""
+        game = make_game(1)
+        # Write a moment so the PGN tag exists.
+        ChessLogStorageService.store_tags(
+            game,
+            {"0": [ChessLogStorageService.make_entry("CLAMP", "M", "hi")]},
+            {},
+        )
+        # Simulate a pending Clear: in-memory flag is False, but PGN still has the tag.
+        game.has_chess_log_tags = False
+        # load_tags must return the PGN data without touching the flag.
+        result = ChessLogStorageService.load_tags(game)
+        self.assertEqual(ChessLogStorageService.count_tags(result), 1,
+                         "load_tags returns PGN data")
+        self.assertFalse(game.has_chess_log_tags,
+                         "load_tags must not clobber the pending-clear flag")
 
     def test_cached_paths_data_assignment_only_in_allowlist(self):
         pattern, allowlist, msg = self._RULES[2]
