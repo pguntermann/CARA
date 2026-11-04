@@ -142,34 +142,73 @@ class TestMissingTag(unittest.TestCase):
 
 
 class TestChecksumCorruptionRecovery(unittest.TestCase):
-    def test_corrupt_checksum_strips_tags_returns_empty(self):
+    def test_corrupt_checksum_returns_empty_pgn_unchanged(self):
+        """load_tags returns {} on checksum mismatch and leaves game.pgn untouched."""
         game = make_game()
         paths_data = {"0": [ChessLogStorageService.make_entry("CLAMP", "L")]}
         ChessLogStorageService.store_tags(game, paths_data)
-        # Corrupt the checksum in the PGN text
+        # Corrupt the checksum in the PGN text.
         game.pgn = game.pgn.replace(
             f'[{ChessLogStorageService.TAG_CHECKSUM} "',
             f'[{ChessLogStorageService.TAG_CHECKSUM} "BAD',
         )
+        pgn_before = game.pgn
         result = ChessLogStorageService.load_tags(game)
         self.assertEqual(result, {})
-        # Tags should have been stripped from the PGN.
-        # Note: load_tags is a pure read and does not update game.has_chess_log_tags.
-        self.assertFalse(ChessLogStorageService.has_chess_log_tags(game))
+        # PGN must be byte-identical — load_tags is a pure read.
+        self.assertEqual(game.pgn, pgn_before, "load_tags must not mutate game.pgn")
+        # Corrupt tag is still present (not stripped by the read).
+        self.assertTrue(ChessLogStorageService.has_chess_log_tags(game))
 
-    def test_corrupt_payload_strips_tags_returns_empty(self):
+    def test_corrupt_payload_returns_empty_pgn_unchanged(self):
+        """load_tags returns {} on bad payload and leaves game.pgn untouched."""
         game = make_game()
         paths_data = {"0": [ChessLogStorageService.make_entry("CCT", "C")]}
         ChessLogStorageService.store_tags(game, paths_data)
-        # Replace encoded payload with garbage (invalid base64)
+        # Replace encoded payload with garbage (invalid base64).
         import re
         game.pgn = re.sub(
             rf'\[{ChessLogStorageService.TAG_NAME} "[^"]*"\]',
             f'[{ChessLogStorageService.TAG_NAME} "!!!notbase64!!!"]',
             game.pgn,
         )
+        pgn_before = game.pgn
         result = ChessLogStorageService.load_tags(game)
         self.assertEqual(result, {})
+        self.assertEqual(game.pgn, pgn_before, "load_tags must not mutate game.pgn")
+
+    def test_corrupt_tag_replaced_on_save(self):
+        """After a corrupt tag, saving with a new moment replaces it; saving with no moments removes it."""
+        import re
+        # --- Save with moment replaces corrupt tag ---
+        game = make_game()
+        ChessLogStorageService.store_tags(
+            game, {"0": [ChessLogStorageService.make_entry("CLAMP", "L")]}, {}
+        )
+        game.pgn = game.pgn.replace(
+            f'[{ChessLogStorageService.TAG_CHECKSUM} "',
+            f'[{ChessLogStorageService.TAG_CHECKSUM} "BAD',
+        )
+        new_data = {"1": [ChessLogStorageService.make_entry("CLAMP", "M", "saved")]}
+        ok = ChessLogStorageService.store_tags(game, new_data, {})
+        self.assertTrue(ok)
+        result = ChessLogStorageService.load_tags(game)
+        self.assertEqual(ChessLogStorageService.count_tags(result), 1)
+        self.assertEqual(result["1"][0]["why"], "saved")
+
+        # --- Save with no moments removes the tag ---
+        game2 = make_game()
+        ChessLogStorageService.store_tags(
+            game2, {"0": [ChessLogStorageService.make_entry("CLAMP", "L")]}, {}
+        )
+        game2.pgn = re.sub(
+            rf'\[{ChessLogStorageService.TAG_CHECKSUM} "[^"]*"\]',
+            f'[{ChessLogStorageService.TAG_CHECKSUM} "BAD999"]',
+            game2.pgn,
+        )
+        ok2 = ChessLogStorageService.clear_tags(game2)
+        self.assertTrue(ok2)
+        self.assertFalse(ChessLogStorageService.has_chess_log_tags(game2))
 
 
 class TestClearTags(unittest.TestCase):
@@ -878,6 +917,131 @@ class TestCheckRun(unittest.TestCase):
         self.assertEqual(loaded_paths["0"][0].get("check_hash"), "abcdef1234567890")
         self.assertIsNotNone(loaded_run)
         self.assertEqual(loaded_run["model"], "X")
+
+
+class TestDatabaseOpenFlagCorrection(unittest.TestCase):
+    """3-game open: flag ✓ only for a valid, non-empty tag.
+
+    Exercises the path that sets has_chess_log_tags at database open time:
+    PgnService._extract_game_data → ChessLogStorageService.has_moments(headers).
+
+    Assertions follow the directive:
+    - Only game 1 gets ✓; game 2 (empty tag) and game 3 (corrupt tag) do not.
+    - Every game's PGN is byte-identical after the open (no PGN mutations).
+    - load_tags on game 3 leaves its PGN unchanged.
+    - Saving game 3 with a new moment replaces the corrupt tag with a valid one.
+    """
+
+    @staticmethod
+    def _make_pgn(white: str, tag_pgn: str = "") -> str:
+        base = (
+            f'[Event "Test"]\n'
+            f'[Site "?"]\n'
+            f'[Date "2026.01.01"]\n'
+            f'[Round "?"]\n'
+            f'[White "{white}"]\n'
+            f'[Black "Black"]\n'
+            f'[Result "*"]\n'
+        )
+        if tag_pgn:
+            base += tag_pgn + "\n"
+        base += "\n1. e4 e5 *\n"
+        return base
+
+    def _build_games(self):
+        """Return (game1_pgn, game2_pgn, game3_pgn) with valid / empty / corrupt tags."""
+        import re
+
+        # Game 1: valid tag with 1 moment.
+        g1 = GameData(game_number=1, pgn=self._make_pgn("Valid"))
+        ChessLogStorageService.store_tags(
+            g1, {"0": [ChessLogStorageService.make_entry("CLAMP", "M", "hi")]}, {}
+        )
+        game1_pgn = g1.pgn
+
+        # Game 2: empty tag — present in PGN but encodes zero moments.
+        g2 = GameData(game_number=2, pgn=self._make_pgn("EmptyTag"))
+        ChessLogStorageService.store_tags(g2, {}, {})
+        game2_pgn = g2.pgn
+
+        # Game 3: corrupt checksum.
+        g3 = GameData(game_number=3, pgn=self._make_pgn("CorruptTag"))
+        ChessLogStorageService.store_tags(
+            g3, {"0": [ChessLogStorageService.make_entry("CLAMP", "L", "corrupt")]}, {}
+        )
+        game3_pgn = g3.pgn.replace(
+            f'[{ChessLogStorageService.TAG_CHECKSUM} "',
+            f'[{ChessLogStorageService.TAG_CHECKSUM} "BAD',
+        )
+        return game1_pgn, game2_pgn, game3_pgn
+
+    def _extract(self, pgn_text: str, game_number: int):
+        """Run through the real database-open path for one game."""
+        import chess.pgn
+        from io import StringIO
+        from app.services.pgn_service import PgnService
+        chess_game = chess.pgn.read_game(StringIO(pgn_text))
+        self.assertIsNotNone(chess_game)
+        result = PgnService._extract_game_data(chess_game, original_pgn_text=pgn_text)
+        self.assertIsNotNone(result)
+        return result
+
+    def test_flags_at_database_open(self):
+        game1_pgn, game2_pgn, game3_pgn = self._build_games()
+
+        d1 = self._extract(game1_pgn, 1)
+        d2 = self._extract(game2_pgn, 2)
+        d3 = self._extract(game3_pgn, 3)
+
+        self.assertTrue(d1["has_chess_log_tags"],
+                        "game 1 (valid, 1 moment) must show ✓")
+        self.assertFalse(d2["has_chess_log_tags"],
+                         "game 2 (empty tag, 0 moments) must not show ✓")
+        self.assertFalse(d3["has_chess_log_tags"],
+                         "game 3 (corrupt tag) must not show ✓")
+
+        # Show All filter: only game 1 would appear.
+        games = [
+            GameData(game_number=i, pgn=d["pgn"],
+                     has_chess_log_tags=d["has_chess_log_tags"])
+            for i, d in enumerate([d1, d2, d3], 1)
+        ]
+        visible = [g for g in games if g.has_chess_log_tags]
+        self.assertEqual(len(visible), 1)
+        self.assertEqual(visible[0].game_number, 1)
+
+    def test_pgn_byte_identical_after_open(self):
+        """_extract_game_data must not mutate any game's PGN."""
+        game1_pgn, game2_pgn, game3_pgn = self._build_games()
+        for pgn, label in [(game1_pgn, "valid"), (game2_pgn, "empty"), (game3_pgn, "corrupt")]:
+            d = self._extract(pgn, 0)
+            # _extract_game_data rstrips; normalise before comparison.
+            self.assertEqual(d["pgn"], pgn.rstrip(),
+                             f"{label}: PGN must be byte-identical after open")
+
+    def test_load_tags_on_corrupt_game_does_not_mutate_pgn(self):
+        """load_tags on game 3 must not change its PGN."""
+        _, _, game3_pgn = self._build_games()
+        game3 = GameData(game_number=3, pgn=game3_pgn)
+        pgn_before = game3.pgn
+        ChessLogStorageService.load_tags(game3)
+        self.assertEqual(game3.pgn, pgn_before,
+                         "load_tags must not mutate game.pgn on corrupt tag")
+
+    def test_save_replaces_corrupt_tag(self):
+        """Logging a moment on game 3 and saving replaces the corrupt tag."""
+        _, _, game3_pgn = self._build_games()
+        game3 = GameData(game_number=3, pgn=game3_pgn)
+        # Verify load_tags sees nothing (corrupt).
+        self.assertEqual(ChessLogStorageService.load_tags(game3), {})
+        # Save a new moment.
+        new_data = {"0": [ChessLogStorageService.make_entry("CLAMP", "C", "new")]}
+        ok = ChessLogStorageService.store_tags(game3, new_data, {})
+        self.assertTrue(ok)
+        result = ChessLogStorageService.load_tags(game3)
+        self.assertEqual(ChessLogStorageService.count_tags(result), 1)
+        self.assertEqual(result["0"][0]["why"], "new",
+                         "new moment written correctly after corrupt tag replaced")
 
 
 if __name__ == "__main__":

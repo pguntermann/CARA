@@ -67,12 +67,52 @@ class ChessLogStorageService:
             return False
 
     @staticmethod
+    def has_moments(pgn_or_headers) -> bool:
+        """Return True only when the game holds at least one valid Chess Log moment.
+
+        Accepts either:
+        - A PGN string (str): full text of one game, parsed with chess.pgn.read_game.
+        - A dict-like headers object (chess.pgn.Headers or dict): used directly,
+          avoiding a second parse when the caller already has the game in memory.
+
+        Returns False for no tag, empty payload, corrupt tag (checksum mismatch or
+        bad payload), or any error.  Never modifies any game object or PGN text.
+        Called from pgn_service._extract_game_data to set has_chess_log_tags at
+        database open time.
+        """
+        try:
+            if isinstance(pgn_or_headers, str):
+                if ChessLogStorageService.TAG_NAME not in pgn_or_headers:
+                    return False
+                chess_game = chess.pgn.read_game(StringIO(pgn_or_headers))
+                if chess_game is None:
+                    return False
+                headers = chess_game.headers
+            else:
+                headers = pgn_or_headers
+            if ChessLogStorageService.TAG_NAME not in headers:
+                return False
+            encoded = headers[ChessLogStorageService.TAG_NAME]
+            json_text = decode_and_decompress_to_str(encoded)
+            if ChessLogStorageService.TAG_CHECKSUM in headers:
+                stored = headers[ChessLogStorageService.TAG_CHECKSUM]
+                if compute_checksum(json_text.encode("utf-8")) != stored:
+                    return False
+            payload = json.loads(json_text)
+            paths_data = payload.get("paths", {})
+            return ChessLogStorageService.count_tags(paths_data) > 0
+        except Exception:
+            return False
+
+    @staticmethod
     def load_tags(game: GameData) -> Dict[str, List[Dict[str, Any]]]:
         """Load Chess Log moments from game PGN.
 
         Returns {path_key: [entry, ...]}. Returns {} on missing tag, checksum
-        mismatch (also strips the corrupt tags), or any error.
-        Does NOT modify game.has_chess_log_tags — this is a pure read.
+        mismatch, or any error.  On a corrupt tag, logs a warning and returns {}
+        without modifying game.pgn — the corrupt tag stays until the game is next
+        saved (store_tags overwrites it; clear_tags removes it).
+        Does NOT modify game.has_chess_log_tags or game.pgn — this is a pure read.
         """
         if game is None:
             return {}
@@ -88,15 +128,18 @@ class ChessLogStorageService:
                 stored = chess_game.headers[ChessLogStorageService.TAG_CHECKSUM]
                 if compute_checksum(json_text.encode("utf-8")) != stored:
                     LoggingService.get_instance().warning(
-                        "Chess Log checksum mismatch — removing corrupt tags."
+                        "Chess Log checksum mismatch — corrupt tag left in PGN; "
+                        "will be replaced on next save."
                     )
-                    ChessLogStorageService._remove_chess_log_tags(game)
                     return {}
             payload = json.loads(json_text)
             paths_data: Dict[str, List[Dict[str, Any]]] = payload.get("paths", {})
             return paths_data
         except ValueError:
-            ChessLogStorageService._remove_chess_log_tags(game)
+            LoggingService.get_instance().warning(
+                "Chess Log payload decode error — corrupt tag left in PGN; "
+                "will be replaced on next save."
+            )
             return {}
         except Exception:
             return {}

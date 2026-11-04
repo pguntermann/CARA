@@ -973,9 +973,8 @@ class PgnService:
             if not has_notes:
                 has_notes = "[CARANotes" in game_pgn
 
-            has_chess_log_tags = "CARAChessLog" in headers
-            if not has_chess_log_tags:
-                has_chess_log_tags = "[CARAChessLog" in game_pgn
+            from app.services.chess_log_storage_service import ChessLogStorageService  # local import — avoids circular
+            has_chess_log_tags = ChessLogStorageService.has_moments(headers)
 
             # Per-game CARA tag bubbles (semicolon-separated).
             game_tags_raw = headers.get("CARAGameTags", "") if headers else ""

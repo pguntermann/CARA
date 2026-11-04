@@ -2958,10 +2958,12 @@ class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
         ("chess_log_storage_service.py", "store_tags"):
             "own definition; sets has_chess_log_tags after writing",
         ("chess_log_storage_service.py", "clear_tags"):
-            "own definition; sets has_chess_log_tags = False after clearing",
+            "own definition; sets has_chess_log_tags = False after clearing; "
+            "sole caller of _remove_chess_log_tags",
     }
-    # Initial flag value is set by pgn_service.py:976 via GameData.__init__ at database
-    # open time (not a game.has_chess_log_tags= assignment; uses local variable + constructor).
+    # Initial flag value is set by pgn_service._extract_game_data:976 via GameData.__init__
+    # at database open time (calls ChessLogStorageService.has_moments(headers) — not a
+    # game.has_chess_log_tags= assignment; uses local variable + constructor).
 
     # Rules: (regex_pattern, frozenset_of_allowed_keys, failure_message).
     # Each key is a (filename_suffix, function_name) pair from _ALLOWLIST_REASONS.
@@ -3009,6 +3011,13 @@ class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
                 ("chess_log_controller.py", "_prune_dirty_games_against_open_databases"),
             }),
             "_multi_cache mutated outside allowlist",
+        ),
+        (
+            r"\._remove_chess_log_tags\s*\(",
+            frozenset({
+                ("chess_log_storage_service.py", "clear_tags"),
+            }),
+            "_remove_chess_log_tags called outside save path (must not be called from load_tags)",
         ),
     ]
 
@@ -3109,6 +3118,13 @@ class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
 
     def test_multi_cache_mutation_only_in_allowlist(self):
         pattern, allowlist, msg = self._RULES[3]
+        violations = self._violations(pattern, allowlist)
+        if violations:
+            detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
+            self.fail(f"{msg}:\n{detail}")
+
+    def test_remove_chess_log_tags_only_in_save_path(self):
+        pattern, allowlist, msg = self._RULES[4]
         violations = self._violations(pattern, allowlist)
         if violations:
             detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
