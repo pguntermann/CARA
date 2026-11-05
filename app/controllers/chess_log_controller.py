@@ -168,35 +168,15 @@ class ChessLogController:
         return True
 
     def save_tags_for_current_game(self) -> bool:
-        """Persist the in-memory cache to the active game's PGN tag.
+        """Persist the active game's Chess Log data to its PGN tag.
 
-        When the cache is empty (after a pending clear), calls clear_tags to
-        remove Chess Log headers rather than leaving an empty payload in the PGN.
+        Thin wrapper over _save_single_game, the single persist path.
+        Returns False when there is no active game.
         """
         game = self._game_controller.get_game_model().active_game
         if game is None:
             return False
-        gid = id(game)
-        check_run = self._pending_check_runs.pop(gid, None)
-        if not self._cached_paths_data:
-            ok = ChessLogStorageService.clear_tags(game)
-        else:
-            ok = ChessLogStorageService.store_tags(
-                game, self._cached_paths_data, self.config,
-                nag_shown=self._nag_shown_by_game.get(self._cached_game_id, False),
-                original_paths=self._cached_original_paths.get(gid),
-                check_run=check_run,
-            )
-        if ok:
-            self._dirty_games.pop(gid, None)
-            # Refresh the snapshot from disk — NOT from the paths_data we passed
-            # in — so a refused new orphan isn't recorded as pre-existing on the
-            # next save, which would defeat the guard.
-            self._cached_original_paths[gid] = ChessLogStorageService.load_tags(game)
-            self._cache_version_by_game[gid] = self._cache_version_by_game.get(gid, 0) + 1
-            self._game_controller.get_game_model().metadata_updated.emit()
-            self._mark_database_unsaved(game)
-        return ok
+        return self._save_single_game(game)
 
     def clear_tags_for_current_game(self) -> bool:
         """Mark all moments for the active game as cleared (pending — save to persist).
@@ -365,7 +345,6 @@ class ChessLogController:
             if self.has_unsaved_changes():
                 if self._save_single_game(current_game):
                     saved += 1
-                    self._game_controller.get_game_model().metadata_updated.emit()
                 else:
                     failed += 1
 
@@ -469,10 +448,14 @@ class ChessLogController:
     def _save_single_game(self, game) -> bool:
         """Persist one game's Chess Log cache and mark its DB unsaved.
 
-        Resolves which store owns the game (single-game cache if it is the active
-        game, multi-cache otherwise), calls store_tags, refreshes the on-disk
-        snapshot, bumps the version counter, marks the DB unsaved, and removes
-        the game from _dirty_games.  Returns True on success.
+        The only place that persists a game.  Resolves which store owns the game
+        (single-game cache if it is the active game, multi-cache otherwise),
+        calls store_tags (or clear_tags when empty), refreshes the on-disk
+        snapshot, bumps the version counter, marks the DB unsaved, removes the
+        game from _dirty_games and the pending _check_run, and emits
+        metadata_updated once if the game is the active game.  A failed save
+        leaves the pending _check_run queued and the game dirty.
+        Returns True on success.
         """
         gid = id(game)
         data = (
@@ -483,7 +466,7 @@ class ChessLogController:
         # Consume any pending _check_run override from a Check Logs Save.
         # When present, store_tags writes the new run info; when absent (None),
         # store_tags auto-preserves whatever _check_run is already in the PGN.
-        check_run = self._pending_check_runs.pop(gid, None)
+        check_run = self._pending_check_runs.get(gid)
         if not data:
             ok = ChessLogStorageService.clear_tags(game)
         else:
@@ -498,6 +481,10 @@ class ChessLogController:
             self._cache_version_by_game[gid] = self._cache_version_by_game.get(gid, 0) + 1
             self._mark_database_unsaved(game)
             self._dirty_games.pop(gid, None)
+            self._pending_check_runs.pop(gid, None)
+            model = self._game_controller.get_game_model()
+            if model.active_game is game:
+                model.metadata_updated.emit()
         return ok
 
     def has_dirty_games(self) -> bool:

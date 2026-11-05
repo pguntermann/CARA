@@ -811,6 +811,31 @@ class TestSaveAllIncludesCurrentGame(unittest.TestCase):
         ctrl.save_all_dirty_games()
         gm.metadata_updated.emit.assert_called()
 
+    def test_save_all_emits_metadata_updated_exactly_once_for_active_game(self):
+        """Active game among several dirty games -> exactly one emit."""
+        ctrl, gm, game = self._make_ctrl_with_tagged_active_game()
+        entry = ChessLogStorageService.make_entry("CLAMP", "C", "n")
+        others = [make_game(n) for n in (2, 3)]
+        for g in others:
+            ctrl._multi_cache[id(g)] = {"0": [entry]}
+            ctrl._dirty_games[id(g)] = g
+        ctrl._dirty_games[id(game)] = game
+        saved, failed = ctrl.save_all_dirty_games()
+        self.assertEqual((saved, failed), (3, 0))
+        self.assertEqual(gm.metadata_updated.emit.call_count, 1)
+
+    def test_failed_save_keeps_pending_check_run_and_dirty(self):
+        ctrl, gm, game = self._make_ctrl_with_tagged_active_game()
+        gid = id(game)
+        ctrl._dirty_games[gid] = game
+        run = {"model": "m"}
+        ctrl.set_check_run_for_game(game, run)
+        with patch.object(ChessLogStorageService, "store_tags", return_value=False):
+            self.assertFalse(ctrl.save_tags_for_current_game())
+        self.assertIs(ctrl._pending_check_runs.get(gid), run)
+        self.assertIn(gid, ctrl._dirty_games)
+        gm.metadata_updated.emit.assert_not_called()
+
 
 class TestSaveCurrentGameDirtyState(unittest.TestCase):
     """Dirty-state regression tests for save and clear paths."""
@@ -3083,6 +3108,26 @@ class TestWriteStoreIsOnlyMutationPath(unittest.TestCase):
         if violations:
             detail = "\n".join(f"  {p}:{ln}: {l}" for p, ln, l in violations)
             self.fail(f"{msg}:\n{detail}")
+
+    def test_store_and_clear_tags_called_only_from_save_single_game(self):
+        """Within chess_log_controller.py, store_tags( and clear_tags( are each
+        called from exactly one function: _save_single_game."""
+        import re
+        path = _os.path.join(
+            _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__))),
+            "app", "controllers", "chess_log_controller.py",
+        )
+        with open(path, encoding="utf-8") as fh:
+            source = fh.read()
+        line_to_func = self._build_line_to_func(source)
+        for name in ("store_tags", "clear_tags"):
+            funcs = {
+                line_to_func.get(i, "<module>")
+                for i, line in enumerate(source.split("\n"), 1)
+                if re.search(r"\b%s\(" % name, line)
+                and not line.lstrip().startswith("#")
+            }
+            self.assertEqual(funcs, {"_save_single_game"}, name)
 
     def test_has_chess_log_tags_assignment_only_in_allowlist(self):
         pattern, allowlist, msg = self._RULES[1]
