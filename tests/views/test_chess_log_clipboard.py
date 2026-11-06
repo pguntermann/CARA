@@ -98,6 +98,7 @@ def _make_charts_stub_controller():
     ctrl.get_available_models.return_value = []
     ctrl.get_default_narrative_model.return_value = None
     ctrl.get_narrative_timeout_seconds.return_value = 60
+    ctrl.get_narrative_token_limit.return_value = 12000
     ctrl.get_narrative_model_override.return_value = None
     ctrl.get_last_narrative_result.return_value = ("", [], None)
     ctrl.get_last_shallow_result.return_value = (None, None, None)

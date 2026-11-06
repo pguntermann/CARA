@@ -271,7 +271,6 @@ class TestB5VagueOnlyExport(unittest.TestCase):
 class TestB6TokensSpinNotRestored(unittest.TestCase):
     """B6: a rebuilt view shows the default token limit, the controller uses another."""
 
-    @unittest.expectedFailure
     def test_tokens_spin_reflects_controller_limit(self):
         from app.views.detail_chess_log_charts_view import DetailChessLogChartsView
 
@@ -280,6 +279,32 @@ class TestB6TokensSpinNotRestored(unittest.TestCase):
         view = DetailChessLogChartsView({})          # what MainWindow.apply_theme() does
         view.set_controller(ctrl)
         self.assertEqual(view._tokens_spin.value(), ctrl._narrative_token_limit)
+        self.assertEqual(ctrl.get_narrative_token_limit(), 20000)   # restoring did not write back
+
+    def test_restore_does_not_write_back_to_controller(self):
+        from app.views.detail_chess_log_charts_view import DetailChessLogChartsView
+
+        ctrl = _charts_controller()
+        ctrl.set_narrative_token_limit(20000)
+        view = DetailChessLogChartsView({})
+        with patch.object(ctrl, "set_narrative_token_limit") as setter:
+            view.set_controller(ctrl)
+        setter.assert_not_called()
+
+    def test_default_limit_literal_defined_once(self):
+        import re
+        from pathlib import Path
+        from app.controllers.chess_log_charts_controller import DEFAULT_NARRATIVE_TOKEN_LIMIT
+
+        self.assertEqual(DEFAULT_NARRATIVE_TOKEN_LIMIT, 12000)
+        hits = []
+        for path in Path("app").rglob("*.py"):
+            if "chess_log" not in path.name:
+                continue
+            for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                if re.search(r"\b12000\b", line):
+                    hits.append((path.name, line.strip().split("  #")[0]))
+        self.assertEqual(hits, [("chess_log_charts_controller.py", "DEFAULT_NARRATIVE_TOKEN_LIMIT = 12000")])
 
 
 @requires_qt

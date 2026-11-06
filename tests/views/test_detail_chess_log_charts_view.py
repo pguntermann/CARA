@@ -57,6 +57,7 @@ def _make_stub_controller(ai_configured: bool = False, models=None, timeout: int
     ctrl.get_available_models.return_value = models or []
     ctrl.get_default_narrative_model.return_value = (models[0] if models else None)
     ctrl.get_narrative_timeout_seconds.return_value = timeout
+    ctrl.get_narrative_token_limit.return_value = 12000
     ctrl.get_narrative_model_override.return_value = None
     ctrl.get_last_narrative_result.return_value = ("", [], None)
     ctrl.get_last_shallow_result.return_value = (None, None, None)

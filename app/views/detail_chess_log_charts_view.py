@@ -32,7 +32,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from app.controllers.chess_log_charts_controller import ChessLogChartsController
+from app.controllers.chess_log_charts_controller import (
+    DEFAULT_NARRATIVE_TOKEN_LIMIT,
+    ChessLogChartsController,
+)
 from app.views.dialogs.message_dialog import MessageDialog
 from app.services.ai_service import TokenUsage
 from app.services.chess_log_narrative_service import sanitize_narrative_markdown
@@ -124,6 +127,11 @@ class DetailChessLogChartsView(QWidget):
         controller.ai_configured_changed.connect(self._on_ai_configured_changed)
         controller.ai_model_changed.connect(self._on_ai_model_changed)
         controller.results_invalidated.connect(self._clear_narrative_and_check_logs)
+
+        # Restore the controller's token limit (survives a theme rebuild); don't write it back.
+        self._tokens_spin.blockSignals(True)
+        self._tokens_spin.setValue(controller.get_narrative_token_limit())
+        self._tokens_spin.blockSignals(False)
 
         self._refresh_ai_state()
 
@@ -293,7 +301,7 @@ class DetailChessLogChartsView(QWidget):
         self._tokens_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self._tokens_spin.setRange(256, 99999)
         self._tokens_spin.setSingleStep(1000)
-        self._tokens_spin.setValue(12000)  # GFM tables render natively in Qt 6.4+; requirements.txt pins 6.11
+        self._tokens_spin.setValue(DEFAULT_NARRATIVE_TOKEN_LIMIT)  # GFM tables render natively in Qt 6.4+; requirements.txt pins 6.11
         self._tokens_spin.setFixedWidth(80)
         self._tokens_spin.valueChanged.connect(self._on_narrative_tokens_changed)
         model_row.addWidget(self._tokens_spin)

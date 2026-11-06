@@ -2295,6 +2295,7 @@ class TestAIHintMenuPath(unittest.TestCase):
         ctrl.get_available_models.return_value = []
         ctrl.get_default_narrative_model.return_value = ""
         ctrl.get_narrative_timeout_seconds.return_value = 60
+        ctrl.get_narrative_token_limit.return_value = 12000
         ctrl.get_narrative_model_override.return_value = ""
         # Connect signals manually would be complex; call _refresh_ai_state directly
         view._controller = ctrl

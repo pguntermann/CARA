@@ -473,6 +473,10 @@ class ChessLogNarrativeThread(QThread):
             self.narrative_failed.emit(f"Unexpected error: {exc}")
 
 
+# Default max output tokens for the Narrative Summary (the Tokens spin box in the Charts tab).
+DEFAULT_NARRATIVE_TOKEN_LIMIT = 12000
+
+
 class ChessLogChartsController(QObject):
     """Controller for the Chess Log Charts detail tab."""
 
@@ -522,7 +526,7 @@ class ChessLogChartsController(QObject):
         self._shallow_thread: Optional[ChessLogShallowThread] = None
 
         # Narrative-panel ephemeral settings (not persisted except timeout).
-        self._narrative_token_limit: int = 12000
+        self._narrative_token_limit: int = DEFAULT_NARRATIVE_TOKEN_LIMIT
         self._narrative_model_override: Optional[str] = None
         self._chess_log_controller: Optional[Any] = None
         self._pending_narrative_model_label: str = ""
@@ -709,6 +713,9 @@ class ChessLogChartsController(QObject):
             )
         except Exception:
             pass
+
+    def get_narrative_token_limit(self) -> int:
+        return self._narrative_token_limit
 
     def set_narrative_token_limit(self, limit: int) -> None:
         self._narrative_token_limit = limit
