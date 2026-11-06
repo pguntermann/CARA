@@ -232,7 +232,6 @@ class TestB4EmptyNotesPathLeavesControllerCacheStale(unittest.TestCase):
         ctrl = _charts_controller()
         g = _make_game()
         ctrl._cached_shallow_keys = frozenset({(g, "0", "CLAMP", "")})
-        ctrl._user_settings = {"x": 1}
         with patch("app.controllers.chess_log_charts_controller.resolve_default_provider",
                    return_value=("openai", "m", "k", None)), \
                 patch.object(ctrl, "_resolve_games", return_value=[g]), \
@@ -283,24 +282,69 @@ class TestB6TokensSpinNotRestored(unittest.TestCase):
         self.assertEqual(view._tokens_spin.value(), ctrl._narrative_token_limit)
 
 
+@requires_qt
 class TestB7AISettingsSnapshotStale(unittest.TestCase):
-    """B7: the Charts controller reads a snapshot of user settings."""
+    """B7: the Charts controller reads AI settings live, never from a snapshot."""
 
-    @unittest.expectedFailure
-    def test_timeout_changed_elsewhere_is_seen(self):
+    def setUp(self):
         import tempfile
         from pathlib import Path
         from app.services.user_settings_service import UserSettingsService
 
-        with tempfile.TemporaryDirectory() as d:
-            svc = UserSettingsService(Path(d) / "user_settings.json")
-            ctrl = _charts_controller()
-            ctrl.set_user_settings(svc.get_settings())
-            # AI Summary's timeout spin writes straight to the shared key.
-            svc.update_ai_summary_settings({"request_timeout_seconds": 90})
-            self.assertEqual(svc.get_settings()["ai_summary"]["request_timeout_seconds"], 90)
-            self.assertEqual(ctrl.get_narrative_timeout_seconds(), 90)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.svc = UserSettingsService(Path(tmp.name) / "user_settings.json")
+        self.svc.get_model().set_ai_models({})
+        self.svc.get_model().set_ai_summary({})
+        p = patch.object(UserSettingsService, "get_instance", classmethod(lambda cls, *a, **k: self.svc))
+        p.start()
+        self.addCleanup(p.stop)
 
+    def test_timeout_changed_elsewhere_is_seen(self):
+        ctrl = _charts_controller()
+        ctrl.set_user_settings(self.svc.get_settings())
+        # AI Summary's timeout spin writes straight to the shared key.
+        self.svc.update_ai_summary_settings({"request_timeout_seconds": 90})
+        self.assertEqual(self.svc.get_settings()["ai_summary"]["request_timeout_seconds"], 90)
+        self.assertEqual(ctrl.get_narrative_timeout_seconds(), 90)
+
+    def test_provider_toggle_reflected_without_set_user_settings(self):
+        self.svc.update_ai_model_settings({
+            "openai": {"api_key": "sk-o", "model": "gpt-4o", "models": ["gpt-4o"]},
+            "anthropic": {"api_key": "sk-a", "model": "claude-x", "models": ["claude-x", "claude-y"]},
+        })
+        self.svc.update_ai_summary_settings({
+            "use_openai_models": True, "use_anthropic_models": False, "use_custom_models": False,
+        })
+        ctrl = _charts_controller()
+        self.assertEqual(ctrl.get_available_models(), ["gpt-4o"])
+        self.svc.update_ai_summary_settings({
+            "use_openai_models": False, "use_anthropic_models": True, "use_custom_models": False,
+        })
+        self.assertEqual(ctrl.get_available_models(), ["claude-x", "claude-y"])
+        self.assertEqual(ctrl.get_default_narrative_model(), "claude-x")
+
+    def test_ai_settings_changed_signal_updates_controller_and_signals(self):
+        self.svc.update_ai_model_settings({"openai": {"api_key": "k", "model": "m", "models": ["m"]}})
+        self.svc.update_ai_summary_settings({"use_openai_models": True})
+        ctrl = _charts_controller()
+        self.svc.get_model().ai_settings_changed.connect(ctrl.on_ai_settings_changed)
+        configured, models = [], []
+        ctrl.ai_configured_changed.connect(configured.append)
+        ctrl.ai_model_changed.connect(lambda: models.append(1))
+        self.svc.update_ai_summary_settings({"request_timeout_seconds": 90})
+        self.assertEqual(configured, [True])   # first sighting of a configured provider
+        self.assertEqual(len(models), 1)
+        self.svc.update_ai_summary_settings({"request_timeout_seconds": 91})
+        self.assertEqual(configured, [True])   # unchanged provider: no repeat signal
+        self.assertEqual(len(models), 1)
+
+    def test_controller_has_no_user_settings_snapshot_attribute(self):
+        ctrl = _charts_controller()
+        self.assertFalse(hasattr(ctrl, "_user_settings"))
+        import inspect
+        from app.controllers import chess_log_charts_controller as mod
+        self.assertNotIn("_user_settings", inspect.getsource(mod).replace("set_user_settings", ""))
 
 
 if __name__ == "__main__":

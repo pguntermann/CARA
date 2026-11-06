@@ -499,7 +499,8 @@ class ChessLogChartsController(QObject):
         super().__init__()
         self._config = config
         self._database_controller = database_controller
-        self._user_settings: Dict[str, Any] = {}
+        # Last AI provider state announced via ai_configured_changed / ai_model_changed.
+        self._ai_baseline: tuple = (False, None)
 
         self._source_selection: int = 0   # 0=None, 1=Active, 2=All, 3=SelectedActive, 4=SelectedAll
         self._current_player: str = ""
@@ -603,20 +604,31 @@ class ChessLogChartsController(QObject):
             return ChessLogStorageService.load_resolved_paths(game)
         return self._chess_log_controller.get_tags_for_game(game)
 
-    def set_user_settings(self, user_settings: Dict[str, Any]) -> None:
-        """Refresh user settings (e.g. after AI Model Settings dialog closes)."""
-        was_configured = resolve_default_provider(self._user_settings) is not None
-        _old_pt = resolve_default_provider(self._user_settings)
-        self._user_settings = user_settings
-        is_configured = resolve_default_provider(self._user_settings) is not None
+    @staticmethod
+    def _live_settings() -> Dict[str, Any]:
+        """Current user settings, read at the moment of use (never cached)."""
+        return UserSettingsService.get_instance().get_settings()
+
+    def on_ai_settings_changed(self) -> None:
+        """Re-resolve the AI provider from live settings; emit change signals if it moved."""
+        provider_tuple = resolve_default_provider(self._live_settings())
+        is_configured = provider_tuple is not None
+        key = (provider_tuple[0], provider_tuple[1]) if provider_tuple else None
+        was_configured, old_key = self._ai_baseline
+        self._ai_baseline = (is_configured, key)
         if was_configured != is_configured:
             self.ai_configured_changed.emit(is_configured)
-        _new_pt = resolve_default_provider(self._user_settings)
-        _old_key = (_old_pt[0], _old_pt[1]) if _old_pt else None
-        _new_key = (_new_pt[0], _new_pt[1]) if _new_pt else None
-        if _old_key != _new_key:
+        if old_key != key:
             self._narrative_model_override = None
             self.ai_model_changed.emit()
+
+    def set_user_settings(self, user_settings: Dict[str, Any]) -> None:
+        """Apply Chess Log chart preferences from *user_settings* and re-check the AI provider.
+
+        AI settings themselves are never cached here; they are read live from
+        UserSettingsService.
+        """
+        self.on_ai_settings_changed()
 
         old = (
             self._target_progression_bins, self._ordinal_fallback_mode, self._progression_x_axis_mode,
@@ -641,7 +653,7 @@ class ChessLogChartsController(QObject):
             self._selection_debounce.start(self._selection_debounce_ms)
 
     def is_ai_configured(self) -> bool:
-        return resolve_default_provider(self._user_settings) is not None
+        return resolve_default_provider(self._live_settings()) is not None
 
     def get_last_narrative_result(self) -> tuple:
         """Return (narrative, flags, usage) from the most recent successful generation."""
@@ -687,7 +699,7 @@ class ChessLogChartsController(QObject):
 
     def get_narrative_timeout_seconds(self) -> int:
         """Return the shared AI Summary timeout (persisted in user_settings)."""
-        return int(self._user_settings.get("ai_summary", {}).get("request_timeout_seconds", 60))
+        return int(self._live_settings().get("ai_summary", {}).get("request_timeout_seconds", 60))
 
     def set_narrative_timeout_seconds(self, seconds: int) -> None:
         """Persist the timeout to the shared ai_summary.request_timeout_seconds key."""
@@ -697,7 +709,6 @@ class ChessLogChartsController(QObject):
             )
         except Exception:
             pass
-        self._user_settings.setdefault("ai_summary", {})["request_timeout_seconds"] = seconds
 
     def set_narrative_token_limit(self, limit: int) -> None:
         self._narrative_token_limit = limit
@@ -712,11 +723,11 @@ class ChessLogChartsController(QObject):
 
     def get_available_models(self) -> List[str]:
         """Return model IDs available for the active provider."""
-        return _get_available_models(self._user_settings)
+        return _get_available_models(self._live_settings())
 
     def get_default_narrative_model(self) -> Optional[str]:
         """Return the default model ID for the active provider, or None if unconfigured."""
-        provider_tuple = resolve_default_provider(self._user_settings)
+        provider_tuple = resolve_default_provider(self._live_settings())
         return provider_tuple[1] if provider_tuple else None
 
     # --- getters ---
@@ -822,7 +833,7 @@ class ChessLogChartsController(QObject):
         if not self._current_player:
             self.narrative_failed.emit("Please select a player first.")
             return
-        provider_tuple = resolve_default_provider(self._user_settings)
+        provider_tuple = resolve_default_provider(self._live_settings())
         if not provider_tuple:
             self.narrative_failed.emit("No AI provider configured.")
             return
@@ -865,7 +876,7 @@ class ChessLogChartsController(QObject):
         SHALLOW, and writes is_shallow onto each affected entry in the cache.
         Emits ``shallow_failed`` on error.
         """
-        provider_tuple = resolve_default_provider(self._user_settings)
+        provider_tuple = resolve_default_provider(self._live_settings())
         if not provider_tuple:
             self.shallow_failed.emit("No AI provider configured.")
             return

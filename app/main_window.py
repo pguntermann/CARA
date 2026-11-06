@@ -2155,8 +2155,14 @@ class MainWindow(QMainWindow):
                     _USS.get_instance().get_settings()
                 )
             )
+            # AI Summary timeout / provider toggles write the shared settings; keep Charts in step.
+            _USS.get_instance().get_model().ai_settings_changed.connect(
+                cl_charts_controller.on_ai_settings_changed
+            )
             if hasattr(self.detail_panel, "chess_log_charts_view"):
-                self.detail_panel.chess_log_charts_view.set_controller(cl_charts_controller)
+                _cl_view = self.detail_panel.chess_log_charts_view
+                _USS.get_instance().get_model().ai_settings_changed.connect(_cl_view.refresh_ai_state)
+                _cl_view.set_controller(cl_charts_controller)
                 self._refresh_chess_log_charts_ai_state()
 
         # Set moves list model in game analysis controller and on chessboard (for move classification badges)

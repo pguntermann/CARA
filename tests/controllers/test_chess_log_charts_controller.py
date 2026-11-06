@@ -236,7 +236,7 @@ class TestChessLogChartsControllerAIConfigured(unittest.TestCase):
 
     def test_openai_settings_ai_configured(self):
         ctrl = self._make_controller()
-        ctrl.set_user_settings({
+        _set_user_settings(ctrl, {
             "ai_models": {"openai": {"api_key": "sk-abc", "model": "gpt-4o"}}
         })
         self.assertTrue(ctrl.is_ai_configured())
@@ -245,7 +245,7 @@ class TestChessLogChartsControllerAIConfigured(unittest.TestCase):
         ctrl = self._make_controller()
         received = []
         ctrl.ai_configured_changed.connect(received.append)
-        ctrl.set_user_settings({
+        _set_user_settings(ctrl, {
             "ai_models": {"openai": {"api_key": "sk-abc", "model": "gpt-4o"}}
         })
         self.assertEqual(received, [True])
@@ -255,7 +255,7 @@ class TestChessLogChartsControllerAIConfigured(unittest.TestCase):
         # Already not configured; set to another unconfigured state — no signal
         received = []
         ctrl.ai_configured_changed.connect(received.append)
-        ctrl.set_user_settings({})
+        _set_user_settings(ctrl, {})
         self.assertEqual(received, [])
 
 
@@ -279,7 +279,7 @@ class TestChessLogChartsControllerNarrativeGate(unittest.TestCase):
 
     def test_narrative_thread_started_when_configured(self):
         ctrl = self._make_controller()
-        ctrl.set_user_settings({
+        _set_user_settings(ctrl, {
             "ai_models": {"openai": {"api_key": "sk-abc", "model": "gpt-4o"}}
         })
         with patch(
@@ -551,38 +551,38 @@ class TestChessLogChartsControllerChartSettings(unittest.TestCase):
 
     def test_set_user_settings_syncs_target_bins(self):
         ctrl = self._ctrl()
-        ctrl.set_user_settings({"chess_log": {"charts": {"target_bins": 8}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"target_bins": 8}}})
         self.assertEqual(ctrl.get_target_progression_bins(), 8)
 
     def test_set_user_settings_syncs_binning_mode(self):
         ctrl = self._ctrl()
-        ctrl.set_user_settings({"chess_log": {"charts": {"binning_mode": "equal_width"}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"binning_mode": "equal_width"}}})
         self.assertEqual(ctrl.get_ordinal_fallback_mode(), "equal_width")
 
     def test_set_user_settings_syncs_x_axis_layout(self):
         ctrl = self._ctrl()
-        ctrl.set_user_settings({"chess_log": {"charts": {"x_axis_layout": "calendar_linear"}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"x_axis_layout": "calendar_linear"}}})
         self.assertEqual(ctrl.get_progression_x_axis_mode(), "calendar_linear")
 
     def test_set_user_settings_syncs_line_style(self):
         ctrl = self._ctrl()
-        ctrl.set_user_settings({"chess_log": {"charts": {"line_style": "straight"}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"line_style": "straight"}}})
         self.assertEqual(ctrl.get_progression_line_style(), "straight")
 
     def test_set_user_settings_syncs_smoothing_strength(self):
         ctrl = self._ctrl()
-        ctrl.set_user_settings({"chess_log": {"charts": {"smoothing_strength": 2.0}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"smoothing_strength": 2.0}}})
         self.assertAlmostEqual(ctrl.get_progression_line_smooth_strength(), 2.0)
 
     def test_set_user_settings_kicks_debounce_when_any_chart_field_changes(self):
         ctrl = self._ctrl()
-        ctrl.set_user_settings({"chess_log": {"charts": {"target_bins": 8}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"target_bins": 8}}})
         self.assertTrue(ctrl._selection_debounce.isActive())
 
     def test_set_user_settings_does_not_kick_debounce_when_settings_unchanged(self):
         ctrl = self._ctrl()
         # All defaults — no actual change.
-        ctrl.set_user_settings({"chess_log": {"charts": {
+        _set_user_settings(ctrl, {"chess_log": {"charts": {
             "target_bins": 16, "binning_mode": "quantile", "x_axis_layout": "uniform_bins",
             "max_gap_segment_days": 28, "line_style": "smooth", "smoothing_strength": 1.0,
         }}})
@@ -603,7 +603,7 @@ class TestChessLogChartsControllerFlagShallowNotes(unittest.TestCase):
         ctrl._source_selection = 1
         ctrl._player_explicit_selected = True
         ctrl._current_player = "Alice"
-        ctrl.set_user_settings({
+        _set_user_settings(ctrl, {
             "ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}
         })
         return ctrl
@@ -671,7 +671,7 @@ class TestChessLogChartsControllerFlagShallowNotes(unittest.TestCase):
         ctrl._source_selection = 1
         ctrl._player_explicit_selected = True
         ctrl._current_player = "Alice"
-        ctrl.set_user_settings({
+        _set_user_settings(ctrl, {
             "ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}
         })
         return ctrl
@@ -1058,7 +1058,7 @@ class TestChessLogChartsControllerGetAvailableModels(unittest.TestCase):
 
     def _with_settings(self, settings: dict) -> "ChessLogChartsController":
         ctrl = self._make_controller()
-        ctrl._user_settings = settings
+        _apply_settings(settings)
         return ctrl
 
     # --- helpers for building settings dicts ---
@@ -1170,10 +1170,11 @@ class TestChessLogChartsControllerGetAvailableModels(unittest.TestCase):
         # Mutating the return value must not affect the settings dict
         ctrl = self._with_settings(self._s_openai())
         result = ctrl.get_available_models()
-        original_models = list(ctrl._user_settings["ai_models"]["openai"]["models"])
+        live = _current_service().get_settings()
+        original_models = list(live["ai_models"]["openai"]["models"])
         result.append("injected")
         self.assertEqual(
-            ctrl._user_settings["ai_models"]["openai"]["models"],
+            live["ai_models"]["openai"]["models"],
             original_models,
         )
 
@@ -1205,7 +1206,7 @@ class TestShallowIterationOrphanExclusion(unittest.TestCase):
         ctrl._source_selection = 1
         ctrl._player_explicit_selected = True
         ctrl._current_player = "Alice"
-        ctrl.set_user_settings({
+        _set_user_settings(ctrl, {
             "ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}
         })
         return ctrl
@@ -1508,7 +1509,7 @@ class TestShallowThread3x3IgnoreHonouredByHash(unittest.TestCase):
         ctrl._source_selection = 1
         ctrl._player_explicit_selected = True
         ctrl._current_player = "Alice"
-        ctrl.set_user_settings({"ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}})
+        _set_user_settings(ctrl, {"ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}})
 
         received = []
         ctrl.shallow_ready.connect(lambda k, vk, ck, u: received.append((k, vk, ck)))
@@ -1540,7 +1541,7 @@ class TestShallowThread3x3IgnoreClearedOnEdit(unittest.TestCase):
         ctrl._source_selection = 1
         ctrl._player_explicit_selected = True
         ctrl._current_player = "Alice"
-        ctrl.set_user_settings({"ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}})
+        _set_user_settings(ctrl, {"ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}})
 
         thread_kwargs: list = []
 
@@ -1584,7 +1585,7 @@ class TestShallowThread3x3AllAnswersIgnored(unittest.TestCase):
         ctrl._source_selection = 1
         ctrl._player_explicit_selected = True
         ctrl._current_player = "Alice"
-        ctrl.set_user_settings({"ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}})
+        _set_user_settings(ctrl, {"ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}})
 
         received = []
         ctrl.shallow_ready.connect(lambda k, vk, ck, u: received.append((k, vk, ck)))
@@ -2136,7 +2137,7 @@ class TestInFlightGuardViaRealStartPaths(unittest.TestCase):
         # Real chart option path: set_user_settings with a changed chart setting
         # Default x_axis_mode is "uniform_bins"; switching to "calendar_linear" changes it.
         # resolve_default_provider({...}) returns None (no AI key) — harmless for this test.
-        ctrl.set_user_settings({"chess_log": {"charts": {"progression_x_axis_mode": "calendar_linear"}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"progression_x_axis_mode": "calendar_linear"}}})
 
         with patch("app.controllers.chess_log_charts_controller.compute_narrative_counts",
                    return_value=(0, 0, 0, 0, False)):
@@ -2447,7 +2448,7 @@ class TestGameSetKeyInvalidation(unittest.TestCase):
 
         invalidated = []
         ctrl.results_invalidated.connect(lambda: invalidated.append(True))
-        ctrl.set_user_settings({"chess_log": {"charts": {"progression_x_axis_mode": "calendar_linear"}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"progression_x_axis_mode": "calendar_linear"}}})
 
         self.assertEqual(ctrl._cached_narrative, "Result to keep")
         self.assertEqual(ctrl._game_set_generation, gen0)
@@ -2586,7 +2587,7 @@ class TestGameSetKeyStability(unittest.TestCase):
         ctrl.results_invalidated.connect(lambda: invalidated.append(True))
 
         # Chart option change via real set_user_settings path (starts debounce timer)
-        ctrl.set_user_settings({"chess_log": {"charts": {"progression_x_axis_mode": "calendar_linear"}}})
+        _set_user_settings(ctrl, {"chess_log": {"charts": {"progression_x_axis_mode": "calendar_linear"}}})
 
         # Fire debounce slot directly — same game objects, key must match
         self._fire_debounce_with_patched_worker(ctrl)
@@ -2724,3 +2725,13 @@ class TestChessLogAggregationWorkerReasonCodes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+from tests.chess_log_ai_settings_helper import (  # noqa: E402
+    apply_settings as _apply_settings,
+    current_service as _current_service,
+    isolate_module as _isolate_module,
+    set_user_settings as _set_user_settings,
+)
+
+_isolate_module(globals())

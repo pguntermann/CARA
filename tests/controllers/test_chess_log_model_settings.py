@@ -73,7 +73,7 @@ def _make_pair(initial_settings: dict):
     db_ctrl.get_panel_model.return_value = None
 
     ctrl = ChessLogChartsController(config={}, database_controller=db_ctrl)
-    ctrl.set_user_settings(initial_settings)
+    _set_user_settings(ctrl, initial_settings)
 
     view = DetailChessLogChartsView(config={})
     view.set_controller(ctrl)
@@ -102,7 +102,7 @@ class TestModelSettingsOverrideCleared(unittest.TestCase):
         self.assertEqual(ctrl._narrative_model_override, "claude-opus-5")
 
         # AI Model Settings saved with a new default: claude-opus-5-5.
-        ctrl.set_user_settings(_settings("claude-opus-5-5"))
+        _set_user_settings(ctrl, _settings("claude-opus-5-5"))
 
         self.assertIsNone(ctrl._narrative_model_override,
                           "Override must be cleared when default model changes")
@@ -116,7 +116,7 @@ class TestModelSettingsOverrideCleared(unittest.TestCase):
         ctrl, view = _make_pair(_settings("claude-sonnet-5"))
         view._model_combo.setCurrentText("claude-opus-5")
 
-        ctrl.set_user_settings(_settings("claude-opus-5-5"))
+        _set_user_settings(ctrl, _settings("claude-opus-5-5"))
         # Dropdown now shows claude-opus-5-5; user picks claude-sonnet-5-5.
         view._model_combo.setCurrentText("claude-sonnet-5-5")
 
@@ -130,7 +130,7 @@ class TestModelSettingsOverrideCleared(unittest.TestCase):
         self.assertEqual(ctrl._narrative_model_override, "claude-opus-5")
 
         # Save settings again with the same default model.
-        ctrl.set_user_settings(_settings("claude-sonnet-5"))
+        _set_user_settings(ctrl, _settings("claude-sonnet-5"))
 
         self.assertEqual(ctrl._narrative_model_override, "claude-opus-5",
                          "Override must be preserved when default model is unchanged")
@@ -145,7 +145,7 @@ class TestModelSettingsOverrideCleared(unittest.TestCase):
         self.assertEqual(ctrl._narrative_model_override, "claude-opus-5")
 
         # Same model, different key.
-        ctrl.set_user_settings(_settings("claude-sonnet-5", api_key="key-B"))
+        _set_user_settings(ctrl, _settings("claude-sonnet-5", api_key="key-B"))
 
         self.assertEqual(ctrl._narrative_model_override, "claude-opus-5",
                          "Override must be preserved when only the API key changes")
@@ -175,3 +175,11 @@ class TestModelSelectionRegressions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+from tests.chess_log_ai_settings_helper import (  # noqa: E402
+    isolate_module as _isolate_module,
+    set_user_settings as _set_user_settings,
+)
+
+_isolate_module(globals())
