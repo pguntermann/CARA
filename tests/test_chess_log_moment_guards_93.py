@@ -94,6 +94,32 @@ class TestNoPathKeyInCopies(unittest.TestCase):
         text, html = _clipboard()
         self._assert_clean(text, html)
 
+    def test_chess_log_tab_copy_lists_moments_in_ply_order(self):
+        from tests.test_chess_log_exports_91 import _Harness, _clipboard, _game
+        # _tags() stores the later move ("0.0.0") before the earlier one ("0").
+        self.h = _Harness([_game(_tags())])
+        self.h.view()._copy_log_to_clipboard()
+        text, html = _clipboard()
+        self.assertLess(text.index("1. e4"), text.index("2. Nf3"))
+        self.assertLess(html.index("1. e4"), html.index("2. Nf3"))
+
+    def test_pdf_moment_labels_never_show_a_path_key(self):
+        # The controller's getters drop orphan path_keys, so hand the view an
+        # unlocatable moment directly (a PDF built from one must not print the key).
+        from app.controllers.chess_log_charts_controller import CheckLogMoment
+        from tests.test_chess_log_exports_91 import _Harness, _entry, _game
+        game = _game(_tags())
+        self.h = _Harness([game])
+        view = self.h.view()
+        orphan = CheckLogMoment(
+            game, "0.0.0.0.0.0.0", "CLAMP", [_entry("CLAMP", "L", "x", is_vague=True)], is_vague=True
+        )
+        with patch.object(view, "_check_log_moments", return_value=[orphan]):
+            labels = [r.move_label for g in view._build_check_log_tag_groups() for r in g["rows"]]
+        self.assertEqual(labels, ["Unknown move"])
+        for label in labels:
+            self.assertNotRegex(label, PATH_KEY_RE)
+
     def test_both_callers_agree_on_the_moments_body(self):
         from tests.test_chess_log_exports_91 import _Harness, _clipboard, _game
         from app.views.dialogs.show_shallow_tags_dialog import ShowShallowTagsDialog
@@ -107,7 +133,9 @@ class TestNoPathKeyInCopies(unittest.TestCase):
         )
         dlg._on_copy_to_clipboard()
         dlg_text, _ = _clipboard()
-        for answer in ("Why1: why one", "Why2: why two generic [Shallow]", "Why4: vague lesson [Vague]"):
+        from app.utils.chess_log_prompts import THREE_BY_THREE_PROMPTS as Q
+        for answer in (f"{Q['Why1']} why one", f"{Q['Why2']} why two generic [Shallow]",
+                       f"{Q['Why4']} vague lesson [Vague]"):
             self.assertIn(answer, tab_text)
             self.assertIn(answer, dlg_text)
 

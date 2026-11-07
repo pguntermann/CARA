@@ -990,6 +990,7 @@ class DetailChessLogChartsView(QWidget):
         from io import StringIO
         import chess.pgn as _chess_pgn
         from app.models.chess_log_snapshot import TagRowSnapshot
+        from app.services.chess_log_moment_renderer import display_move_label
         from app.views.dialogs._tag_row_helpers import (
             game_header_text as _game_header_text,
             node_info as _node_info,
@@ -1015,6 +1016,8 @@ class DetailChessLogChartsView(QWidget):
                 current_game = game
                 groups.append(current)
             fen, played_move, move_label, mover_is_black = _node_info(pgn_games[id(game)], mo.path_key)
+            # An unlocatable moment gets the renderer's label, never the raw path key.
+            move_label = display_move_label(pgn_games[id(game)], mo.path_key)
             current["rows"].append(TagRowSnapshot(
                 move_label=move_label,
                 preset=mo.preset,
