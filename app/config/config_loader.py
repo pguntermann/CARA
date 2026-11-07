@@ -2350,6 +2350,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.pgn_notation.padding",
     "ui.panels.detail.pgn_notation.placeholder_text",
     "ui.panels.detail.pgn_notation.text_color",
+    "ui.panels.detail.chess_log_charts.ai.default_timeout_seconds",
     "ui.panels.detail.chess_log_charts.category_colors.CCT.C",
     "ui.panels.detail.chess_log_charts.category_colors.CCT.C2",
     "ui.panels.detail.chess_log_charts.category_colors.CCT.T",

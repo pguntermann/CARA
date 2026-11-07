@@ -758,6 +758,11 @@ class DetailChessLogChartsView(QWidget):
         else:
             self._shallow_hint.setText("")
             self._shallow_hint.setVisible(False)
+        # Sync timeout from Chess Log's own setting without triggering valueChanged persist.
+        if self._controller:
+            self._timeout_spin.blockSignals(True)
+            self._timeout_spin.setValue(self._controller.get_narrative_timeout_seconds())
+            self._timeout_spin.blockSignals(False)
         self._model_combo.setEnabled(configured)
         self._timeout_spin.setEnabled(configured)
         self._tokens_spin.setEnabled(configured)
@@ -765,7 +770,6 @@ class DetailChessLogChartsView(QWidget):
         if configured and self._controller:
             models = self._controller.get_available_models()
             default_model = self._controller.get_default_narrative_model() or ""
-            timeout = self._controller.get_narrative_timeout_seconds()
 
             # Repopulate combo without firing model-changed signal.
             # Priority: (1) current visible selection, (2) persisted override
@@ -784,11 +788,6 @@ class DetailChessLogChartsView(QWidget):
                 idx = self._model_combo.findText(default_model)
             self._model_combo.setCurrentIndex(idx if idx >= 0 else 0)
             self._model_combo.blockSignals(False)
-
-            # Sync timeout from shared setting without triggering valueChanged persist.
-            self._timeout_spin.blockSignals(True)
-            self._timeout_spin.setValue(timeout)
-            self._timeout_spin.blockSignals(False)
 
     # ------------------------------------------------------------------
     # Right-click context menu

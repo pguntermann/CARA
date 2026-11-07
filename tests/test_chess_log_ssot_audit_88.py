@@ -328,9 +328,11 @@ class TestB7AISettingsSnapshotStale(unittest.TestCase):
     def test_timeout_changed_elsewhere_is_seen(self):
         ctrl = _charts_controller()
         ctrl.set_user_settings(self.svc.get_settings())
-        # AI Summary's timeout spin writes straight to the shared key.
-        self.svc.update_ai_summary_settings({"request_timeout_seconds": 90})
-        self.assertEqual(self.svc.get_settings()["ai_summary"]["request_timeout_seconds"], 90)
+        # #90: Chess Log's timeout is its own key; a write through the service is seen live.
+        self.svc.update_chess_log_settings({"ai_timeout_seconds": 90})
+        self.assertEqual(ctrl.get_narrative_timeout_seconds(), 90)
+        # ...and AI Summary's timeout is no longer shared with it.
+        self.svc.update_ai_summary_settings({"request_timeout_seconds": 45})
         self.assertEqual(ctrl.get_narrative_timeout_seconds(), 90)
 
     def test_provider_toggle_reflected_without_set_user_settings(self):

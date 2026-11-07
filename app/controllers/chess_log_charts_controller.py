@@ -475,6 +475,7 @@ class ChessLogNarrativeThread(QThread):
 
 # Default max output tokens for the Narrative Summary (the Tokens spin box in the Charts tab).
 DEFAULT_NARRATIVE_TOKEN_LIMIT = 12000
+CHESS_LOG_AI_TIMEOUT_KEY = "ai_timeout_seconds"  # under user_settings.chess_log
 
 
 class ChessLogChartsController(QObject):
@@ -702,17 +703,32 @@ class ChessLogChartsController(QObject):
     # --- narrative panel controls ---
 
     def get_narrative_timeout_seconds(self) -> int:
-        """Return the shared AI Summary timeout (persisted in user_settings)."""
-        return int(self._live_settings().get("ai_summary", {}).get("request_timeout_seconds", 60))
+        """Return Chess Log's own AI timeout (``chess_log.ai_timeout_seconds``), read live.
+
+        Falls back to the config default when the key is absent. Independent of
+        AI Summary's timeout.
+        """
+        stored = self._live_settings().get("chess_log", {}).get(CHESS_LOG_AI_TIMEOUT_KEY)
+        if stored is None:
+            return self._default_ai_timeout_seconds()
+        return int(stored)
 
     def set_narrative_timeout_seconds(self, seconds: int) -> None:
-        """Persist the timeout to the shared ai_summary.request_timeout_seconds key."""
+        """Persist the timeout to ``chess_log.ai_timeout_seconds``."""
         try:
-            UserSettingsService.get_instance().update_ai_summary_settings(
-                {"request_timeout_seconds": seconds}
+            UserSettingsService.get_instance().update_chess_log_settings(
+                {CHESS_LOG_AI_TIMEOUT_KEY: int(seconds)}
             )
         except Exception:
             pass
+
+    def _default_ai_timeout_seconds(self) -> int:
+        """Default Chess Log AI timeout from config.json."""
+        cfg = self._config
+        if not cfg.get("ui", {}).get("panels", {}).get("detail", {}).get("chess_log_charts", {}).get("ai", {}):
+            from app.config.config_loader import ConfigLoader
+            cfg = ConfigLoader().load()
+        return int(cfg["ui"]["panels"]["detail"]["chess_log_charts"]["ai"]["default_timeout_seconds"])
 
     def get_narrative_token_limit(self) -> int:
         return self._narrative_token_limit

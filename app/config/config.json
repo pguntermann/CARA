@@ -460,6 +460,9 @@
           "placeholder_text": "Add notes about this game..."
         },
         "chess_log_charts": {
+          "ai": {
+            "default_timeout_seconds": 120
+          },
           "chart": {
             "height": 220,
             "line_width": 2,

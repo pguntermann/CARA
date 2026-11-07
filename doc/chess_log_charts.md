@@ -65,7 +65,7 @@ Models that reject `thinking.type.disabled` outright cause a 400 with a recogniz
 
 ### Narrative panel controls (visible when AI is configured)
 
-Model combo (ephemeral, lists models for the active provider from `ai_models.{provider}.models`), Timeout spinner (10–600s, shared with AI Summary via `ai_summary.request_timeout_seconds` — changing it here also changes it in the AI Summary tab), Tokens spinner (256–16000, default **12000**, ephemeral — not persisted to user_settings).
+Model combo (ephemeral, lists models for the active provider from `ai_models.{provider}.models`), Timeout spinner (10–600s; Chess Log's own setting, persisted as `user_settings.chess_log.ai_timeout_seconds`, default **120** from `ui.panels.detail.chess_log_charts.ai.default_timeout_seconds` in `config.json`; used by both Narrative Summary and Check Logs; independent of AI Summary's `ai_summary.request_timeout_seconds` — changing either leaves the other untouched), Tokens spinner (256–99999, default **12000**, ephemeral — not persisted to user_settings).
 
 A **"Check Logs"** button (`_show_shallow_btn`) sits between the model/timeout/tokens row and the generate button — enabled when AI is configured and both Source and Player are selected. A single **"Generate Narrative"** button (`_generate_btn`) triggers narrative generation; clicking disables it, sets the edit to "Generating…", then calls `request_narrative()` on the controller. It re-enables when `narrative_ready` or `narrative_failed` fires.
 
@@ -75,7 +75,7 @@ Clicking "Check Logs" disables the button, starts a `BusySpinner` and shows "Che
 
 **Signal arity.** `narrative_ready = pyqtSignal(str, list, object)` carries `(text, shallow_flags, usage: Optional[TokenUsage])`; `shallow_ready = pyqtSignal(object, object, object, object)` carries `(shallow_keys, vague_keys, classified_keys, usage: Optional[TokenUsage])`. All three key sets use **4-tuple** `(game, path_key, preset, cat)` keys where `game` is the **GameData object** (Python identity, not `game_number`): CLAMP/CCT use `cat=""` (empty string); 3x3 uses `cat` in `{"Why1","Why2","Why3","Why4"}`. `classified_keys` is a `frozenset` of 4-tuples that were parsed this run (the "touchable set"); `shallow_keys ∪ vague_keys ⊆ classified_keys`. `vague_keys` is always empty for CLAMP/CCT notes. Both thread classes and the controller class use these arities. Every consumer (`_on_narrative_ready`, `_on_shallow_ready`, all test stubs) must accept all arguments.
 
-The controller's `get_available_models()` / `get_default_narrative_model()` / `get_narrative_timeout_seconds()` drive the view; `set_narrative_*()` setters update the in-memory state (timeout also persists).
+The controller's `get_available_models()` / `get_default_narrative_model()` / `get_narrative_timeout_seconds()` drive the view; `set_narrative_*()` setters update the in-memory state (timeout also persists to `chess_log.ai_timeout_seconds`, read live at each request).
 
 ### Narrative sanitization
 

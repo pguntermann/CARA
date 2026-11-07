@@ -2155,7 +2155,7 @@ class MainWindow(QMainWindow):
                     _USS.get_instance().get_settings()
                 )
             )
-            # AI Summary timeout / provider toggles write the shared settings; keep Charts in step.
+            # AI Summary provider / model toggles write the shared settings; keep Charts in step.
             _USS.get_instance().get_model().ai_settings_changed.connect(
                 cl_charts_controller.on_ai_settings_changed
             )
