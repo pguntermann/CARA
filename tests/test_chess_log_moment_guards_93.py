@@ -193,6 +193,15 @@ class TestCallersUseTheRenderer(unittest.TestCase):
         names = _names(fn)
         self.assertIn("ChessLogMomentRenderer", names)
         self.assertIn("render", names)
+        # Pending state in either mode: entries_for is always passed, and the copy
+        # never branches on the mode to fall back to stored entries.
+        self.assertIn("_pending_entries", names)
+        self.assertNotIn("_is_saved_mode", names)
+        render_calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                        and isinstance(n.func, ast.Attribute) and n.func.attr == "render"]
+        self.assertTrue(render_calls)
+        for call in render_calls:
+            self.assertIn("entries_for", {kw.arg for kw in call.keywords})
         # The document wrappers get the rendered body, never snapshot groups.
         kwargs = {kw.arg for n in ast.walk(fn) if isinstance(n, ast.Call) for kw in n.keywords}
         self.assertTrue({"moments_html", "moments_plain"} <= kwargs)

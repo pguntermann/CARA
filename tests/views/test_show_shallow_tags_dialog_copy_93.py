@@ -89,13 +89,64 @@ class TestDialogCopyBeforeSave(unittest.TestCase):
         self.assertEqual([e["why"] for e in pending], ["edited"])
         self.assertFalse(any(e.get("is_shallow") for e in pending))
 
-    def test_saved_mode_uses_saved_results_not_widget_edits(self):
+    def test_saved_mode_shows_unsaved_edit_to_an_answer_with_text(self):
+        # Paul's real-app steps: open from saved results, edit, copy without Save.
         keys = {(self.game, "0.0.0", "CLAMP", "")}
         dlg = self._dialog(saved_mode=True, shallow_keys=keys)
         dlg._widget_for_row[0]._why_texts["why"].setPlainText("typed but unsaved")
+        text, html = self._copy(dlg)
+        self.assertIn("typed but unsaved", text)
+        self.assertIn("typed but unsaved", html)
+        self.assertNotIn("attacked too early", text)
+
+    def test_saved_mode_edit_to_a_blank_answer(self):
+        self.stored = {"0": [
+            _entry("3x3", "Why1", "answer one", is_shallow=True),
+            _entry("3x3", "Why2", ""),
+        ]}
+        dlg = self._dialog(saved_mode=True, shallow_keys={(self.game, "0", "3x3", "Why1")})
+        dlg._widget_for_row[0]._why_texts["Why2"].setPlainText("now filled in")
+        text, html = self._copy(dlg)
+        self.assertIn("now filled in", text)
+        self.assertIn("now filled in", html)
+        self.assertIn("answer one [Shallow]", text)
+
+    def test_saved_mode_follows_the_ignore_box(self):
+        dlg = self._dialog(saved_mode=True, shallow_keys={(self.game, "0.0.0", "CLAMP", "")})
+        dlg._widget_for_row[0]._ignore_check.setChecked(True)
+        text, html = self._copy(dlg)
+        self.assertIn("saved shallow", text)
+        self.assertNotIn("[Shallow]", text)
+        self.assertNotIn("9a4400", html)
+
+    def test_saved_mode_edited_flagged_answer_loses_its_marker_like_save(self):
+        # Save drops the verdict of an answer whose text changed; so does the copy.
+        dlg = self._dialog(saved_mode=True, shallow_keys={(self.game, "0.0.0", "CLAMP", "")})
+        dlg._widget_for_row[0]._why_texts["why"].setPlainText("rewritten")
         text, _ = self._copy(dlg)
-        self.assertIn("saved shallow [Shallow]", text)
-        self.assertNotIn("typed but unsaved", text)
+        self.assertIn("rewritten", text)
+        self.assertNotIn("[Shallow]", text)
+        self.assertFalse(any(e.get("is_shallow") for e in dlg._pending_entries(0)))
+
+    def test_copy_equals_what_save_writes_in_both_modes(self):
+        from app.services.chess_log_moment_renderer import ChessLogMomentRenderer, MomentRef
+        for saved in (True, False):
+            with self.subTest(saved_mode=saved):
+                self.stored = {"0": [_entry("CLAMP", "C", "attacked too early", is_shallow=True)]}
+                keys = {(self.game, "0", "CLAMP", "")}
+                dlg = self._dialog(saved_mode=saved, shallow_keys=keys)
+                dlg._widget_for_row[0]._why_texts["why"].setPlainText("a different note")
+                copied, _ = self._copy(dlg)
+                dlg._on_save()
+                written = {}
+                for call in dlg._controller.replace_entries_at_path_for_game.call_args_list:
+                    game, pk, preset, entries = call.args
+                    written[MomentRef(game, pk, preset)] = entries
+                self.assertTrue(written)
+                saved_text = ChessLogMomentRenderer(MagicMock(), {}).render(
+                    list(written), entries_for=written.__getitem__
+                ).plain
+                self.assertIn(saved_text, copied)
 
     def test_saved_mode_does_not_mark_an_unsaved_verdict(self):
         dlg = self._dialog(saved_mode=True, shallow_keys={(self.game, "0.0.0", "CLAMP", "")})

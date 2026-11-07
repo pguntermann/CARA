@@ -559,13 +559,10 @@ class ShowShallowTagsDialog(QDialog):
             for i, (pk, preset, _entries) in enumerate(self._rows)
         ]
         renderer = ChessLogMomentRenderer(self._controller, self._config)
-        if self._is_saved_mode:
-            rendered = renderer.render(refs)
-        else:
-            # Live mode (before Save): show what Save would write, from the dialog's
-            # own pending state; the renderer keeps none of it.
-            pending = {ref: self._pending_entries(i) for i, ref in enumerate(refs)}
-            rendered = renderer.render(refs, entries_for=pending.__getitem__)
+        # Before Save, in either mode, the copy shows what Save would write, from the
+        # dialog's own pending state; the renderer keeps none of it.
+        pending = {ref: self._pending_entries(i) for i, ref in enumerate(refs)}
+        rendered = renderer.render(refs, entries_for=pending.__getitem__)
         model_label, generated_at = self._resolve_model_generated()
         svc = ChessLogHTMLService(self._config)
         mime = QMimeData()
