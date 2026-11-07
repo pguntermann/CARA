@@ -247,6 +247,16 @@ Abbreviations: **CLC** = `ChessLogController`; **CCC** = `ChessLogChartsControll
 
 **Adding data.** Any new piece of Chess Log data gets a row in this table and a guard test in `tests/test_chess_log_owner_guards_88.py` (or next to the owner's other tests) that fails when code outside the owner writes it or reads around the accessor. Decide the owner, the single write method and the accessor before writing a view; if a view needs a value after a rebuild, it reads it from the owner rather than keeping its own copy. Where a source-level guard is impractical, say why in the row.
 
+### Moment text renderer (#93)
+
+`app/services/chess_log_moment_renderer.py` is the one place a logged moment's copyable text is built, in both clipboard flavors (plain text and HTML). Callers: the Chess Log tab's "Copy log to clipboard" and Show Shallow/Vague Logs' "Copy to clipboard".
+
+- Callers pass `MomentRef(game, path_key, preset)`; the renderer reads entries and flags through the controller's `get_tags_for_game` at render time and keeps no copy.
+- Whole moment is listed; flagged answers are marked after the answer text: `Why1: ... [Shallow]`, `Why4: ... [Vague]`, both as `[Shallow] [Vague]`. The HTML flavor draws the same markers as chips.
+- Saved flags only. An answer whose Ignore is honoured (`is_entry_ignore_honoured`, which also drops Ignore when the text changed since) is unmarked.
+- The move comes from `_tag_row_helpers.node_info` (`32. g5` / `32… g5`). A moment whose move cannot be located reads "Unknown move"; a path key is never printed.
+- Guards: `tests/test_chess_log_moment_guards_93.py`.
+
 ## Change notification (`chess_log_changed`)
 
 `ChessLogController` is a `QObject` and the only thing that announces Chess Log changes.
