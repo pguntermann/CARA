@@ -499,20 +499,38 @@ class ShowShallowTagsDialog(QDialog):
         install_themed_dialog_resize_grip(self, self._config)
 
     def _build_tag_groups(self):
-        """Build game-grouped TagRowSnapshot lists from current widget state."""
+        """Game-grouped TagRowSnapshot lists for the PDF export (what Save would write).
+
+        Each row's mini board comes from its widget; its entries, flags and Ignore
+        state come from ``_pending_entries`` through the renderer's ``moment_flags``,
+        so a flag always belongs to the text shown beside it.
+        """
+        from dataclasses import replace
+        from app.services.chess_log_moment_renderer import moment_flags
+
         tag_groups = []
         current_game = None
         current_rows = []
         current_header = None
-        for i, row_widget in enumerate(self._row_widgets):
+        for i in sorted(self._widget_for_row):
             game = self._row_games[i]
+            preset = self._rows[i][1]
             if game is not current_game:
                 if current_rows:
                     tag_groups.append({"header": current_header, "rows": current_rows})
                 current_game = game
                 current_rows = []
                 current_header = _game_header_text(game)
-            current_rows.append(row_widget.snapshot())
+            entries = self._pending_entries(i)
+            is_shallow, is_vague, shallow_cats, vague_cats = moment_flags(preset, entries)
+            current_rows.append(replace(
+                self._widget_for_row[i].snapshot(),
+                entries=entries,
+                is_shallow=is_shallow,
+                is_vague=is_vague,
+                shallow_cats=shallow_cats,
+                vague_cats=vague_cats,
+            ))
         if current_rows:
             tag_groups.append({"header": current_header, "rows": current_rows})
         return tag_groups

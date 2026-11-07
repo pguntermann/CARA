@@ -20,7 +20,7 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass
 from io import StringIO
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple
 
 import chess.pgn
 
@@ -70,6 +70,30 @@ def _answer_flags(entry: Dict[str, Any]) -> Tuple[bool, bool]:
     if ChessLogStorageService.is_entry_ignore_honoured(entry):
         return (False, False)
     return (bool(entry.get("is_shallow")), bool(entry.get("is_vague")))
+
+
+def moment_flags(
+    preset: str, entries: List[Dict[str, Any]]
+) -> Tuple[bool, bool, FrozenSet[str], FrozenSet[str]]:
+    """(is_shallow, is_vague, shallow_cats, vague_cats) for a moment's entries.
+
+    CLAMP/CCT flag the moment; 3x3 flags per answer (Why1-3 Shallow, Why4 Vague).
+    Uses ``_answer_flags``, so every output agrees on what still applies to the text.
+    """
+    if preset == "3x3":
+        shallow_cats = set()
+        vague_cats = set()
+        for e in entries:
+            if not (e.get("why") or "").strip():
+                continue
+            shallow, vague = _answer_flags(e)
+            if shallow and e.get("cat") in _WHY_KEYS[:3]:
+                shallow_cats.add(e["cat"])
+            if vague and e.get("cat") == _WHY_KEYS[3]:
+                vague_cats.add(e["cat"])
+        return (False, False, frozenset(shallow_cats), frozenset(vague_cats))
+    flags = [_answer_flags(e) for e in entries]
+    return (any(f[0] for f in flags), any(f[1] for f in flags), frozenset(), frozenset())
 
 
 class ChessLogMomentRenderer:
@@ -198,10 +222,7 @@ class ChessLogMomentRenderer:
             ((e.get("why") or "").strip() for e in entries if (e.get("why") or "").strip()),
             "",
         )
-        shallow = vague = False
-        for e in entries:
-            s, v = _answer_flags(e)
-            shallow, vague = shallow or s, vague or v
+        shallow, vague, _, _ = moment_flags(preset, entries)
         plain = [head]
         html_parts = [f"<p><strong>{html.escape(head, quote=False)}</strong></p>"]
         if note:
