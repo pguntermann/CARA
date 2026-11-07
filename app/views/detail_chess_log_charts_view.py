@@ -924,31 +924,37 @@ class DetailChessLogChartsView(QWidget):
             lines.append("Narrative Summary:")
             lines.append(narrative)
             lines.append("")
-        moments = self._check_log_moments()
-        if moments:
+        rendered = self._render_check_log_moments()
+        if rendered.plain:
             lines.append("Check Logs:")
-            for mo in moments:
-                white = str(getattr(mo.game, "white", "") or "?")
-                black = str(getattr(mo.game, "black", "") or "?")
-                for e in mo.entries:
-                    if not ChessLogStorageService.entry_has_flag(e):
-                        continue
-                    cat = e.get("cat", "")
-                    why = e.get("why", "").strip()
-                    lines.append(
-                        f"  {white}–{black}  |  {mo.path_key}  |  {mo.preset}  |  {cat}  |  {why}"
-                    )
+            lines.append(rendered.plain)
         plain_text = "\n".join(lines)
 
-        html_text = self._charts_log_html_for_copy()
+        html_text = self._charts_log_html_for_copy(rendered)
         mime = QMimeData()
         mime.setHtml(html_text)
         mime.setText(plain_text)
         QApplication.clipboard().setMimeData(mime)
 
-    def _charts_log_html_for_copy(self) -> str:
+    def _render_check_log_moments(self):
+        """Both clipboard flavors of the flagged moments, via the shared renderer (#93)."""
+        from app.services.chess_log_moment_renderer import (
+            ChessLogMomentRenderer,
+            MomentRef,
+            RenderedMoments,
+        )
+
+        if self._controller is None:
+            return RenderedMoments(plain="", html="")
+        refs = [MomentRef(mo.game, mo.path_key, mo.preset) for mo in self._check_log_moments()]
+        return ChessLogMomentRenderer(self._controller, self._config).render(refs)
+
+    def _charts_log_html_for_copy(self, rendered=None) -> str:
         """Build HTML for the Charts log clipboard action."""
         from app.services.chess_log_html_service import ChessLogHTMLService
+
+        if rendered is None:
+            rendered = self._render_check_log_moments()
 
         player_name, source_label = self._export_header()
         narrative = sanitize_narrative_markdown(self._narrative_text())
@@ -963,14 +969,13 @@ class DetailChessLogChartsView(QWidget):
             for w in self._chart_widgets
         ]
 
-        check_log_groups = self._build_check_log_tag_groups()
-
         return ChessLogHTMLService(self._config).charts_log_html(
             player_name,
             source_label,
             chart_preset_names,
             narrative,
-            check_log_groups,
+            [],
+            moments_html=rendered.html,
             n_games=n,
             g_games=g,
             m_moments=m,

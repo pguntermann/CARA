@@ -234,13 +234,13 @@ class TestThreeFormatsAgree(unittest.TestCase):
         pdf_rows = captured["rows"]
 
         # Same moments, in the same order, in all three.
-        # Text: one line per flagged answer, so the flagged answers themselves appear.
-        check_lines = [ln for ln in text.splitlines() if ln.startswith("  ") and "|" in ln]
-        self.assertEqual(len(check_lines), 3)    # CLAMP note; 3x3 Why2; 3x3 Why4
-        self.assertIn("clamp shallow note", check_lines[0])
-        self.assertIn("why two generic", check_lines[1])
-        self.assertIn("vague lesson", check_lines[2])
-        self.assertNotIn("why one", text)         # unflagged answer is not listed
+        # Text (#93): each flagged moment is listed whole; flagged answers carry a marker.
+        marked = [ln for ln in text.splitlines() if ln.endswith("[Shallow]") or ln.endswith("[Vague]")]
+        self.assertEqual(len(marked), 3)    # CLAMP note; 3x3 Why2; 3x3 Why4
+        self.assertIn("clamp shallow note", marked[0])
+        self.assertIn("why two generic", marked[1])
+        self.assertIn("vague lesson", marked[2])
+        self.assertIn("why one", text)      # the whole moment is listed, unflagged answers too
         self.assertEqual(len(pdf_rows), len(moments))
         for row, mo in zip(pdf_rows, moments):
             self.assertEqual(row.preset, mo.preset)

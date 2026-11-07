@@ -413,6 +413,8 @@ class TestCopyLogShallowChipCLAMP(unittest.TestCase):
         ctrl.get_check_log_moments.return_value = [
             CheckLogMoment(self._game1, "0", "CLAMP", [flagged], is_shallow=True),
         ]
+        # The renderer reads the entries through the controller, not from the moment.
+        ctrl.get_tags_for_game.side_effect = lambda g: {"0": [flagged]} if g is self._game1 else {}
         self._view.set_controller(ctrl)
 
     def test_shallow_chip_appears_for_flagged_clamp_moment(self):
@@ -451,6 +453,7 @@ class TestCopyLogShallowChip3x3(unittest.TestCase):
             self._game, "0", "3x3", entries,
             shallow_cats=frozenset({"Why2"}), vague_cats=frozenset({"Why4"}),
         )]
+        ctrl.get_tags_for_game.side_effect = lambda g: {"0": entries}
         self._view.set_controller(ctrl)
 
     def test_shallow_chip_on_why2(self):

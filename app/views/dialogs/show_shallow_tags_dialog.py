@@ -550,21 +550,28 @@ class ShowShallowTagsDialog(QDialog):
         from PyQt6.QtWidgets import QApplication
         from PyQt6.QtCore import QMimeData
         from app.services.chess_log_html_service import ChessLogHTMLService
-        tag_groups = self._build_tag_groups()
+        from app.services.chess_log_moment_renderer import ChessLogMomentRenderer, MomentRef
+        refs = [
+            MomentRef(self._row_games[i], pk, preset)
+            for i, (pk, preset, _entries) in enumerate(self._rows)
+        ]
+        rendered = ChessLogMomentRenderer(self._controller, self._config).render(refs)
         model_label, generated_at = self._resolve_model_generated()
         svc = ChessLogHTMLService(self._config)
         mime = QMimeData()
         mime.setHtml(svc.check_logs_html(
-            tag_groups,
+            [],
             source_label=self._source_label,
             model_label=model_label,
             generated_at=generated_at,
+            moments_html=rendered.html,
         ))
         mime.setText(svc.check_logs_plain(
-            tag_groups,
+            [],
             source_label=self._source_label,
             model_label=model_label,
             generated_at=generated_at,
+            moments_plain=rendered.plain,
         ))
         QApplication.clipboard().setMimeData(mime)
 
