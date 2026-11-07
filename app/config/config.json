@@ -905,7 +905,8 @@
           },
           "none_found": {
             "title": "Nothing Flagged",
-            "message_template": "No shallow notes or vague lessons found — great job."
+            "message_template": "No shallow notes or vague lessons found — great job.",
+            "save_explanation": "Save records these notes as checked, so Show Shallow/Vague Logs won't count them as new."
           }
         }
       },

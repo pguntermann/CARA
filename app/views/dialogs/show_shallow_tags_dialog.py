@@ -4,8 +4,10 @@ Save/Cancel model: edits are buffered in the row widgets until the user clicks
 Save.  Save writes ``is_shallow=True`` / ``is_vague=True`` on every shown row
 (per key membership), clears stale flags on entries classified-clean this run
 (scoped to ``classified_keys`` only — entries the classifier didn't touch this
-run are never modified), then calls ``controller.save_games(affected_games)``
-to write game.pgn and mark each affected database unsaved.  Cancel and the
+run are never modified), then saves the affected games and marks each database
+unsaved.  The writing is done by ``commit_check_record`` (the one check-record
+writer, shared with the Nothing Flagged Save); this dialog only gathers its rows'
+decisions and calls it.  Cancel and the
 window close button discard all edits.
 
 The Ignore checkbox (via ``_TagRowWidget(show_ignore_checkbox=True)``) lets
@@ -36,6 +38,7 @@ from PyQt6.QtWidgets import (
 
 from datetime import datetime, timezone
 
+from app.services.chess_log_check_record_service import CheckRowDecision, commit_check_record
 from app.services.chess_log_storage_service import ChessLogStorageService
 from app.utils.chess_log_best_move import resolve_best_move_for_path
 from app.utils.help_icon import make_help_icon
@@ -47,7 +50,7 @@ from app.views.dialogs._tag_row_helpers import (
     ply_for_path as _ply_for_path_fn,
 )
 from app.views.dialogs.message_dialog import MessageDialog
-from app.views.dialogs.show_tags_dialog import _TagRowWidget, _PRESET_ORDER, _normalize_entries
+from app.views.dialogs.show_tags_dialog import _TagRowWidget, _PRESET_ORDER
 from app.views.style.style_manager import StyleManager
 
 
@@ -224,11 +227,6 @@ class ShowShallowTagsDialog(QDialog):
         if preset == "3x3":
             return (game, pk, "3x3", cat) in self._vague_keys
         return (game, pk, preset, "") in self._vague_keys
-
-    def _in_classified(self, game, pk: str, preset: str, cat: str) -> bool:
-        if preset == "3x3":
-            return (game, pk, "3x3", cat) in self._classified_keys
-        return (game, pk, preset, "") in self._classified_keys
 
     def _stamp_entries(
         self, game, pk: str, preset: str, entries: List[Dict[str, Any]]
@@ -642,20 +640,11 @@ class ShowShallowTagsDialog(QDialog):
         )
 
     def _on_save(self) -> None:
-        affected: set = set()
-
-        # a) Shown rows: stamp is_shallow / is_vague and check_hash per key membership.
+        """Gather each shown row's decision and hand them to the one check-record writer."""
+        rows = []
         for i, (path_key, preset, _) in enumerate(self._rows):
             game = self._row_games[i]
-            original_row = self._original_snapshot.get(i, [])
-            new_entries = self._pending_entries(i)
-            # Stamp check_hash on entries that were classified this run AND whose
-            # text has not been edited in this dialog session.
-            new_entries = self._stamp_check_hashes_shown(
-                new_entries, original_row, game, path_key, preset
-            )
-            original = original_row
-            orig_with_flags = self._stamp_entries(game, path_key, preset, original)
+            original = self._original_snapshot.get(i, [])
             flags_missing = any(
                 (
                     self._is_shallow_key(game, path_key, preset, e.get("cat", ""))
@@ -666,157 +655,32 @@ class ShowShallowTagsDialog(QDialog):
                 )
                 for e in original
             )
-            # Repair: if storage has a honoured-Ignore entry that is missing its chip
-            # flag (dropped by the stale-clear bug), force a save so the C1 inference
-            # in _stamp_entries writes the flag back.
+            # Repair: a honoured-Ignore entry missing its chip flag (dropped by the
+            # stale-clear bug) is forced out so the inference in _stamp_entries writes it back.
             inference_repair_needed = preset == "3x3" and any(
                 ChessLogStorageService.is_entry_ignore_honoured(e)
                 and not e.get("is_shallow") and not e.get("is_vague")
                 for e in original
             )
-            if _normalize_entries(new_entries) != _normalize_entries(orig_with_flags) or flags_missing or inference_repair_needed:
-                self._controller.replace_entries_at_path_for_game(
-                    game, path_key, preset, new_entries
-                )
-                affected.add(game)
-
-        # b) Classified-but-not-shown entries: clear stale is_shallow/is_vague and
-        #    stamp check_hash.  Scoped to _classified_keys — never touches unparsed,
-        #    ignored, or empty-why entries.  Skips entries already handled by Phase a
-        #    (those whose per-cat key is in _flagged_keys).
-        for game in self._games_in_scope:
-            tags = self._controller.get_tags_for_game(game)
-            for path_key, entries in tags.items():
-                by_preset: Dict[str, List[Dict[str, Any]]] = {}
-                for e in entries:
-                    by_preset.setdefault(e.get("preset", ""), []).append(e)
-                for preset, preset_entries in by_preset.items():
-                    if preset == "3x3":
-                        # Per-entry processing for 3x3
-                        new_list = []
-                        changed = False
-                        for e in preset_entries:
-                            cat = e.get("cat", "")
-                            in_cls = self._in_classified(game, path_key, preset, cat)
-                            in_flag = (
-                                self._is_shallow_key(game, path_key, preset, cat) or
-                                self._is_vague_key(game, path_key, preset, cat)
-                            )
-                            # Never stale-clear an entry whose Ignore is still honoured —
-                            # the user's dismiss is intentional and must not be undone.
-                            ignore_honoured = ChessLogStorageService.is_entry_ignore_honoured(e)
-                            if in_cls and not in_flag:
-                                e_copy = dict(e)
-                                # Stale flag clear
-                                if not ignore_honoured and (e.get("is_shallow") or e.get("is_vague")):
-                                    # Also clear ignore_shallow/ignore_text_hash: editing the text
-                                    # (which caused the hash mismatch) invalidates the Ignore.
-                                    # Never leave ignore_shallow=True with no chip flag.
-                                    for k in ("is_shallow", "is_vague", "ignore_shallow", "ignore_text_hash"):
-                                        e_copy.pop(k, None)
-                                    changed = True
-                                # check_hash: stamp on non-ignored entries with non-blank why.
-                                # In-flag entries (shown in Phase a) are excluded so we don't
-                                # re-stamp entries whose text may have been edited by the user.
-                                if not ignore_honoured:
-                                    why = (e_copy.get("why") or "").strip()
-                                    if why:
-                                        new_hash = ChessLogStorageService.compute_check_hash(why)
-                                        if e_copy.get("check_hash") != new_hash:
-                                            e_copy["check_hash"] = new_hash
-                                            changed = True
-                                new_list.append(e_copy)
-                            else:
-                                new_list.append(e)
-                        if changed:
-                            self._controller.replace_entries_at_path_for_game(
-                                game, path_key, preset, new_list
-                            )
-                            affected.add(game)
-                    else:
-                        # Per-preset processing for CLAMP/CCT
-                        key_4 = (game, path_key, preset, "")
-                        if key_4 not in self._classified_keys:
-                            continue
-                        if self._moment_has_flag(game, path_key, preset):
-                            continue  # shown in Phase a
-                        new_list = []
-                        changed = False
-                        for e in preset_entries:
-                            ignore_honoured = ChessLogStorageService.is_entry_ignore_honoured(e)
-                            e_copy = dict(e)
-                            # Stale flag clear
-                            if not ignore_honoured and (e.get("is_shallow") or e.get("is_vague")):
-                                for k in ("is_shallow", "is_vague"):
-                                    e_copy.pop(k, None)
-                                changed = True
-                            # check_hash: stamp on non-ignored entries with non-blank why
-                            if not ignore_honoured:
-                                why = (e_copy.get("why") or "").strip()
-                                if why:
-                                    new_hash = ChessLogStorageService.compute_check_hash(why)
-                                    if e_copy.get("check_hash") != new_hash:
-                                        e_copy["check_hash"] = new_hash
-                                        changed = True
-                            new_list.append(e_copy)
-                        if changed:
-                            self._controller.replace_entries_at_path_for_game(
-                                game, path_key, preset, new_list
-                            )
-                            affected.add(game)
-
-        # c) Write _check_run to every game touched by this Check Logs run.
-        if self._check_run_info and self._classified_keys:
-            classified_games: set = {key[0] for key in self._classified_keys}
-            for cg in classified_games:
-                self._controller.set_check_run_for_game(cg, self._check_run_info)
-                affected.add(cg)
-
-        if affected:
-            self._controller.save_games(affected)
+            rows.append(CheckRowDecision(
+                game=game,
+                path_key=path_key,
+                preset=preset,
+                entries=self._pending_entries(i),
+                original=original,
+                baseline=self._stamp_entries(game, path_key, preset, original),
+                force_write=flags_missing or inference_repair_needed,
+            ))
+        commit_check_record(
+            self._controller,
+            self._games_in_scope,
+            rows,
+            self._shallow_keys,
+            self._vague_keys,
+            self._classified_keys,
+            self._check_run_info,
+        )
         self.accept()
-
-    def _stamp_check_hashes_shown(
-        self,
-        new_entries: List[Dict[str, Any]],
-        original_entries: List[Dict[str, Any]],
-        game: Any,
-        path_key: str,
-        preset: str,
-    ) -> List[Dict[str, Any]]:
-        """Stamp check_hash on shown-row entries that were classified AND text is unchanged.
-
-        Only entries in _classified_keys receive check_hash.  Entries whose text
-        was edited in this session are excluded (an edited answer is unchecked).
-        Ignored entries are excluded (their honoured Ignore already counts as checked).
-        """
-        if not self._classified_keys:
-            return new_entries
-
-        # Build original why lookup by cat (for comparison).
-        orig_by_cat: Dict[str, str] = {}
-        for e in original_entries:
-            cat = e.get("cat", "")
-            orig_by_cat[cat] = (e.get("why") or "").strip()
-
-        result = []
-        for e in new_entries:
-            cat = e.get("cat", "")
-            clamp_cat = cat if preset == "3x3" else ""
-            in_cls = self._in_classified(game, path_key, preset, clamp_cat)
-            ignore_honoured = ChessLogStorageService.is_entry_ignore_honoured(e)
-            if in_cls and not ignore_honoured:
-                why = (e.get("why") or "").strip()
-                if why:
-                    # Only stamp when the text hasn't changed from the original
-                    # (edited answers must remain unchecked after Save).
-                    orig_key = cat if preset == "3x3" else next(iter(orig_by_cat), "")
-                    original_why = orig_by_cat.get(orig_key, "")
-                    if why == original_why:
-                        e = dict(e)
-                        e["check_hash"] = ChessLogStorageService.compute_check_hash(why)
-            result.append(e)
-        return result
 
     def _clear_stale_flags_after_edit(
         self,

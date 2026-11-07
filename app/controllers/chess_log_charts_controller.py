@@ -346,13 +346,15 @@ class ChessLogShallowThread(QThread):
             total_flagged = len(merged_shallow) + len(merged_vague)
             total_input = len(self._legacy_notes) + len(self._three_notes)
 
-            if total_unparsed > 0 and total_flagged == 0:
+            # An error only when no note at all could be read; a run that read some notes
+            # and flagged none is a partial run (notice + shallow_ready), so its checks can be saved.
+            if total_unparsed > 0 and total_unparsed >= total_input:
                 tmpl = msgs.get("all_failed", {}).get(
                     "message_template",
                     "None of the {count} note{s_suffix} could be classified. "
                     "Try again; the model's reply couldn't be read.",
                 )
-                msg = tmpl.format(count=total_unparsed, s_suffix=s(total_unparsed))
+                msg = tmpl.format(count=total_input, s_suffix=s(total_input))
                 self.shallow_failed.emit(msg)
                 return
             if total_unparsed > 0:
@@ -1131,6 +1133,28 @@ class ChessLogChartsController(QObject):
         self._cached_shallow_model_label = model_label
         self._cached_shallow_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.shallow_ready.emit(shallow_keys, vague_keys, classified_keys, usage)
+
+    def save_clean_check_run(self, classified_keys) -> bool:
+        """Record a live Check Logs run that flagged nothing, through the one check-record writer.
+
+        Called only from an explicit Save on the Nothing Flagged message.  Writes exactly
+        what the Check Logs dialog's Save would for the same run with no rows: the answers in
+        ``classified_keys`` get their check record, the games are saved and the database is
+        marked unsaved.  Returns False when there was nothing to record.
+        """
+        chess_log_ctrl = self._chess_log_controller
+        if chess_log_ctrl is None or not classified_keys:
+            return False
+        check_run_info = (
+            {"model": self._cached_shallow_model_label, "date": self._cached_shallow_timestamp}
+            if self._cached_shallow_model_label and self._cached_shallow_timestamp else None
+        )
+        from app.services.chess_log_check_record_service import commit_check_record
+        commit_check_record(
+            chess_log_ctrl, self._resolve_games(), [],
+            frozenset(), frozenset(), frozenset(classified_keys), check_run_info,
+        )
+        return True
 
     def _on_shallow_thread_partial(self, message: str) -> None:
         if self._shallow_launch_gen != self._game_set_generation:

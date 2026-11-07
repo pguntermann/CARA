@@ -370,7 +370,7 @@ class ChessLogController(QObject):
     def set_check_run_for_game(self, game: Any, check_run: Dict[str, str]) -> None:
         """Queue a _check_run dict to be written the next time this game is saved.
 
-        Called by ShowShallowTagsDialog._on_save after a successful Check Logs run,
+        Called only by ``commit_check_record`` (chess_log_check_record_service) after a live Check Logs run,
         once per game that had at least one note classified.  _save_single_game
         consumes and clears the entry after writing.
         """

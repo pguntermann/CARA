@@ -38,6 +38,7 @@ from app.controllers.chess_log_charts_controller import (
     ChessLogChartsController,
     CheckLogMoment,
 )
+from app.views.dialogs.chess_log_save_message_dialog import SaveCancelMessageDialog
 from app.views.dialogs.message_dialog import MessageDialog
 from app.services.ai_service import TokenUsage
 from app.services.chess_log_narrative_service import sanitize_narrative_markdown
@@ -715,9 +716,16 @@ class DetailChessLogChartsView(QWidget):
             ).get("shallow_notes", {}).get("none_found", {})
             title = msgs.get("title", "Nothing Flagged")
             message = msgs.get("message_template", "No shallow notes or vague lessons found — great job.")
+            # Something was checked → offer to record it; a run that checked nothing has nothing to save.
+            can_save = bool(classified_keys)
+            if can_save:
+                message = f"{message}<br><br>{msgs.get('save_explanation', '')}"
             if partial_notice:
                 message = f"{html.escape(partial_notice)}<br><br>{message}"
-            MessageDialog.show_information(self._config, title, message, self)
+            if not can_save:
+                MessageDialog.show_information(self._config, title, message, self)
+            elif SaveCancelMessageDialog.ask(self._config, title, message, self):
+                self._controller.save_clean_check_run(classified_keys)
             return
         games = self._controller.resolve_games()
         chess_log_ctrl = self._controller.get_chess_log_controller()

@@ -3533,6 +3533,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.dialogs.chess_log_messages.shallow_notes.partial.message_template",
     "ui.dialogs.chess_log_messages.shallow_notes.none_found.title",
     "ui.dialogs.chess_log_messages.shallow_notes.none_found.message_template",
+    "ui.dialogs.chess_log_messages.shallow_notes.none_found.save_explanation",
     "ui.dialogs.shallow.button_save",
     "ui.dialogs.shallow.button_cancel",
     "ui.dialogs.shallow.labels.shallow.text",

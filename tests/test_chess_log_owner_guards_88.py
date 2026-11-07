@@ -83,8 +83,9 @@ class TestEntryFlagWritersAreTheEditPaths(unittest.TestCase):
     _KEYS = {"is_shallow", "is_vague", "check_hash", "ignore_shallow", "ignore_text_hash"}
     _ALLOWED = {
         "app/services/chess_log_storage_service.py",       # make_entry / flag normalisation
+        "app/services/chess_log_check_record_service.py",  # the one Check Logs check-record writer (#98)
         "app/views/dialogs/show_tags_dialog.py",           # Show Logged Moments edits (committed on Save)
-        "app/views/dialogs/show_shallow_tags_dialog.py",   # Check Logs verdicts (committed on Save)
+        "app/views/dialogs/show_shallow_tags_dialog.py",   # Check Logs verdicts shown in its rows (committed on Save)
     }
 
     def test_entry_flag_keys_assigned_only_in_allowed_files(self):
@@ -107,8 +108,9 @@ class TestEntryFlagWritersAreTheEditPaths(unittest.TestCase):
         )
         self.assertEqual(files, [
             "app/controllers/chess_log_controller.py",
+            "app/services/chess_log_check_record_service.py",   # the one Check Logs check-record writer (#98)
             "app/services/chess_log_storage_service.py",
-            "app/views/dialogs/show_shallow_tags_dialog.py",
+            "app/views/dialogs/show_shallow_tags_dialog.py",   # names it in comments; assigns none (see #98 guard)
             "app/views/dialogs/show_tags_dialog.py",
         ])
 
