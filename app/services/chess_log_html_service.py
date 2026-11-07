@@ -115,7 +115,9 @@ class ChessLogHTMLService:
         has_3x3: bool = False,
         generated_at: str = "",
         model_label: str = "",
+        moments_html: Optional[str] = None,
     ) -> str:
+        """*moments_html* (from ChessLogMomentRenderer) replaces *check_log_groups*."""
         parts = [
             self._charts_header_html(
                 player_name, source_label, n_games, g_games, m_moments, s_flagged, has_3x3,
@@ -129,7 +131,11 @@ class ChessLogHTMLService:
             )
         if narrative_text:
             parts.append(_narrative_body_html(narrative_text))
-        if check_log_groups:
+        if moments_html is not None:
+            if moments_html:
+                parts.append("<h2>Check Logs</h2>")
+                parts.append(moments_html)
+        elif check_log_groups:
             parts.append("<h2>Check Logs</h2>")
             parts.append(self._tag_groups_html(check_log_groups))
         return _wrap_html_document("".join(parts))
@@ -162,9 +168,11 @@ class ChessLogHTMLService:
         source_label: str = "",
         model_label: str = "",
         generated_at: str = "",
+        moments_html: Optional[str] = None,
     ) -> str:
+        """*moments_html* (from ChessLogMomentRenderer) replaces the snapshot body."""
         parts = [self._check_logs_header_html(source_label, model_label, generated_at)]
-        parts.append(self._tag_groups_html(tag_groups))
+        parts.append(moments_html if moments_html is not None else self._tag_groups_html(tag_groups))
         return _wrap_html_document("".join(parts))
 
     def check_logs_plain(
@@ -174,7 +182,9 @@ class ChessLogHTMLService:
         source_label: str = "",
         model_label: str = "",
         generated_at: str = "",
+        moments_plain: Optional[str] = None,
     ) -> str:
+        """*moments_plain* (from ChessLogMomentRenderer) replaces the snapshot body."""
         lines = ["Chess Log — Check Logs"]
         if source_label:
             lines.append(f"Source: {source_label}")
@@ -183,7 +193,7 @@ class ChessLogHTMLService:
         if model_label:
             lines.append(f"AI model: {model_label}")
         lines.append("")
-        body = self._tag_groups_plain(tag_groups)
+        body = moments_plain if moments_plain is not None else self._tag_groups_plain(tag_groups)
         if body:
             lines.append(body)
         return "\n".join(lines)
@@ -398,6 +408,22 @@ class ChessLogHTMLService:
     # ------------------------------------------------------------------
     # Chip helper
     # ------------------------------------------------------------------
+
+    def shallow_chip_html(self) -> str:
+        """The Shallow chip span, as used in every Chess Log HTML flavor."""
+        return self._chip_span(self._shallow_label, _SHALLOW_BG)
+
+    def vague_chip_html(self) -> str:
+        """The Vague chip span, as used in every Chess Log HTML flavor."""
+        return self._chip_span(self._vague_label, _VAGUE_BG)
+
+    @property
+    def shallow_label(self) -> str:
+        return self._shallow_label
+
+    @property
+    def vague_label(self) -> str:
+        return self._vague_label
 
     def _chip_span(self, label: str, bg_color: str) -> str:
         style = f"background-color:{bg_color};{_CHIP_BASE_STYLE}"
