@@ -173,6 +173,8 @@ class ShowShallowTagsDialog(QDialog):
         }
 
         self._row_widgets: List[_TagRowWidget] = []
+        # Row index (into _rows) -> its widget; orphan rows have none.
+        self._widget_for_row: Dict[int, _TagRowWidget] = {}
         self._rows_layout = None
         self._setup_ui()
         self.setWindowTitle(window_title)
@@ -414,6 +416,7 @@ class ShowShallowTagsDialog(QDialog):
                 )
                 rows_layout.addWidget(row_widget)
                 self._row_widgets.append(row_widget)
+                self._widget_for_row[i] = row_widget
                 row_count += 1
 
             if orphan_count > 0:
@@ -555,7 +558,14 @@ class ShowShallowTagsDialog(QDialog):
             MomentRef(self._row_games[i], pk, preset)
             for i, (pk, preset, _entries) in enumerate(self._rows)
         ]
-        rendered = ChessLogMomentRenderer(self._controller, self._config).render(refs)
+        renderer = ChessLogMomentRenderer(self._controller, self._config)
+        if self._is_saved_mode:
+            rendered = renderer.render(refs)
+        else:
+            # Live mode (before Save): show what Save would write, from the dialog's
+            # own pending state; the renderer keeps none of it.
+            pending = {ref: self._pending_entries(i) for i, ref in enumerate(refs)}
+            rendered = renderer.render(refs, entries_for=pending.__getitem__)
         model_label, generated_at = self._resolve_model_generated()
         svc = ChessLogHTMLService(self._config)
         mime = QMimeData()
@@ -597,21 +607,33 @@ class ShowShallowTagsDialog(QDialog):
             generated_at=generated_at,
         )
 
+    def _pending_entries(self, i: int) -> List[Dict[str, Any]]:
+        """Row *i*'s entries as Save would write them (before check_hash stamping).
+
+        Shared by Save and the live-mode copy, so the copy shows what Save writes:
+        the widget's current text and Ignore state, the classifier verdicts stamped
+        per key, and chips dropped from answers whose text was edited this session.
+        """
+        path_key, preset, stored = self._rows[i]
+        game = self._row_games[i]
+        widget = self._widget_for_row.get(i)
+        current = widget.get_current_entries() if widget is not None else stored
+        new_entries = self._stamp_entries(game, path_key, preset, current)
+        # _stamp_entries stamps based on key membership without checking text changes;
+        # clear_verdict_if_text_changed drops the chip of an answer edited in this
+        # session (the classifier's verdict was for the old text).
+        return self._clear_stale_flags_after_edit(
+            new_entries, self._original_snapshot.get(i, []), preset
+        )
+
     def _on_save(self) -> None:
         affected: set = set()
 
         # a) Shown rows: stamp is_shallow / is_vague and check_hash per key membership.
         for i, (path_key, preset, _) in enumerate(self._rows):
-            row_widget = self._row_widgets[i]
             game = self._row_games[i]
-            user_entries = row_widget.get_current_entries()
-            new_entries = self._stamp_entries(game, path_key, preset, user_entries)
             original_row = self._original_snapshot.get(i, [])
-            # Clear is_shallow/is_vague for entries whose text was edited in this session.
-            # _stamp_entries stamps based on key membership without checking text changes;
-            # this pass applies clear_verdict_if_text_changed so edited answers lose
-            # their chip (the classifier's verdict was for the old text).
-            new_entries = self._clear_stale_flags_after_edit(new_entries, original_row, preset)
+            new_entries = self._pending_entries(i)
             # Stamp check_hash on entries that were classified this run AND whose
             # text has not been edited in this dialog session.
             new_entries = self._stamp_check_hashes_shown(
