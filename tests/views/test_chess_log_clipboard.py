@@ -101,8 +101,12 @@ def _make_charts_stub_controller():
     ctrl.get_narrative_token_limit.return_value = 12000
     ctrl.get_narrative_model_override.return_value = None
     ctrl.get_last_narrative_result.return_value = ("", [], None)
-    ctrl.get_last_shallow_result.return_value = (None, None, None)
+    ctrl.get_last_shallow_result.return_value = (frozenset(), frozenset(), None)
     ctrl.get_current_source_filenames.return_value = []
+    ctrl.get_player_display_name.return_value = "Alice"
+    ctrl.get_source_label.return_value = "Active Database"
+    ctrl.get_source_description.return_value = "Active Database"
+    ctrl.get_check_log_moments.return_value = []
     ctrl.get_last_narrative_metadata.return_value = ("", "", 0, 0, 0, 0, False)
     for sig in (
         "charts_updated", "charts_unavailable", "charts_skipped", "charts_loading",
@@ -125,9 +129,9 @@ def _make_charts_stub_controller():
 class TestChartsCopySection(unittest.TestCase):
     def setUp(self):
         self._view = DetailChessLogChartsView({})
-        ctrl = _make_charts_stub_controller()
-        self._view.set_controller(ctrl)
-        self._view._last_narrative = "## Heading\n\nSome body text."
+        self._ctrl = _make_charts_stub_controller()
+        self._view.set_controller(self._ctrl)
+        self._ctrl.get_last_narrative_result.return_value = ("## Heading\n\nSome body text.", [], None)
 
     def test_narrative_copy_puts_html_on_clipboard(self):
         self._view._copy_section_to_clipboard("narrative")
@@ -158,7 +162,7 @@ class TestChartsCopySection(unittest.TestCase):
         self.assertIn("CLAMP", mime.text())
 
     def test_html_and_plain_text_differ(self):
-        self._view._last_narrative = "## Section\n\nParagraph text."
+        self._ctrl.get_last_narrative_result.return_value = ("## Section\n\nParagraph text.", [], None)
         self._view._copy_section_to_clipboard("narrative")
         h = _get_clipboard_html()
         plain = _get_clipboard_text()
@@ -174,11 +178,11 @@ class TestChartsCopySection(unittest.TestCase):
 class TestChartsCopyLog(unittest.TestCase):
     def setUp(self):
         self._view = DetailChessLogChartsView({})
-        ctrl = _make_charts_stub_controller()
-        ctrl.get_chess_log_controller.return_value = None
-        ctrl.resolve_games.return_value = []
-        self._view.set_controller(ctrl)
-        self._view._last_narrative = "## Summary\n\nText."
+        self._ctrl = _make_charts_stub_controller()
+        self._ctrl.get_chess_log_controller.return_value = None
+        self._ctrl.resolve_games.return_value = []
+        self._view.set_controller(self._ctrl)
+        self._ctrl.get_last_narrative_result.return_value = ("## Summary\n\nText.", [], None)
 
     def test_copy_log_puts_html_on_clipboard(self):
         self._view._copy_log_to_clipboard()
@@ -193,6 +197,14 @@ class TestChartsCopyLog(unittest.TestCase):
         self._view._copy_log_to_clipboard()
         plain = _get_clipboard_text()
         self.assertIn("Chess Log —", plain)
+
+    def test_header_comes_from_controller_not_combo_text(self):
+        # Player and data source are the controller's, not the combo boxes' display text.
+        self._view._copy_log_to_clipboard()
+        plain = _get_clipboard_text()
+        self.assertIn("Chess Log — Alice", plain)
+        self.assertNotIn("logged)", plain)
+        self.assertIn("Source: Active Database", plain)
 
     def test_html_has_h2_header(self):
         self._view._copy_log_to_clipboard()
@@ -378,45 +390,30 @@ class TestShowShallowTagsDialogCopyButton(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# Test 5: Copy log — CLAMP chip lookup via real classifier parse step
+# Test 5: Copy log — CLAMP chip from a saved flag
 # ---------------------------------------------------------------------------
 
 @requires_qt
 class TestCopyLogShallowChipCLAMP(unittest.TestCase):
-    """Build shallow_keys the same way classify_notes() does, then verify
-    the Shallow chip appears on the flagged CLAMP moment and that an unflagged
+    """The Shallow chip appears on the flagged CLAMP moment and an unflagged
     game is not shown at all in the HTML output."""
 
     def setUp(self):
-        from app.services.chess_log_shallow_service import _parse_verdicts
-
-        # Two games: only game1's moment is classified SHALLOW.
+        # Two games: only game1's moment is flagged SHALLOW.
         self._game1 = GameData(game_number=1, white="White1", black="Black1")
         self._game2 = GameData(game_number=2, white="White2", black="Black2")
 
-        # Build shallow_keys through the real parse step (same as classify_notes).
-        notes = [(0, self._game1, "0", "CLAMP", "I attacked too early")]
-        parsed = _parse_verdicts("0: SHALLOW", len(notes))
-        shallow_keys = frozenset(
-            (notes[i][1], notes[i][2], notes[i][3], "")
-            for i, verdict in parsed.items()
-            if verdict == "SHALLOW"
-        )
+        from app.controllers.chess_log_charts_controller import CheckLogMoment
 
-        chess_log_ctrl = MagicMock()
-        chess_log_ctrl.get_tags_for_game.side_effect = lambda g: (
-            {"0": [{"preset": "CLAMP", "cat": "C", "why": "I attacked too early"}]}
-            if g is self._game1
-            else {"0": [{"preset": "CLAMP", "cat": "M", "why": "I played too fast"}]}
-        )
-
+        # Only game1's moment carries a saved Shallow flag; the controller (the one
+        # place that decides) therefore hands the exports only that moment.
+        flagged = {"preset": "CLAMP", "cat": "C", "why": "I attacked too early", "is_shallow": True}
         self._view = DetailChessLogChartsView({})
         ctrl = _make_charts_stub_controller()
-        ctrl.get_chess_log_controller.return_value = chess_log_ctrl
-        ctrl.resolve_games.return_value = [self._game1, self._game2]
+        ctrl.get_check_log_moments.return_value = [
+            CheckLogMoment(self._game1, "0", "CLAMP", [flagged], is_shallow=True),
+        ]
         self._view.set_controller(ctrl)
-        self._view._last_shallow_keys = shallow_keys
-        self._view._last_vague_keys = frozenset()
 
     def test_shallow_chip_appears_for_flagged_clamp_moment(self):
         self._view._copy_log_to_clipboard()
@@ -424,57 +421,37 @@ class TestCopyLogShallowChipCLAMP(unittest.TestCase):
         self.assertIn("#9a4400", h)
 
     def test_unflagged_game_absent_from_output(self):
-        # game2 is not in shallow_keys → filtered out; its White player isn't shown
+        # game2 has no saved flag → absent; its White player isn't shown
         self._view._copy_log_to_clipboard()
         h = QApplication.clipboard().mimeData().html()
         self.assertNotIn("White2", h)
 
 
 # ---------------------------------------------------------------------------
-# Test 6: Copy log — 3x3 chip lookup via real classifier parse step
+# Test 6: Copy log — 3x3 chips from saved flags
 # ---------------------------------------------------------------------------
 
 @requires_qt
 class TestCopyLogShallowChip3x3(unittest.TestCase):
-    """Build shallow_keys and vague_keys the same way classify_notes_3x3() does,
-    then verify Why2 gets the Shallow chip and Why4 gets the Vague chip."""
+    """Why2 gets the Shallow chip and Why4 gets the Vague chip."""
 
     def setUp(self):
-        from app.services.chess_log_shallow_service import _parse_3x3_verdicts
+        from app.controllers.chess_log_charts_controller import CheckLogMoment
 
         self._game = GameData(game_number=1, white="W", black="B")
-
-        # Build shallow_keys and vague_keys through the real parse step.
-        notes = [(0, self._game, "0", "3x3",
-                  "I wanted a pawn", "I missed the fork", "Nf3 was better", "Calculate next time")]
-        reply = "0: WHY1=SPECIFIC WHY2=GENERIC WHY3=SPECIFIC LESSON=FILLER"
-        parsed = _parse_3x3_verdicts(reply, len(notes))
-
-        s_keys = []
-        v_keys = []
-        for i, (why1, why2, why3, lesson) in parsed.items():
-            game, pk = notes[i][1], notes[i][2]
-            for cat, verdict in (("Why1", why1), ("Why2", why2), ("Why3", why3)):
-                if verdict == "GENERIC":
-                    s_keys.append((game, pk, "3x3", cat))
-            if lesson == "FILLER":
-                v_keys.append((game, pk, "3x3", "Why4"))
-
-        chess_log_ctrl = MagicMock()
-        chess_log_ctrl.get_tags_for_game.return_value = {"0": [
+        entries = [
             {"preset": "3x3", "cat": "Why1", "why": "I wanted a pawn"},
-            {"preset": "3x3", "cat": "Why2", "why": "I missed the fork"},
+            {"preset": "3x3", "cat": "Why2", "why": "I missed the fork", "is_shallow": True},
             {"preset": "3x3", "cat": "Why3", "why": "Nf3 was better"},
-            {"preset": "3x3", "cat": "Why4", "why": "Calculate next time"},
-        ]}
-
+            {"preset": "3x3", "cat": "Why4", "why": "Calculate next time", "is_vague": True},
+        ]
         self._view = DetailChessLogChartsView({})
         ctrl = _make_charts_stub_controller()
-        ctrl.get_chess_log_controller.return_value = chess_log_ctrl
-        ctrl.resolve_games.return_value = [self._game]
+        ctrl.get_check_log_moments.return_value = [CheckLogMoment(
+            self._game, "0", "3x3", entries,
+            shallow_cats=frozenset({"Why2"}), vague_cats=frozenset({"Why4"}),
+        )]
         self._view.set_controller(ctrl)
-        self._view._last_shallow_keys = frozenset(s_keys)
-        self._view._last_vague_keys = frozenset(v_keys)
 
     def test_shallow_chip_on_why2(self):
         self._view._copy_log_to_clipboard()
@@ -487,7 +464,7 @@ class TestCopyLogShallowChip3x3(unittest.TestCase):
         self.assertIn("#1d4ed8", h)
 
     def test_why1_not_shallow(self):
-        # Why1 is SPECIFIC → not in shallow_keys → no extra chip
+        # Why1 is unflagged → no extra chip
         self._view._copy_log_to_clipboard()
         h = QApplication.clipboard().mimeData().html()
         # Both chips are present overall; count chip spans: shallow chip for Why2,

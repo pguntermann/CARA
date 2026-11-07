@@ -60,7 +60,7 @@ class TestCheckLogsModelResolutionLog(unittest.TestCase):
         mock_ctrl.get_narrative_timeout_seconds.return_value = 60
         mock_ctrl.get_narrative_token_limit = MagicMock(return_value=12000)
         mock_ctrl.get_last_narrative_result.return_value = ("", [], None)
-        mock_ctrl.get_last_shallow_result.return_value = (None, None, None)
+        mock_ctrl.get_last_shallow_result.return_value = (frozenset(), frozenset(), None)
         mock_ctrl.get_cached_shallow_model_label.return_value = ""
 
         view = DetailChessLogChartsView(config={})

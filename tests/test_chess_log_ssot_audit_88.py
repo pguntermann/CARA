@@ -1,8 +1,8 @@
 """Reproducing tests for Issue #88 single-source-of-truth audit.
 
-Each test is marked @unittest.expectedFailure so the suite stays green.
-A test flips to "unexpected success" (a failure) once its fix lands; the
-fixed ones then lose the marker (B2 was fixed by #92).
+Each test was marked @unittest.expectedFailure so the suite stayed green until
+its fix landed; fixed ones lose the marker.  B2 was fixed by #92, B3 by #88,
+B4 and B5 by #91.  No expectedFailure markers remain in this module.
 
 Coverage:
   B1 — Moves List icons stale after ShowTagsDialog.Save or save_games()
@@ -228,13 +228,13 @@ class TestB3PlayerComboSilentClear(unittest.TestCase):
         view._on_players_ready([("X", 1)])
         view._player_combo.setCurrentIndex(0)      # user picks X
         ctrl.set_player_selection("X")
-        view._last_narrative = "narrative about X"
+        ctrl._cached_narrative = "narrative about X"
         # X's last moment is cleared; the refreshed dropdown no longer lists X.
         view._on_players_ready([("Y", 2)])
         self.assertEqual(view._player_combo.currentIndex(), -1)
         # The combo says "no player", so nothing about X may remain in force.
         self.assertFalse(ctrl.has_player_selected())
-        self.assertEqual(view._last_narrative, "")
+        self.assertEqual(view._narrative_text(), "")
 
     def _selected_view(self, ctrl):
         from app.views.detail_chess_log_charts_view import DetailChessLogChartsView
@@ -249,12 +249,11 @@ class TestB3PlayerComboSilentClear(unittest.TestCase):
         ctrl = _charts_controller()
         view = self._selected_view(ctrl)
         ctrl._cached_narrative = "cached about X"
-        view._last_narrative = "narrative about X"
         view._on_players_ready([("X", 3), ("Y", 2)])
         self.assertEqual(view._player_combo.currentData(), "X")
         self.assertTrue(ctrl.has_player_selected())
         self.assertEqual(ctrl._cached_narrative, "cached about X")
-        self.assertEqual(view._last_narrative, "narrative about X")
+        self.assertEqual(view._narrative_text(), "cached about X")
 
     def test_vanished_player_disables_ai_buttons(self):
         ctrl = _charts_controller()
@@ -279,9 +278,9 @@ class TestB3PlayerComboSilentClear(unittest.TestCase):
 
 @requires_qt
 class TestB4EmptyNotesPathLeavesControllerCacheStale(unittest.TestCase):
-    """B4: the 'no notes' path emits shallow_ready without updating the cache."""
+    """B4 (fixed by #91): the 'no notes' path ends a Check Logs run through the
+    same controller handler as every other run, so it replaces the stored result."""
 
-    @unittest.expectedFailure
     def test_empty_check_logs_run_clears_controller_cache(self):
         ctrl = _charts_controller()
         g = _make_game()
@@ -294,31 +293,32 @@ class TestB4EmptyNotesPathLeavesControllerCacheStale(unittest.TestCase):
             ctrl.request_flag_shallow_notes()
         # The run reported "nothing to classify"; the cached result of the
         # previous run must not survive to be restored onto a rebuilt view.
-        self.assertIsNone(ctrl.get_last_shallow_result()[0])
+        # (Rewritten for #91: the empty result is an empty set, never None.)
+        self.assertEqual(ctrl.get_last_shallow_result()[:2], (frozenset(), frozenset()))
 
 
 @requires_qt
 class TestB5VagueOnlyExport(unittest.TestCase):
-    """B5: Check Logs export is gated on _last_shallow_keys only."""
+    """B5 (fixed by #91): a saved vague-only Check Logs result is exported."""
 
-    @unittest.expectedFailure
     def test_vague_only_result_is_exported(self):
+        from app.controllers.chess_log_charts_controller import CheckLogMoment
         from app.views.detail_chess_log_charts_view import DetailChessLogChartsView
 
         game = _make_game()
         entry = _make_entry("3x3", "Why4", "vague lesson")
-        chess_log_ctrl = MagicMock()
-        chess_log_ctrl.get_tags_for_game.return_value = {"0": [entry]}
+        entry["is_vague"] = True            # saved flag, as the Check Logs dialog's Save writes it
         charts = MagicMock()
-        charts.get_chess_log_controller.return_value = chess_log_ctrl
-        charts.resolve_games.return_value = [game]
+        charts.get_check_log_moments.return_value = [CheckLogMoment(
+            game, "0", "3x3", [entry], vague_cats=frozenset({"Why4"}),
+        )]
 
         view = DetailChessLogChartsView({})
         view._controller = charts
-        view._last_shallow_keys = None
-        view._last_vague_keys = frozenset({(game, "0", "3x3", "Why4")})
         groups = view._build_check_log_tag_groups()
         self.assertEqual(len(groups), 1, "vague-only Check Logs result missing from export")
+        self.assertEqual(groups[0]["rows"][0].vague_cats, frozenset({"Why4"}))
+        # End to end through the real controller: tests/test_chess_log_exports_91.py.
 
 
 @requires_qt

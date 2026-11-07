@@ -1994,7 +1994,7 @@ class TestInFlightGuard(unittest.TestCase):
         )
 
         self.assertEqual(received, [], "stale shallow result must not be emitted")
-        self.assertIsNone(ctrl._cached_shallow_keys, "stale shallow result must not be cached")
+        self.assertEqual(ctrl._cached_shallow_keys, frozenset(), "stale shallow result must not be cached")
 
     def test_shallow_accepted_when_game_set_unchanged(self):
         """A shallow result whose launch gen still matches current gen must be shown."""
@@ -2010,7 +2010,7 @@ class TestInFlightGuard(unittest.TestCase):
         ctrl._on_shallow_thread_ready(shallow_keys, frozenset(), frozenset(), None)
 
         self.assertEqual(len(received), 1)
-        self.assertIsNotNone(ctrl._cached_shallow_keys)
+        self.assertEqual(ctrl._cached_shallow_keys, shallow_keys)
 
     # --- generation advances on each game-set change ---
 
@@ -2805,7 +2805,7 @@ class TestColorFilterInvalidatesResults(unittest.TestCase):
         ctrl.set_color_filter("white")
         self.assertEqual(ctrl._color_filter, "white")
         self.assertEqual(ctrl._cached_narrative, "")
-        self.assertIsNone(ctrl._cached_shallow_keys)
+        self.assertEqual(ctrl._cached_shallow_keys, frozenset())
         self.assertEqual(received, [True])
         self.assertGreater(ctrl._game_set_generation, generation)
         ctrl._kick_debounce.assert_called_once()

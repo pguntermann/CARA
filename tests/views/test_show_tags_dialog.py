@@ -2291,7 +2291,7 @@ class TestAIHintMenuPath(unittest.TestCase):
         ctrl = MagicMock()
         ctrl.is_ai_configured.return_value = False
         ctrl.get_last_narrative_result.return_value = ("", [], None)
-        ctrl.get_last_shallow_result.return_value = (None, None, None)
+        ctrl.get_last_shallow_result.return_value = (frozenset(), frozenset(), None)
         ctrl.get_available_models.return_value = []
         ctrl.get_default_narrative_model.return_value = ""
         ctrl.get_narrative_timeout_seconds.return_value = 60

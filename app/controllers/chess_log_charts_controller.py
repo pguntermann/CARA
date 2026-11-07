@@ -12,6 +12,7 @@ wiring in AppController / MainWindow.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from PyQt6.QtCore import QMutex, QMutexLocker, QObject, QThread, QTimer, pyqtSignal
@@ -35,7 +36,10 @@ from app.services.chess_log_stats_service import (
     compute_narrative_counts,
     get_all_players,
 )
+from app.services.chess_log_storage_service import ChessLogStorageService
 from app.services.user_settings_service import UserSettingsService
+from app.utils.chess_log_color_scoping import color_from_path_key
+from app.utils.player_matcher import game_matches_player_color
 from app.utils.ai_provider_config import (
     get_available_models as _get_available_models,
     resolve_default_provider,
@@ -478,6 +482,29 @@ DEFAULT_NARRATIVE_TOKEN_LIMIT = 12000
 CHESS_LOG_AI_TIMEOUT_KEY = "ai_timeout_seconds"  # under user_settings.chess_log
 
 
+SOURCE_LABELS = [
+    "None",
+    "Active Database",
+    "All Open Databases",
+    "Selected games (Active Database)",
+    "Selected games (All Open Databases)",
+]
+
+
+@dataclass(frozen=True)
+class CheckLogMoment:
+    """One (game, path_key, preset) moment carrying a saved Check Logs flag."""
+
+    game: GameData
+    path_key: str
+    preset: str
+    entries: List[Dict[str, Any]]
+    is_shallow: bool = False
+    is_vague: bool = False
+    shallow_cats: FrozenSet[str] = frozenset()
+    vague_cats: FrozenSet[str] = frozenset()
+
+
 class ChessLogChartsController(QObject):
     """Controller for the Chess Log Charts detail tab."""
 
@@ -494,7 +521,7 @@ class ChessLogChartsController(QObject):
     shallow_partial = pyqtSignal(str)            # informational: N notes unparsed, results follow
     ai_configured_changed = pyqtSignal(bool)  # True when LLM becomes available or unavailable
     ai_model_changed = pyqtSignal()           # default provider or model changed in AI Settings
-    results_invalidated = pyqtSignal()        # charted game set changed mid-session; view should clear narrative/Check Logs
+    results_invalidated = pyqtSignal()        # stored results were cleared (game set, source, player or colour changed); view resets its display
 
     def __init__(
         self,
@@ -542,8 +569,8 @@ class ChessLogChartsController(QObject):
         self._cached_narrative_counts: Optional[Tuple[int, int, int, int, bool]] = None
         self._cached_narrative_generated_at: str = ""
         self._cached_narrative_model_label: str = ""
-        self._cached_shallow_keys: Optional[Any] = None
-        self._cached_vague_keys: Optional[Any] = None
+        self._cached_shallow_keys: FrozenSet = frozenset()
+        self._cached_vague_keys: FrozenSet = frozenset()
         self._cached_shallow_usage: Optional[Any] = None
         self._cached_shallow_model_label: str = ""
         self._cached_shallow_timestamp: str = ""  # UTC ISO-8601; set when shallow_ready fires
@@ -693,8 +720,85 @@ class ChessLogChartsController(QObject):
         )
 
     def get_last_shallow_result(self) -> tuple:
-        """Return (shallow_keys, vague_keys, usage) from the most recent successful shallow check."""
+        """Return (shallow_keys, vague_keys, usage) from the most recent Check Logs run.
+
+        The keys are frozensets (empty, never None) and are the *session* verdicts,
+        saved or not; exports use saved flags (get_check_log_moments) instead.
+        """
         return self._cached_shallow_keys, self._cached_vague_keys, self._cached_shallow_usage
+
+    def get_player_display_name(self) -> str:
+        """Return the selected player's name as listed in the Player dropdown, or ''."""
+        return self._current_player
+
+    def get_source_label(self) -> str:
+        """Return the Data Source label (e.g. 'Active Database') for the current selection."""
+        if 0 <= self._source_selection < len(SOURCE_LABELS):
+            return SOURCE_LABELS[self._source_selection]
+        return ""
+
+    def get_source_description(self) -> str:
+        """Return the Data Source label, followed by ': <database names>' when known."""
+        label = self.get_source_label()
+        files = self.get_current_source_filenames()
+        return f"{label}: {', '.join(files)}" if files else label
+
+    def get_check_log_moments(self) -> List["CheckLogMoment"]:
+        """Return the saved Check Logs flags for the charted games and selected player.
+
+        Exports (text, HTML, PDF) all list these.  Only saved is_shallow/is_vague
+        flags count, never a classifier verdict that was cancelled or edited since,
+        so the result agrees with Show Shallow/Vague Logs and the narrative header's
+        flagged count.  Scope mirrors compute_narrative_counts: games matching the
+        player and colour filter, and only the player's own path_keys.
+        """
+        chess_log_ctrl = self._chess_log_controller
+        if chess_log_ctrl is None or not self._current_player:
+            return []
+        player_cf = self._current_player.casefold().strip()
+        games = [
+            g for g in self._resolve_games()
+            if game_matches_player_color(g, player_cf, self._color_filter)
+            and getattr(g, "has_chess_log_tags", False)
+        ]
+        shallow_keys, vague_keys = chess_log_ctrl.get_shallow_vague_keys(games)
+        moments: List[CheckLogMoment] = []
+        for game in games:
+            white_cf = (game.white or "").casefold().strip()
+            black_cf = (game.black or "").casefold().strip()
+            player_color = "white" if white_cf == player_cf else "black" if black_cf == player_cf else None
+            for path_key, entries in chess_log_ctrl.get_tags_for_game(game).items():
+                if not entries:
+                    continue
+                if player_color is not None:
+                    pk_color = color_from_path_key(path_key)
+                    if pk_color is not None and pk_color != player_color:
+                        continue
+                by_preset: Dict[str, List[Dict[str, Any]]] = {}
+                for e in entries:
+                    if e.get("preset", ""):
+                        by_preset.setdefault(e["preset"], []).append(e)
+                for preset, preset_entries in by_preset.items():
+                    if not any(ChessLogStorageService.entry_has_flag(e) for e in preset_entries):
+                        continue
+                    if preset == "3x3":
+                        shallow_cats = frozenset(
+                            c for c in ("Why1", "Why2", "Why3") if (game, path_key, preset, c) in shallow_keys
+                        )
+                        vague_cats = frozenset(
+                            c for c in ("Why4",) if (game, path_key, preset, c) in vague_keys
+                        )
+                        is_shallow = is_vague = False
+                    else:
+                        shallow_cats = vague_cats = frozenset()
+                        is_shallow = (game, path_key, preset, "") in shallow_keys
+                        is_vague = (game, path_key, preset, "") in vague_keys
+                    moments.append(CheckLogMoment(
+                        game=game, path_key=path_key, preset=preset, entries=preset_entries,
+                        is_shallow=is_shallow, is_vague=is_vague,
+                        shallow_cats=shallow_cats, vague_cats=vague_cats,
+                    ))
+        return moments
 
     def get_cached_shallow_model_label(self) -> str:
         """Return '<Provider> <model-id>' from the most recent Check Logs run, or '' if none."""
@@ -705,6 +809,7 @@ class ChessLogChartsController(QObject):
         return self._cached_shallow_timestamp
 
     def _clear_result_cache(self) -> None:
+        """Drop every stored result and tell the view; the only place results are cleared."""
         self._game_set_generation += 1
         self._last_game_set_key = None
         self._cached_narrative = ""
@@ -713,11 +818,12 @@ class ChessLogChartsController(QObject):
         self._cached_narrative_counts = None
         self._cached_narrative_generated_at = ""
         self._cached_narrative_model_label = ""
-        self._cached_shallow_keys = None
-        self._cached_vague_keys = None
+        self._cached_shallow_keys = frozenset()
+        self._cached_vague_keys = frozenset()
         self._cached_shallow_usage = None
         self._cached_shallow_model_label = ""
         self._cached_shallow_timestamp = ""
+        self.results_invalidated.emit()
 
     # --- narrative panel controls ---
 
@@ -860,7 +966,6 @@ class ChessLogChartsController(QObject):
     def set_color_filter(self, color_filter: str) -> None:
         self._color_filter = color_filter
         self._clear_result_cache()
-        self.results_invalidated.emit()
         self._kick_debounce()
 
     def notify_selection_changed(self) -> None:
@@ -934,7 +1039,7 @@ class ChessLogChartsController(QObject):
         legacy_notes, three_notes, three_ignored_sets = build_notes(games, self.get_tags_for_game)
 
         if not legacy_notes and not three_notes:
-            self.shallow_ready.emit(set(), set(), frozenset(), None)
+            self._finish_shallow_run(set(), set(), frozenset(), None)
             return
 
         self._cancel_shallow_thread()
@@ -993,9 +1098,13 @@ class ChessLogChartsController(QObject):
         """Cache shallow/vague results then pass to the view; the dialog's Save commits them."""
         if self._shallow_launch_gen != self._game_set_generation:
             return
+        self._finish_shallow_run(shallow_keys, vague_keys, classified_keys, usage, model_label)
+
+    def _finish_shallow_run(self, shallow_keys, vague_keys, classified_keys, usage, model_label: str = "") -> None:
+        """Store a finished Check Logs run's result and announce it; every successful run ends here."""
         from datetime import datetime, timezone
-        self._cached_shallow_keys = frozenset(shallow_keys) if shallow_keys else None
-        self._cached_vague_keys = frozenset(vague_keys) if vague_keys else None
+        self._cached_shallow_keys = frozenset(shallow_keys or ())
+        self._cached_vague_keys = frozenset(vague_keys or ())
         self._cached_shallow_usage = usage
         self._cached_shallow_model_label = model_label
         self._cached_shallow_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1112,7 +1221,6 @@ class ChessLogChartsController(QObject):
         new_key = frozenset(id(g) for g in games)
         if self._last_game_set_key is not None and new_key != self._last_game_set_key:
             self._clear_result_cache()
-            self.results_invalidated.emit()
         self._last_game_set_key = new_key
         self._cancel_agg_worker()
         chart_cfg = chart_cfg_with_chess_log_charts_overrides(

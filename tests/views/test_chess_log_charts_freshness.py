@@ -48,79 +48,24 @@ _VAGUE_KEYS = frozenset({(_GAME_3, "v1", "3x3", "Why4")}) if _QT_OK else frozens
 
 
 @requires_qt
-class TestShalowKeysFreshness(unittest.TestCase):
-    def setUp(self):
-        self._view = DetailChessLogChartsView(_MINIMAL_CONFIG)
+class TestViewKeepsNoResultCopies(unittest.TestCase):
+    """#91: the view holds no copy of the narrative or Check Logs result; the
+    controller is the only store, so the two can never disagree."""
 
-    def test_initial_state_is_none(self):
-        self.assertIsNone(self._view._last_shallow_keys)
+    def test_view_has_no_result_copy_attributes(self):
+        view = DetailChessLogChartsView(_MINIMAL_CONFIG)
+        for attr in ("_last_shallow_keys", "_last_vague_keys", "_last_narrative"):
+            self.assertFalse(hasattr(view, attr), f"view must not keep {attr}")
 
-    def test_on_shallow_ready_caches_keys(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, frozenset(), frozenset(), None)
-        self.assertEqual(self._view._last_shallow_keys, _SHALLOW_KEYS)
+    def test_shallow_ready_does_not_store_on_view(self):
+        view = DetailChessLogChartsView(_MINIMAL_CONFIG)
+        view._on_shallow_ready(frozenset(), frozenset(), frozenset(), None)
+        self.assertFalse(hasattr(view, "_last_shallow_keys"))
 
-    def test_on_shallow_ready_empty_set_stores_none(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, frozenset(), frozenset(), None)  # set first
-        self._view._on_shallow_ready(set(), frozenset(), frozenset(), None)
-        self.assertIsNone(self._view._last_shallow_keys)
-
-    def test_on_source_changed_clears_cache(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, frozenset(), frozenset(), None)
-        self._view._on_source_changed(1)
-        self.assertIsNone(self._view._last_shallow_keys)
-
-    def test_on_player_changed_clears_cache(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, frozenset(), frozenset(), None)
-        # _on_player_changed with index=-1 returns early without controller call
-        # but still clears cache
-        self._view._on_player_changed(-1)
-        self.assertIsNone(self._view._last_shallow_keys)
-
-    def test_cache_survives_narrative_ready(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, frozenset(), frozenset(), None)
-        # Narrative update should not touch shallow cache
-        self._view._on_narrative_ready("some narrative", [], None)
-        self.assertEqual(self._view._last_shallow_keys, _SHALLOW_KEYS)
-
-    def test_cache_type_is_frozenset(self):
-        g = GameData(game_number=1)
-        self._view._on_shallow_ready({(g, "k", "CLAMP", "")}, frozenset(), frozenset(), None)
-        self.assertIsInstance(self._view._last_shallow_keys, frozenset)
-
-
-@requires_qt
-class TestVagueKeysFreshness(unittest.TestCase):
-    """_last_vague_keys mirrors _last_shallow_keys lifecycle."""
-
-    def setUp(self):
-        self._view = DetailChessLogChartsView(_MINIMAL_CONFIG)
-
-    def test_initial_state_is_none(self):
-        self.assertIsNone(self._view._last_vague_keys)
-
-    def test_on_shallow_ready_caches_vague_keys(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, _VAGUE_KEYS, frozenset(), None)
-        self.assertEqual(self._view._last_vague_keys, _VAGUE_KEYS)
-
-    def test_on_shallow_ready_empty_vague_stores_none(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, _VAGUE_KEYS, frozenset(), None)
-        self._view._on_shallow_ready(_SHALLOW_KEYS, frozenset(), frozenset(), None)
-        self.assertIsNone(self._view._last_vague_keys)
-
-    def test_on_source_changed_clears_vague_keys(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, _VAGUE_KEYS, frozenset(), None)
-        self._view._on_source_changed(1)
-        self.assertIsNone(self._view._last_vague_keys)
-
-    def test_on_player_changed_clears_vague_keys(self):
-        self._view._on_shallow_ready(_SHALLOW_KEYS, _VAGUE_KEYS, frozenset(), None)
-        self._view._on_player_changed(-1)
-        self.assertIsNone(self._view._last_vague_keys)
-
-    def test_cache_type_is_frozenset(self):
-        g = GameData(game_number=9)
-        self._view._on_shallow_ready(_SHALLOW_KEYS, {(g, "x", "3x3", "Why1")}, frozenset(), None)
-        self.assertIsInstance(self._view._last_vague_keys, frozenset)
+    def test_narrative_ready_does_not_store_on_view(self):
+        view = DetailChessLogChartsView(_MINIMAL_CONFIG)
+        view._on_narrative_ready("some narrative", [], None)
+        self.assertFalse(hasattr(view, "_last_narrative"))
 
 
 def _make_ctrl():
@@ -148,7 +93,7 @@ class TestThemeRebuildPreservesResults(unittest.TestCase):
 
         view = self._simulate_theme_rebuild(ctrl)
 
-        self.assertEqual(view._last_narrative, "Deep pawn structure issues.")
+        self.assertEqual(view._narrative_text(), "Deep pawn structure issues.")
         # Token label is empty (None usage) but narrative text is present.
         self.assertNotEqual(view._narrative_edit.toPlainText().strip(), "")
 
@@ -166,9 +111,9 @@ class TestThemeRebuildPreservesResults(unittest.TestCase):
         ctrl = _make_ctrl()
         ctrl._on_shallow_thread_ready(_SHALLOW_KEYS, frozenset(), frozenset(), None)
 
-        view = self._simulate_theme_rebuild(ctrl)
+        self._simulate_theme_rebuild(ctrl)
 
-        self.assertEqual(view._last_shallow_keys, _SHALLOW_KEYS)
+        self.assertEqual(ctrl.get_last_shallow_result()[0], _SHALLOW_KEYS)
 
     def test_shallow_token_counts_survive_theme_rebuild(self):
         from app.services.ai_service import TokenUsage
@@ -182,11 +127,38 @@ class TestThemeRebuildPreservesResults(unittest.TestCase):
 
     def test_vague_keys_survive_theme_rebuild(self):
         ctrl = _make_ctrl()
-        ctrl._on_shallow_thread_ready(_SHALLOW_KEYS, _VAGUE_KEYS, frozenset(), None)
+        ctrl._on_shallow_thread_ready(frozenset(), _VAGUE_KEYS, frozenset(), None)
+
+        self._simulate_theme_rebuild(ctrl)
+
+        # A vague-only result is stored as such (shallow is an empty set, not None).
+        self.assertEqual(ctrl.get_last_shallow_result()[:2], (frozenset(), _VAGUE_KEYS))
+
+    def test_vague_only_token_label_survives_theme_rebuild(self):
+        from app.services.ai_service import TokenUsage
+        ctrl = _make_ctrl()
+        usage = TokenUsage(input_tokens=80, output_tokens=31, reasoning_tokens=None, reported=True)
+        ctrl._on_shallow_thread_ready(frozenset(), _VAGUE_KEYS, frozenset(), usage)
 
         view = self._simulate_theme_rebuild(ctrl)
 
-        self.assertEqual(view._last_vague_keys, _VAGUE_KEYS)
+        self.assertIn("31", view._shallow_token_label.text())
+
+    def test_rebuilt_view_reads_the_same_results_from_the_controller(self):
+        from app.services.ai_service import TokenUsage
+        ctrl = _make_ctrl()
+        usage = TokenUsage(input_tokens=10, output_tokens=7, reasoning_tokens=None, reported=True)
+        ctrl._on_narrative_thread_ready("Narrative text.", [], usage)
+        ctrl._on_shallow_thread_ready(_SHALLOW_KEYS, _VAGUE_KEYS, frozenset(), usage)
+        first = self._simulate_theme_rebuild(ctrl)
+        second = self._simulate_theme_rebuild(ctrl)
+
+        for view in (first, second):
+            self.assertEqual(view._narrative_text(), "Narrative text.")
+            self.assertEqual(view._narrative_edit.toPlainText(), first._narrative_edit.toPlainText())
+            self.assertEqual(view._shallow_token_label.text(), first._shallow_token_label.text())
+            self.assertIn("7", view._shallow_token_label.text())
+        self.assertEqual(ctrl.get_last_shallow_result()[:2], (_SHALLOW_KEYS, _VAGUE_KEYS))
 
     def test_database_switch_clears_narrative_before_rebuild(self):
         ctrl = _make_ctrl()
@@ -200,7 +172,7 @@ class TestThemeRebuildPreservesResults(unittest.TestCase):
 
         view = self._simulate_theme_rebuild(ctrl)
 
-        self.assertEqual(view._last_narrative, "")
+        self.assertEqual(view._narrative_text(), "")
         self.assertEqual(view._narrative_edit.toPlainText().strip(), "")
 
     def test_database_switch_clears_shallow_before_rebuild(self):
@@ -213,9 +185,9 @@ class TestThemeRebuildPreservesResults(unittest.TestCase):
              patch.object(ctrl, "_cancel_shallow_thread"):
             ctrl._on_active_database_changed(MagicMock())
 
-        view = self._simulate_theme_rebuild(ctrl)
+        self._simulate_theme_rebuild(ctrl)
 
-        self.assertIsNone(view._last_shallow_keys)
+        self.assertEqual(ctrl.get_last_shallow_result()[:2], (frozenset(), frozenset()))
 
     def test_player_change_clears_both_before_rebuild(self):
         ctrl = _make_ctrl()
@@ -227,8 +199,8 @@ class TestThemeRebuildPreservesResults(unittest.TestCase):
 
         view = self._simulate_theme_rebuild(ctrl)
 
-        self.assertEqual(view._last_narrative, "")
-        self.assertIsNone(view._last_shallow_keys)
+        self.assertEqual(view._narrative_text(), "")
+        self.assertEqual(ctrl.get_last_shallow_result()[:2], (frozenset(), frozenset()))
 
     def test_source_change_clears_both_before_rebuild(self):
         ctrl = _make_ctrl()
@@ -241,95 +213,8 @@ class TestThemeRebuildPreservesResults(unittest.TestCase):
 
         view = self._simulate_theme_rebuild(ctrl)
 
-        self.assertEqual(view._last_narrative, "")
-        self.assertIsNone(view._last_shallow_keys)
-
-
-@requires_qt
-class TestMomentInLastShallowHelper(unittest.TestCase):
-    """Tests for _moment_in_last_shallow — the identity-safe helper that replaces
-    the pre-fix 4-tuple cat-based lookup (which mismatched CLAMP entries)."""
-
-    def setUp(self):
-        self._view = DetailChessLogChartsView(_MINIMAL_CONFIG)
-
-    def test_clamp_hit(self):
-        """CLAMP moment whose game object is in shallow_keys returns True."""
-        self._view._last_shallow_keys = _SHALLOW_KEYS
-        self.assertTrue(self._view._moment_in_last_shallow(_GAME_1, "k1", "CLAMP"))
-
-    def test_clamp_miss_different_object(self):
-        """A DIFFERENT game object (same game_number) must NOT match — identity check."""
-        self._view._last_shallow_keys = _SHALLOW_KEYS
-        other_game = GameData(game_number=1)  # same number, different object
-        self.assertFalse(self._view._moment_in_last_shallow(other_game, "k1", "CLAMP"))
-
-    def test_clamp_miss_different_path(self):
-        self._view._last_shallow_keys = _SHALLOW_KEYS
-        self.assertFalse(self._view._moment_in_last_shallow(_GAME_1, "k9", "CLAMP"))
-
-    def test_3x3_any_cat_hit(self):
-        """3x3 moment returns True if any Why cat is in shallow_keys."""
-        g = GameData(game_number=99)
-        self._view._last_shallow_keys = frozenset([(g, "k", "3x3", "Why2")])
-        self.assertTrue(self._view._moment_in_last_shallow(g, "k", "3x3"))
-
-    def test_3x3_no_cat_miss(self):
-        """3x3 moment returns False when no Why cat is in shallow_keys."""
-        g = GameData(game_number=99)
-        self._view._last_shallow_keys = frozenset()
-        self.assertFalse(self._view._moment_in_last_shallow(g, "k", "3x3"))
-
-    def test_stale_cache_no_false_positive(self):
-        """A new game with the same game_number must not match the stale cache entry."""
-        game_original = GameData(game_number=1)
-        self._view._last_shallow_keys = frozenset([(game_original, "k", "CLAMP", "")])
-        game_new = GameData(game_number=1)  # different object, same number
-        self.assertFalse(self._view._moment_in_last_shallow(game_new, "k", "CLAMP"),
-                         "identity-keyed lookup must not match a different object")
-
-    def test_sort_reindex_does_not_break_identity(self):
-        """Even if game_number is reassigned (simulating sort/reindex),
-        the object-identity key must still match the original game object."""
-        game = GameData(game_number=5)
-        self._view._last_shallow_keys = frozenset([(game, "k", "CLAMP", "")])
-        # Simulate sort reassigning game_number
-        game.game_number = 2
-        self.assertTrue(self._view._moment_in_last_shallow(game, "k", "CLAMP"),
-                        "shallow_keys must still match after game_number reassignment")
-
-    def test_none_shallow_keys_returns_false(self):
-        self._view._last_shallow_keys = None
-        self.assertFalse(self._view._moment_in_last_shallow(_GAME_1, "k1", "CLAMP"))
-
-    def test_3x3_vague_only_hit(self):
-        """3x3 moment in vague_keys only (not shallow_keys) must return True."""
-        g = GameData(game_number=7)
-        self._view._last_shallow_keys = frozenset()
-        self._view._last_vague_keys = frozenset([(g, "0", "3x3", "Why4")])
-        self.assertTrue(self._view._moment_in_last_shallow(g, "0", "3x3"),
-                        "vague-only 3x3 Why4 moment must appear in export")
-
-    def test_clamp_vague_only_hit(self):
-        """CLAMP moment in vague_keys only must return True."""
-        g = GameData(game_number=8)
-        self._view._last_shallow_keys = frozenset()
-        self._view._last_vague_keys = frozenset([(g, "p", "CLAMP", "")])
-        self.assertTrue(self._view._moment_in_last_shallow(g, "p", "CLAMP"),
-                        "vague-only CLAMP moment must appear in export")
-
-    def test_3x3_in_neither_returns_false(self):
-        """3x3 moment absent from both shallow_keys and vague_keys returns False."""
-        g = GameData(game_number=9)
-        self._view._last_shallow_keys = frozenset()
-        self._view._last_vague_keys = frozenset()
-        self.assertFalse(self._view._moment_in_last_shallow(g, "0", "3x3"))
-
-    def test_none_vague_keys_falls_back_to_shallow(self):
-        """When vague_keys is None, a shallow_keys hit still returns True."""
-        self._view._last_shallow_keys = _SHALLOW_KEYS
-        self._view._last_vague_keys = None
-        self.assertTrue(self._view._moment_in_last_shallow(_GAME_1, "k1", "CLAMP"))
+        self.assertEqual(view._narrative_text(), "")
+        self.assertEqual(ctrl.get_last_shallow_result()[:2], (frozenset(), frozenset()))
 
 
 @requires_qt
@@ -339,81 +224,87 @@ class TestGameSetChangeClearsDisplay(unittest.TestCase):
     that mutates display state must fail before the fix and pass after."""
 
     def setUp(self):
+        self._ctrl = _make_ctrl()
         self._view = DetailChessLogChartsView(_MINIMAL_CONFIG)
-        self._view._on_narrative_ready("Old narrative text.", [], None)
+        with patch.object(self._ctrl, "_start_dropdown_worker"):
+            self._view.set_controller(self._ctrl)
+        self._ctrl._on_narrative_thread_ready("Old narrative text.", [], None)
+        self._ctrl._on_shallow_thread_ready(_SHALLOW_KEYS, frozenset(), frozenset(), None)
+        self.assertNotEqual(self._view._narrative_edit.toPlainText().strip(), "")
+
+    def _clear_via_controller(self):
+        """Everything that invalidates results does so through the controller."""
+        with patch.object(self._ctrl, "_kick_debounce"):
+            self._ctrl._clear_result_cache()
 
     # --- DB switch / reset_player_selection ---
 
     def test_db_switch_clears_narrative_edit_text(self):
-        """After _reset_player_selection (triggered by DB switch), narrative edit is empty."""
-        self.assertNotEqual(self._view._narrative_edit.toPlainText().strip(), "")
-        self._view._reset_player_selection()
+        """A controller-side clear (DB switch) empties the narrative display."""
+        self._clear_via_controller()
         self.assertEqual(self._view._narrative_edit.toPlainText().strip(), "")
 
-    def test_db_switch_clears_last_narrative(self):
-        """_reset_player_selection clears _last_narrative (PDF export protection)."""
-        self._view._reset_player_selection()
-        self.assertEqual(self._view._last_narrative, "")
+    def test_db_switch_clears_stored_narrative(self):
+        """The controller's stored narrative is gone (PDF export protection)."""
+        self._clear_via_controller()
+        self.assertEqual(self._view._narrative_text(), "")
 
     def test_db_switch_clears_shallow_token_label(self):
-        """_reset_player_selection clears _shallow_token_label."""
         self._view._shallow_token_label.setText("Tokens: 100 in / 50 out")
-        self._view._reset_player_selection()
+        self._clear_via_controller()
         self.assertEqual(self._view._shallow_token_label.text(), "")
 
     def test_db_switch_clears_narrative_token_label(self):
-        """_reset_player_selection clears _narrative_token_label."""
         self._view._narrative_token_label.setText("Tokens: 200 in / 80 out")
-        self._view._reset_player_selection()
+        self._clear_via_controller()
         self.assertEqual(self._view._narrative_token_label.text(), "")
 
     # --- player change ---
 
     def test_player_change_clears_narrative_edit_text(self):
-        """Player change must clear _narrative_edit display."""
-        self.assertNotEqual(self._view._narrative_edit.toPlainText().strip(), "")
-        self._view._on_player_changed(-1)
+        """Choosing a player clears the narrative display (through the controller)."""
+        with patch.object(self._ctrl, "_kick_debounce"):
+            self._ctrl.set_player_selection("Player B")
         self.assertEqual(self._view._narrative_edit.toPlainText().strip(), "")
 
-    def test_player_change_clears_last_narrative(self):
-        """Player change must clear _last_narrative (PDF export protection)."""
-        self.assertEqual(self._view._last_narrative, "Old narrative text.")
-        self._view._on_player_changed(-1)
-        self.assertEqual(self._view._last_narrative, "")
+    def test_player_change_clears_stored_narrative(self):
+        self.assertEqual(self._view._narrative_text(), "Old narrative text.")
+        with patch.object(self._ctrl, "_kick_debounce"):
+            self._ctrl.set_player_selection("Player B")
+        self.assertEqual(self._view._narrative_text(), "")
 
-    def test_player_change_clears_shallow_keys(self):
-        """Player change must clear _last_shallow_keys."""
-        self._view._last_shallow_keys = _SHALLOW_KEYS
-        self._view._on_player_changed(-1)
-        self.assertIsNone(self._view._last_shallow_keys)
+    def test_player_change_clears_stored_check_logs_result(self):
+        with patch.object(self._ctrl, "_kick_debounce"):
+            self._ctrl.set_player_selection("Player B")
+        self.assertEqual(self._ctrl.get_last_shallow_result()[:2], (frozenset(), frozenset()))
+
+    def test_view_player_handler_clears_nothing_itself(self):
+        """_on_player_changed only forwards to the controller; the controller clears."""
+        self._view._player_combo.addItem("Player B (1 logged)", "Player B")
+        with patch.object(self._ctrl, "_kick_debounce"):
+            self._view._on_player_changed(0)
+        self.assertEqual(self._ctrl.get_player_display_name(), "Player B")
+        self.assertEqual(self._view._narrative_text(), "")
+
+    def test_source_change_clears_through_controller(self):
+        with patch.object(self._ctrl, "_start_dropdown_worker"), \
+             patch.object(self._ctrl, "_cancel_agg_worker"):
+            self._view._on_source_changed(2)
+        self.assertEqual(self._view._narrative_text(), "")
+        self.assertEqual(self._view._narrative_edit.toPlainText().strip(), "")
+        self.assertEqual(self._ctrl.get_last_shallow_result()[:2], (frozenset(), frozenset()))
 
     # --- positive control: chart redraw does NOT clear ---
 
     def test_chart_loading_does_not_clear_narrative(self):
         """_on_charts_loading (chart redraw, same game set) must not clear narrative."""
-        narrative_before = self._view._last_narrative
         self._view._on_charts_loading()
-        self.assertEqual(self._view._last_narrative, narrative_before)
+        self.assertEqual(self._view._narrative_text(), "Old narrative text.")
         self.assertNotEqual(self._view._narrative_edit.toPlainText().strip(), "")
 
     def test_chart_updated_does_not_clear_narrative(self):
-        """_on_charts_updated (chart redraw result) must not clear narrative."""
-        narrative_before = self._view._last_narrative
         self._view._on_charts_updated({})
-        self.assertEqual(self._view._last_narrative, narrative_before)
-
-    # --- export after clear ---
-
-    def test_export_field_empty_after_player_change(self):
-        """_last_narrative is empty after player change → PDF export gets no narrative."""
-        self._view._on_player_changed(-1)
-        self.assertEqual(self._view._last_narrative.strip(), "")
-
-    def test_export_shallow_field_empty_after_db_switch(self):
-        """_last_shallow_keys is None after DB switch → PDF export has no Check Logs rows."""
-        self._view._last_shallow_keys = _SHALLOW_KEYS
-        self._view._reset_player_selection()
-        self.assertIsNone(self._view._last_shallow_keys)
+        self.assertEqual(self._view._narrative_text(), "Old narrative text.")
 
     # --- saved data untouched ---
 
@@ -423,6 +314,7 @@ class TestGameSetChangeClearsDisplay(unittest.TestCase):
             "app.services.chess_log_storage_service.ChessLogStorageService.store_tags"
         ) as mock_store:
             self._view._clear_narrative_and_check_logs()
+            self._clear_via_controller()
         mock_store.assert_not_called()
 
 

@@ -2276,15 +2276,15 @@ class TestF5SortScenario(unittest.TestCase):
             view = DetailChessLogChartsView({})
             view.set_controller(ctrl)
 
-        self.assertIsNotNone(view._last_shallow_keys,
-                             "set_controller must restore shallow_keys from cache")
+        restored_keys = ctrl.get_last_shallow_result()[0]
+        self.assertEqual(restored_keys, sk, "the controller keeps the session result across the rebuild")
 
         tags = {
             id(game_a): {"0": [_make_entry("CLAMP", "C", "vague note")]},
             id(game_b): {"0": [_make_entry("CLAMP", "L", "specific insight")]},
         }
         dlg, dlg_ctrl = _make_shallow_dialog(
-            [game_a, game_b], tags, view._last_shallow_keys, ck,
+            [game_a, game_b], tags, restored_keys, ck,
         )
         self.assertEqual(len(dlg._row_widgets), 1,
                          "Only game_a must have chip after sort — game_b must not")

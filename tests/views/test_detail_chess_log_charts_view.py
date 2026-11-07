@@ -60,7 +60,7 @@ def _make_stub_controller(ai_configured: bool = False, models=None, timeout: int
     ctrl.get_narrative_token_limit.return_value = 12000
     ctrl.get_narrative_model_override.return_value = None
     ctrl.get_last_narrative_result.return_value = ("", [], None)
-    ctrl.get_last_shallow_result.return_value = (None, None, None)
+    ctrl.get_last_shallow_result.return_value = (frozenset(), frozenset(), None)
     # Simulate signal attributes so connect() calls succeed
     for sig in (
         "charts_updated", "charts_unavailable", "charts_skipped", "charts_loading",
@@ -334,18 +334,18 @@ class TestDetailChessLogChartsViewSelector(unittest.TestCase):
         view._reset_player_selection()
         self.assertEqual(view._player_combo.currentIndex(), -1)
 
-    def test_reset_player_selection_clears_last_shallow_keys_and_narrative(self):
-        """DB switch and player-change both call _reset_player_selection;
-        it must clear _last_shallow_keys and _last_narrative so stale data
-        from the previous database is never shown against the new one."""
+    def test_results_invalidated_clears_narrative_display(self):
+        """DB switch and player change clear results in the controller, which emits
+        results_invalidated; the view then empties its display.  The view keeps no
+        result copy (#91), so there is nothing else for it to clear."""
         view = DetailChessLogChartsView(config={})
         view.set_controller(_make_stub_controller())
-        # Simulate having stale shallow-key results from a previous library
-        view._last_shallow_keys = frozenset([(5, "0.0", "CLAMP")])
-        view._last_narrative = "Prior narrative text"
-        view._reset_player_selection()
-        self.assertIsNone(view._last_shallow_keys)
-        self.assertEqual(view._last_narrative, "")
+        view._on_narrative_ready("Prior narrative text", [], None)
+        self.assertNotEqual(view._narrative_edit.toPlainText().strip(), "")
+        view._clear_narrative_and_check_logs()
+        self.assertEqual(view._narrative_edit.toPlainText().strip(), "")
+        self.assertFalse(hasattr(view, "_last_shallow_keys"))
+        self.assertFalse(hasattr(view, "_last_narrative"))
 
     def test_players_ready_with_empty_list_shows_no_players_placeholder(self):
         view = DetailChessLogChartsView(config={})
@@ -757,16 +757,17 @@ class TestExportPdfReportNarrativeMetadata(unittest.TestCase):
         view = self._make_view()
         ctrl = _make_stub_controller(ai_configured=True, models=["m1"])
         ctrl.get_last_narrative_result.return_value = ("Some narrative", [], None)
-        ctrl.get_last_shallow_result.return_value = (None, None, None)
+        ctrl.get_last_shallow_result.return_value = (frozenset(), frozenset(), None)
         ctrl.get_last_narrative_metadata.return_value = (
             "2026-06-01 12:00",      # generated_at
             "Anthropic claude-x",    # model_label
             10, 7, 18, 14, False,    # n, g, m, s, has_3x3
         )
         ctrl.get_current_source_filenames.return_value = ["DB.pgn"]
+        ctrl.get_player_display_name.return_value = "Alice"
+        ctrl.get_source_description.return_value = "Active Database: DB.pgn"
+        ctrl.get_check_log_moments.return_value = []
         view.set_controller(ctrl)
-        # Manually set last narrative so the method sees it
-        view._last_narrative = "Some narrative"
 
         captured: dict = {}
 
@@ -801,10 +802,12 @@ class TestExportPdfReportNarrativeMetadata(unittest.TestCase):
         view = self._make_view()
         ctrl = _make_stub_controller(ai_configured=True, models=["m1"])
         ctrl.get_last_narrative_result.return_value = ("", [], None)
-        ctrl.get_last_shallow_result.return_value = (None, None, None)
+        ctrl.get_last_shallow_result.return_value = (frozenset(), frozenset(), None)
         ctrl.get_current_source_filenames.return_value = []
+        ctrl.get_player_display_name.return_value = "Alice"
+        ctrl.get_source_description.return_value = "Active Database"
+        ctrl.get_check_log_moments.return_value = []
         view.set_controller(ctrl)
-        view._last_narrative = ""
 
         captured: dict = {}
 
