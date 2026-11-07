@@ -2571,12 +2571,12 @@ class TestPDFHeaderSavedMode(unittest.TestCase):
     def _open_and_export(self, game, entry, check_run_side_effect):
         from unittest.mock import patch, MagicMock
         sk = frozenset([(game, "0", "CLAMP", "")])
-        dlg, _ = _make_dialog(
+        dlg, ctrl = _make_dialog(
             [game], {game.game_number: {"0": [entry]}}, sk
         )
         captured = {}
-        with patch(
-            "app.views.dialogs.show_shallow_tags_dialog.ChessLogStorageService.load_check_run",
+        with patch.object(
+            ctrl, "get_check_run_for_game",
             side_effect=check_run_side_effect,
         ), patch(
             "app.services.chess_log_pdf_service.ChessLogPDFService.export_tags",
@@ -2650,8 +2650,8 @@ class TestPDFHeaderSavedMode(unittest.TestCase):
             id(game2): {"model": "claude-sonnet-4-6", "date": "2026-10-30T12:00:00Z"},
         }
         captured = {}
-        with patch(
-            "app.views.dialogs.show_shallow_tags_dialog.ChessLogStorageService.load_check_run",
+        with patch.object(
+            ctrl, "get_check_run_for_game",
             side_effect=lambda g: cr_map.get(id(g)),
         ), patch(
             "app.services.chess_log_pdf_service.ChessLogPDFService.export_tags",
@@ -3603,8 +3603,8 @@ class TestMixedRunsPDFDate(unittest.TestCase):
             id(game2): {"model": "claude-sonnet-4-6", "date": "2026-10-30T12:00:00Z"},
         }
         captured = {}
-        with patch(
-            "app.views.dialogs.show_shallow_tags_dialog.ChessLogStorageService.load_check_run",
+        with patch.object(
+            ctrl, "get_check_run_for_game",
             side_effect=lambda g: cr_map.get(id(g)),
         ), patch(
             "app.services.chess_log_pdf_service.ChessLogPDFService.export_tags",
@@ -3617,6 +3617,39 @@ class TestMixedRunsPDFDate(unittest.TestCase):
         self.assertIn("2026-10-30", captured.get("generated_at", ""),
             "generated_at must contain the most recent run's date in mixed-runs export")
         self.assertEqual(captured.get("model_label"), "claude-sonnet-4-6 (mixed runs)")
+
+
+@requires_qt
+class TestCheckRunReadThroughController(unittest.TestCase):
+    """The dialog reads _check_run via the controller, never the storage service (C2)."""
+
+    def test_resolve_model_generated_calls_controller(self):
+        from unittest.mock import patch
+        game = _make_game(1)
+        sk = frozenset([(game, "0", "CLAMP", "")])
+        dlg, ctrl = _make_dialog(
+            [game], {1: {"0": [_make_entry("CLAMP", "C", "n")]}}, sk
+        )
+        ctrl.get_check_run_for_game.return_value = {
+            "model": "m1", "date": "2026-10-28T10:00:00Z"
+        }
+        dlg._check_run_info = None
+        with patch(
+            "app.services.chess_log_storage_service.ChessLogStorageService.load_check_run"
+        ) as storage:
+            model_label, _ = dlg._resolve_model_generated()
+        ctrl.get_check_run_for_game.assert_called_with(game)
+        storage.assert_not_called()
+        self.assertEqual(model_label, "m1")
+
+    def test_no_view_calls_storage_load_check_run(self):
+        import pathlib
+        root = pathlib.Path(__file__).resolve().parents[2] / "app" / "views"
+        offenders = [
+            str(p) for p in root.rglob("*.py")
+            if "ChessLogStorageService.load_check_run" in p.read_text(encoding="utf-8")
+        ]
+        self.assertEqual(offenders, [])
 
 
 if __name__ == "__main__":

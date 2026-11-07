@@ -836,6 +836,20 @@ class TestSaveAllIncludesCurrentGame(unittest.TestCase):
         self.assertIn(gid, ctrl._dirty_games)
         gm.metadata_updated.emit.assert_not_called()
 
+    def test_get_check_run_returns_pending_before_stored(self):
+        ctrl, gm, game = self._make_ctrl_with_tagged_active_game()
+        stored = {"model": "stored", "date": "2026-01-01T00:00:00Z"}
+        ChessLogStorageService.store_tags(game, {}, check_run=stored)
+        self.assertEqual(ctrl.get_check_run_for_game(game), stored)
+        pending = {"model": "pending", "date": "2026-02-02T00:00:00Z"}
+        ctrl.set_check_run_for_game(game, pending)
+        self.assertIs(ctrl.get_check_run_for_game(game), pending)
+
+    def test_get_check_run_none_when_neither(self):
+        game = make_game(1)
+        ctrl, gm = make_controller(game)
+        self.assertIsNone(ctrl.get_check_run_for_game(game))
+
 
 class TestSaveCurrentGameDirtyState(unittest.TestCase):
     """Dirty-state regression tests for save and clear paths."""

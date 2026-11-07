@@ -365,7 +365,14 @@ class ChessLogController:
         self._pending_check_runs[id(game)] = check_run
 
     def get_check_run_for_game(self, game: Any) -> Optional[Dict[str, Any]]:
-        """Return the stored _check_run dict for a game, or None if absent."""
+        """Return the _check_run dict for a game, or None if absent.
+
+        A run queued by set_check_run_for_game but not yet saved takes precedence
+        over the stored one.
+        """
+        pending = self._pending_check_runs.get(id(game))
+        if pending:
+            return pending
         return ChessLogStorageService.load_check_run(game)
 
     def get_shallow_vague_keys(self, games) -> Tuple[FrozenSet, FrozenSet]:

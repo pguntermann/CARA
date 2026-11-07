@@ -546,7 +546,7 @@ class ShowShallowTagsDialog(QDialog):
                 if id(game) in seen_game_ids:
                     continue
                 seen_game_ids.add(id(game))
-                cr = ChessLogStorageService.load_check_run(game)
+                cr = self._controller.get_check_run_for_game(game)
                 if cr and cr.get("model") and cr.get("date"):
                     seen_runs.append((cr["model"], cr["date"]))
             if not seen_runs:
