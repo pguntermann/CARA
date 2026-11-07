@@ -7,11 +7,19 @@ use ``StorageBackedChessLogController``, which answers from the games' PGNs.
 
 from __future__ import annotations
 
+from PyQt6.QtCore import QObject, pyqtSignal
+
 from app.services.chess_log_storage_service import ChessLogStorageService
 
 
-class StorageBackedChessLogController:
-    """Minimal ChessLogController stub: resolved moments straight from the PGN."""
+class StorageBackedChessLogController(QObject):
+    """Minimal ChessLogController stub: resolved moments straight from the PGN.
+
+    Carries the real controller's ``chess_log_changed`` signal, which the
+    charts controller subscribes to on injection.
+    """
+
+    chess_log_changed = pyqtSignal(object)
 
     def get_tags_for_game(self, game):
         return ChessLogStorageService.load_resolved_paths(game)

@@ -213,6 +213,23 @@ Policy:
 - **Feature code (resolved view)**: `get_tags_for_current_game()`, `get_tags_for_game()`, and `should_confirm_extra_moment()` consume `_resolved_view(raw, game)` — an orphan-filtered copy memoized per `id(game)`. The memoization key is `(write_version, blake2b-16 hash of game.pgn)`. The content hash (not `len(pgn)`) is used so same-length move substitutions (e.g. `Nf3` → `Nc3`) also invalidate the cache. The method always returns a **shallow copy** of the memoized dict so caller mutation cannot corrupt the cache. Background service callers (charts aggregation, narrative prompt, charts controller fallback) call `load_resolved_paths` directly — they read from disk and never see in-session edits, so the one-level disk filter is correct.
 - **Display**: `ShowTagsDialog` and `ShowShallowTagsDialog` detect orphan rows by checking `move_label == path_key` (the fallback when `node_at_path` returns `None` in `_tag_row_helpers.node_info`), skip them silently, and append a single notice at the bottom of the dialog listing the count of unreachable moments.
 
+## Change notification (`chess_log_changed`)
+
+`ChessLogController` is a `QObject` and the only thing that announces Chess Log changes.
+It emits `chess_log_changed(game)` from `_write_store` (Log, Clear, dialog edits; pending
+edits count) and from `_save_single_game` (after a successful persist). A save of many
+games emits once per game. Subscribers:
+
+- **Moves List view** — refreshes tag icons when the changed game is the active game.
+- **Chess Log tab controller** (`ChessLogChartsController`) — one debounced
+  (`_data_changed_debounce`) refresh of the player dropdown and, if a player is selected,
+  the charts, using a fresh tag snapshot. The same debounce also fires on the open
+  databases' `stats_relevant_data_change` (games added/removed/updated).
+
+Callers must not notify views themselves; `tests/controllers/test_chess_log_changed_signal.py`
+guards against it. `_save_single_game` still emits `metadata_updated`: the PGN and Metadata
+views display the `CARAChessLog` tag it writes.
+
 ## Key files
 
 - `app/services/chess_log_storage_service.py`

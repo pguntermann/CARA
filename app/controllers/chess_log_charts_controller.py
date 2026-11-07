@@ -552,6 +552,13 @@ class ChessLogChartsController(QObject):
         self._selection_debounce.setSingleShot(True)
         self._selection_debounce.timeout.connect(self._on_selection_debounced)
         self._selection_debounce_ms = 100
+        # Coalesces the burst of chess_log_changed / game-set signals (one per
+        # game on a multi-game save) into a single dropdown + charts refresh.
+        self._data_changed_debounce = QTimer(self)
+        self._data_changed_debounce.setSingleShot(True)
+        self._data_changed_debounce.timeout.connect(self._on_data_changed_debounced)
+        self._data_changed_debounce_ms = 100
+        self._watched_database_models: List[Any] = []
 
         # Generation counter: incremented by _clear_result_cache() on every game-set
         # change.  Captured into _narrative_launch_gen / _shallow_launch_gen when a
@@ -580,8 +587,20 @@ class ChessLogChartsController(QObject):
         self._get_selected_games_callback = callback
 
     def set_chess_log_controller(self, controller: Any) -> None:
-        """Inject ChessLogController for Chess Log dialogs."""
+        """Inject ChessLogController for Chess Log dialogs.
+
+        Subscribes to its chess_log_changed signal: any Chess Log change (pending
+        edits included) schedules one debounced dropdown + charts refresh.
+        """
+        old = self._chess_log_controller
+        if old is not None:
+            try:
+                old.chess_log_changed.disconnect(self._on_chess_log_changed)
+            except (TypeError, RuntimeError):
+                pass
         self._chess_log_controller = controller
+        if controller is not None:
+            controller.chess_log_changed.connect(self._on_chess_log_changed)
 
     def get_chess_log_controller(self) -> Optional[Any]:
         """Return the injected ChessLogController."""
@@ -590,17 +609,6 @@ class ChessLogChartsController(QObject):
     def resolve_games(self) -> List[GameData]:
         """Public wrapper around _resolve_games()."""
         return self._resolve_games()
-
-    def notify_chess_log_saved(self) -> None:
-        """Re-run the player dropdown worker after Chess Log tags have been saved.
-
-        Must be called after any successful Chess Log save so that the tagged-game
-        counts in the player combo stay current.  Only refreshes the dropdown;
-        does not re-run chart aggregation (the chart data is still valid).
-        """
-        if self._source_selection == 0:
-            return
-        self._start_dropdown_worker(self._resolve_games())
 
     def has_player_selected(self) -> bool:
         """True iff the user has explicitly picked a player in the Player dropdown."""
@@ -1028,6 +1036,38 @@ class ChessLogChartsController(QObject):
     # Internal helpers
     # ------------------------------------------------------------------
 
+    def _on_chess_log_changed(self, _game=None) -> None:
+        self._data_changed_debounce.start(self._data_changed_debounce_ms)
+
+    def _on_data_changed_debounced(self) -> None:
+        """Re-aggregate from fresh moments after a Chess Log or game-set change.
+
+        With a player selected the dropdown and charts both refresh (the snapshot
+        is taken now, so the charts see the current moments); otherwise only the
+        dropdown counts need updating.
+        """
+        if self._source_selection == 0:
+            return
+        if self._player_explicit_selected:
+            self._refresh_dropdown_and_charts()
+        else:
+            self._start_dropdown_worker(self._resolve_games())
+
+    def _watch_database_models(self) -> None:
+        """Subscribe to game-set changes of every open database (idempotent)."""
+        panel_model = self._database_controller.get_panel_model()
+        if not panel_model:
+            return
+        try:
+            models = list(panel_model.get_all_database_models())
+        except TypeError:
+            return
+        for db in models:
+            if any(db is w for w in self._watched_database_models):
+                continue
+            db.stats_relevant_data_change.connect(self._on_chess_log_changed)
+            self._watched_database_models.append(db)
+
     def _kick_debounce(self) -> None:
         self._selection_debounce.stop()
         self._selection_debounce.start(self._selection_debounce_ms)
@@ -1245,9 +1285,12 @@ class ChessLogChartsController(QObject):
         except (RuntimeError, TypeError):
             pass
         panel_model.active_database_changed.connect(self._on_active_database_changed)
+        panel_model.database_added.connect(lambda *_: self._watch_database_models())
+        self._watch_database_models()
 
     def _on_active_database_changed(self, database) -> None:
         """Reset player selection when the active database changes (sources 1 and 2 only)."""
+        self._watch_database_models()
         if self._source_selection not in (1, 2):
             return
         self.clear_player_selection()

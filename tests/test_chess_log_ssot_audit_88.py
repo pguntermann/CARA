@@ -1,7 +1,8 @@
 """Reproducing tests for Issue #88 single-source-of-truth audit.
 
 Each test is marked @unittest.expectedFailure so the suite stays green.
-A test flips to "unexpected success" (a failure) once its fix lands.
+A test flips to "unexpected success" (a failure) once its fix lands; the
+fixed ones then lose the marker (B2 was fixed by #92).
 
 Coverage:
   B1 — Moves List icons stale after ShowTagsDialog.Save or save_games()
@@ -185,19 +186,33 @@ def _charts_controller():
 
 @requires_qt
 class TestB2ChartsNotRefreshedOnSave(unittest.TestCase):
-    """B2: notify_chess_log_saved() refreshes only the player dropdown."""
+    """B2 (fixed by #92): a change emitted by the owner re-aggregates the charts.
 
-    @unittest.expectedFailure
-    def test_save_notification_reaggregates_charts(self):
+    Rewritten from the old notify_chess_log_saved() probe: the notify method is
+    gone, so the test drives the real mechanism instead — ChessLogController
+    emits chess_log_changed, and the charts controller's debounced handler
+    schedules a chart refresh (not just a dropdown refresh).
+    """
+
+    def test_owner_change_reaggregates_charts(self):
+        from app.controllers.chess_log_controller import ChessLogController
+
         ctrl = _charts_controller()
         ctrl._source_selection = 1
         ctrl._player_explicit_selected = True
         ctrl._current_player = "W"
+        owner = ChessLogController(
+            config={}, game_controller=MagicMock(), database_controller=None,
+        )
+        ctrl.set_chess_log_controller(owner)
+        game = _make_game()
         with patch.object(ctrl, "_start_dropdown_worker"), \
                 patch.object(ctrl, "_resolve_games", return_value=[]), \
                 patch.object(ctrl, "_schedule_charts_refresh") as refresh:
-            ctrl.notify_chess_log_saved()
-        refresh.assert_called()
+            owner._write_store(game, id(game), {"0": [_make_entry("CLAMP", "C")]})
+            ctrl._data_changed_debounce.stop()
+            ctrl._on_data_changed_debounced()
+        refresh.assert_called_once()
 
 
 @requires_qt

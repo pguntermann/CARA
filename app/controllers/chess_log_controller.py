@@ -7,13 +7,14 @@ from io import StringIO
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import chess.pgn
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from app.controllers.game_controller import GameController
 from app.services.chess_log_storage_service import ChessLogStorageService
 from app.utils.pgn_variation_path import decode_path, encode_path, node_at_path
 
 
-class ChessLogController:
+class ChessLogController(QObject):
     """Controller for Chess Log tagging.
 
     Maintains an in-memory cache of the current game's moments (paths_data)
@@ -25,7 +26,17 @@ class ChessLogController:
     - Connects to game_model.active_game_changed to reload cache on game switch.
     - Views call add_moment_at_active_path() on user action, then
       save_tags_for_current_game() via the Chess Log menu or Ctrl+Alt+L.
+
+    Owns every logged moment, so it also announces every change: views that
+    show Chess Log data subscribe to ``chess_log_changed`` instead of being
+    told by whichever caller happened to make the edit.
     """
+
+    # Emitted after any in-memory write (_write_store) or successful persist
+    # (_save_single_game).  Payload is the affected game, or None for
+    # "several or all games".  A save of many games emits once per game;
+    # subscribers debounce.
+    chess_log_changed = pyqtSignal(object)
 
     def __init__(
         self,
@@ -34,6 +45,7 @@ class ChessLogController:
         database_controller=None,
         user_settings_service=None,
     ) -> None:
+        super().__init__()
         self.config = config
         self._game_controller = game_controller
         self._database_controller = database_controller
@@ -491,7 +503,10 @@ class ChessLogController:
             self._pending_check_runs.pop(gid, None)
             model = self._game_controller.get_game_model()
             if model.active_game is game:
+                # Not Chess Log-only: the PGN and Metadata views show the
+                # CARAChessLog tag that store_tags just wrote.
                 model.metadata_updated.emit()
+            self.chess_log_changed.emit(game)
         return ok
 
     def has_dirty_games(self) -> bool:
@@ -718,8 +733,8 @@ class ChessLogController:
 
         This is the ONLY method that may write _cached_paths_data, _multi_cache[gid],
         or game.has_chess_log_tags for user-visible operations (Log, Clear, Edit).
-        Bumps the version counter and emits dataChanged on the Log column when the
-        has_chess_log_tags flag transitions.
+        Bumps the version counter, emits dataChanged on the Log column when the
+        has_chess_log_tags flag transitions, and emits chess_log_changed.
         """
         old_has = getattr(game, "has_chess_log_tags", False)
         if gid == self._cached_game_id:
@@ -730,6 +745,7 @@ class ChessLogController:
         self._cache_version_by_game[gid] = self._cache_version_by_game.get(gid, 0) + 1
         if old_has != game.has_chess_log_tags:
             self._notify_database_row_changed(game)
+        self.chess_log_changed.emit(game)
 
     def _notify_database_row_changed(self, game) -> None:
         """Emit dataChanged for the game's Log column in the database panel."""

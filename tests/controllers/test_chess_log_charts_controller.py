@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -828,51 +829,97 @@ class TestChessLogChartsControllerRefreshUsesLiveFields(unittest.TestCase):
 
 
 @unittest.skipUnless(_QT_AVAILABLE, "Qt not available in this environment")
-class TestNotifyChessLogSaved(unittest.TestCase):
-    """notify_chess_log_saved() must restart the dropdown worker so tagged-game
-    counts stay current after a Chess Log save."""
+class TestChessLogChangedRefresh(unittest.TestCase):
+    """A chess_log_changed emit from the owner, or a game-set change in an open
+    database, schedules one debounced dropdown + charts refresh (#92)."""
 
-    def _make_controller(self, games=None) -> "ChessLogChartsController":
-        games = games or []
-        db_ctrl = _make_db_controller(games)
+    def _make_controller(self, games=None, player=True) -> "ChessLogChartsController":
+        db_ctrl = _make_db_controller(games or [])
         ctrl = ChessLogChartsController(config={}, database_controller=db_ctrl)
-        # Avoid real QThread starts: stub out the worker starter so tests are fast
-        # and don't leave dangling threads that crash teardown.
         ctrl._start_dropdown_worker = MagicMock()
-        ctrl._cancel_dropdown_worker = MagicMock()
+        ctrl._schedule_charts_refresh = MagicMock()
+        ctrl._source_selection = 1
+        ctrl._player_explicit_selected = player
+        ctrl._current_player = "W" if player else ""
         return ctrl
 
-    def test_notify_with_no_source_is_noop(self):
+    def test_emit_with_no_source_is_noop(self):
         ctrl = self._make_controller()
         ctrl._source_selection = 0
-        ctrl.notify_chess_log_saved()
+        ctrl._on_data_changed_debounced()
         ctrl._start_dropdown_worker.assert_not_called()
+        ctrl._schedule_charts_refresh.assert_not_called()
 
-    def test_notify_with_source_starts_dropdown_worker(self):
+    def test_player_selected_refreshes_dropdown_and_charts_with_fresh_snapshot(self):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
         ctrl = self._make_controller(games=[game])
-        ctrl._source_selection = 1
-        ctrl.notify_chess_log_saved()
+        ctrl._resolve_games = lambda: [game]
+        ctrl._on_data_changed_debounced()
+        ctrl._start_dropdown_worker.assert_called_once()
+        ctrl._schedule_charts_refresh.assert_called_once()
+        snapshot = ctrl._schedule_charts_refresh.call_args.kwargs["snapshot"]
+        self.assertEqual(snapshot[id(game)], ctrl.get_tags_for_game(game))
+
+    def test_no_player_selected_refreshes_dropdown_only(self):
+        game = _make_game(entries_per_path={"0": [_clamp("C")]})
+        ctrl = self._make_controller(games=[game], player=False)
+        ctrl._on_data_changed_debounced()
+        ctrl._start_dropdown_worker.assert_called_once()
+        ctrl._schedule_charts_refresh.assert_not_called()
+
+    def test_burst_of_emits_yields_one_refresh(self):
+        ctrl = self._make_controller()
+        ctrl._data_changed_debounce_ms = 1
+        owner = ctrl.get_chess_log_controller()
+        for _ in range(5):
+            owner.chess_log_changed.emit(None)
+        deadline = time.time() + 2
+        while ctrl._schedule_charts_refresh.call_count == 0 and time.time() < deadline:
+            _app.processEvents()
+        _app.processEvents()
+        ctrl._schedule_charts_refresh.assert_called_once()
         ctrl._start_dropdown_worker.assert_called_once()
 
-    def test_notify_does_not_restart_agg_worker(self):
-        game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        ctrl = self._make_controller(games=[game])
-        ctrl._source_selection = 1
-        ctrl.notify_chess_log_saved()
-        self.assertIsNone(ctrl._agg_worker)
+    def test_replacing_owner_disconnects_the_old_one(self):
+        ctrl = self._make_controller()
+        old = ctrl.get_chess_log_controller()
+        ctrl.set_chess_log_controller(StorageBackedChessLogController())
+        ctrl._on_chess_log_changed = MagicMock()
+        old.chess_log_changed.emit(None)
+        ctrl._on_chess_log_changed.assert_not_called()
 
-    def test_notify_passes_games_from_resolve_to_worker(self):
-        """Games passed to the dropdown worker must come from _resolve_games."""
+    def test_database_game_set_change_schedules_one_refresh(self):
+        db = DatabaseModel()
+        ctrl = self._make_controller()
+        ctrl._database_controller.get_panel_model.return_value = MagicMock(
+            get_all_database_models=MagicMock(return_value=[db])
+        )
+        ctrl._watch_database_models()
+        ctrl._watch_database_models()  # idempotent: no double connection
+        ctrl._data_changed_debounce_ms = 1
+        db.add_game(_make_game(entries_per_path={"0": [_clamp("C")]}), tags=[])
+        deadline = time.time() + 2
+        while ctrl._schedule_charts_refresh.call_count == 0 and time.time() < deadline:
+            _app.processEvents()
+        _app.processEvents()
+        ctrl._schedule_charts_refresh.assert_called_once()
+
+    def test_database_game_removal_schedules_refresh(self):
+        db = DatabaseModel()
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
-        ctrl = self._make_controller(games=[game])
-        ctrl._source_selection = 1
-        # Patch _resolve_games so we control what it returns.
-        sentinel = [game]
-        ctrl._resolve_games = lambda: sentinel
-        ctrl.notify_chess_log_saved()
-        args, _ = ctrl._start_dropdown_worker.call_args
-        self.assertIs(args[0], sentinel)
+        db.add_game(game, tags=[])
+        ctrl = self._make_controller()
+        ctrl._database_controller.get_panel_model.return_value = MagicMock(
+            get_all_database_models=MagicMock(return_value=[db])
+        )
+        ctrl._watch_database_models()
+        ctrl._data_changed_debounce_ms = 1
+        db.remove_games([game])
+        deadline = time.time() + 2
+        while ctrl._schedule_charts_refresh.call_count == 0 and time.time() < deadline:
+            _app.processEvents()
+        _app.processEvents()
+        ctrl._schedule_charts_refresh.assert_called_once()
 
 
 @unittest.skipUnless(_QT_AVAILABLE, "Qt not available in this environment")
@@ -2779,8 +2826,9 @@ class TestGetTagsForGameRequiresController(unittest.TestCase):
 class TestNarrativeCountsFromRequestSnapshot(unittest.TestCase):
     """Narrative header counts describe the request-time snapshot, not live tags (C7)."""
 
-    class _LiveTags:
+    class _LiveTags(StorageBackedChessLogController):
         def __init__(self, tags):
+            super().__init__()
             self.tags = tags
 
         def get_tags_for_game(self, game):

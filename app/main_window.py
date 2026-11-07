@@ -1460,8 +1460,6 @@ class MainWindow(QMainWindow):
         chess_log_controller = self.controller.get_chess_log_controller()
         if chess_log_controller and chess_log_controller.save_tags_for_current_game():
             self.controller.set_status("Chess Log saved to current game")
-            self._notify_moveslist_chess_log_changed()
-            self.controller.get_chess_log_charts_controller().notify_chess_log_saved()
 
     def _save_chess_logs_for_all_games(self) -> None:
         """Persist dirty Chess Log edits for all games in the multi-game cache."""
@@ -1482,9 +1480,6 @@ class MainWindow(QMainWindow):
                 f"Chess Log saved for {saved} game{'s' if saved != 1 else ''}; "
                 f"{failed} failed"
             )
-        if saved > 0:
-            self._notify_moveslist_chess_log_changed()
-            self.controller.get_chess_log_charts_controller().notify_chess_log_saved()
 
     def _show_chess_logs_for_all_games(self) -> None:
         """Open Show Chess Logs dialog scoped to tagged games in the active database."""
@@ -1582,8 +1577,6 @@ class MainWindow(QMainWindow):
         if chess_log_controller:
             chess_log_controller.clear_tags_for_current_game()
             self.controller.set_status("Chess Log cleared for current game")
-            self._notify_moveslist_chess_log_changed()
-            self.controller.get_chess_log_charts_controller().notify_chess_log_saved()
 
     def _on_highlight_chess_log_moves_toggled(self, checked: bool) -> None:
         """Handle 'Highlight Logged Moments in Moves List' toggle."""
@@ -1592,11 +1585,6 @@ class MainWindow(QMainWindow):
         self._settings_service.update_chess_log_settings({"highlight_chess_log_moves_in_list": checked})
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
             self.detail_panel.moveslist_model.set_highlight_chess_log_moves(checked)
-
-    def _notify_moveslist_chess_log_changed(self) -> None:
-        """Tell the moves list model to refresh Chess Log tag indicators."""
-        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
-            self.detail_panel.moveslist_model.notify_chess_log_changed()
 
     def _show_ai_model_settings(self) -> None:
         """Show the AI model settings dialog."""

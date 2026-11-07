@@ -68,7 +68,23 @@ class DetailMovesListView(QWidget):
 
     def set_chess_log_controller(self, controller: Optional["ChessLogController"]) -> None:
         """Set chess log controller for tagging moments."""
+        old = self._chess_log_controller
+        if old is not None:
+            try:
+                old.chess_log_changed.disconnect(self._on_chess_log_changed)
+            except (TypeError, RuntimeError):
+                pass
         self._chess_log_controller = controller
+        if controller is not None:
+            controller.chess_log_changed.connect(self._on_chess_log_changed)
+
+    def _on_chess_log_changed(self, game) -> None:
+        """Refresh tag icons when the changed game is the active one (None = any)."""
+        if not self._moveslist_model:
+            return
+        active = self._game_model.active_game if self._game_model else None
+        if game is None or game is active:
+            self._moveslist_model.notify_chess_log_changed()
 
 
     def _setup_ui(self) -> None:
@@ -535,8 +551,6 @@ class DetailMovesListView(QWidget):
             return
 
         self._chess_log_controller.add_moment_at_active_path(entries, self)
-        if self._moveslist_model:
-            self._moveslist_model.notify_chess_log_changed()
 
     def _on_show_tags(self) -> None:
         """Open the Show Tags dialog for the current game."""
