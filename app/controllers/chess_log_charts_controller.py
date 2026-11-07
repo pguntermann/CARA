@@ -559,6 +559,10 @@ class ChessLogChartsController(QObject):
         # are silently discarded so an in-flight run on game-set A cannot appear on B.
         self._game_set_generation: int = 0
         self._narrative_launch_gen: int = 0
+        # Games and tag snapshot captured by request_narrative(); the header counts
+        # are computed from these so they describe the same data as the text.
+        self._narrative_request_games: Optional[List[GameData]] = None
+        self._narrative_request_snapshot: Optional[Dict[int, Dict[str, Any]]] = None
         self._shallow_launch_gen: int = 0
         # Last resolved game-set identity key; compared in _schedule_charts_refresh to
         # detect mid-session changes (e.g. selected-game source 3/4 picks different rows).
@@ -879,6 +883,8 @@ class ChessLogChartsController(QObject):
             return
         self._cancel_narrative_thread()
         snapshot = self._snapshot_tags(games)
+        self._narrative_request_games = games
+        self._narrative_request_snapshot = snapshot
         thread = ChessLogNarrativeThread(
             games=games,
             provider=provider,
@@ -953,9 +959,14 @@ class ChessLogChartsController(QObject):
         self._cached_narrative_usage = usage
         self._cached_narrative_generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         self._cached_narrative_model_label = self._pending_narrative_model_label
-        games = self._resolve_games()
+        games = self._narrative_request_games
+        snapshot = self._narrative_request_snapshot
+        if games is None or snapshot is None:
+            games = self._resolve_games()
+            snapshot = self._snapshot_tags(games)
         self._cached_narrative_counts = compute_narrative_counts(
-            games, self._current_player, self._color_filter, self.get_tags_for_game
+            games, self._current_player, self._color_filter,
+            lambda g: snapshot.get(id(g), {}),
         )
         self.narrative_ready.emit(narrative, flags, usage)
 

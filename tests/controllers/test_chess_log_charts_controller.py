@@ -2775,6 +2775,64 @@ class TestGetTagsForGameRequiresController(unittest.TestCase):
         cl.get_tags_for_game.assert_called_once_with(game)
 
 
+@unittest.skipUnless(_QT_AVAILABLE, "Qt not available in this environment")
+class TestNarrativeCountsFromRequestSnapshot(unittest.TestCase):
+    """Narrative header counts describe the request-time snapshot, not live tags (C7)."""
+
+    class _LiveTags:
+        def __init__(self, tags):
+            self.tags = tags
+
+        def get_tags_for_game(self, game):
+            return {k: list(v) for k, v in self.tags.items()}
+
+    def _request_with_fake_thread(self, ctrl):
+        class FakeThread:
+            def __init__(self, **kwargs):
+                for name in ("narrative_ready", "narrative_failed", "finished"):
+                    sig = MagicMock()
+                    sig.connect = MagicMock()
+                    setattr(self, name, sig)
+
+            def start(self):
+                pass
+
+        with patch(
+            "app.controllers.chess_log_charts_controller.ChessLogNarrativeThread",
+            side_effect=FakeThread,
+        ):
+            ctrl.request_narrative()
+
+    def test_counts_match_request_time_snapshot_after_live_edit(self):
+        game = _make_game()
+        game.has_chess_log_tags = True
+        unflagged = ChessLogStorageService.make_entry("CLAMP", "C", "a note")
+        flagged = dict(unflagged, is_shallow=True)
+        live = self._LiveTags({"0": [unflagged]})
+
+        ctrl = ChessLogChartsController(config={}, database_controller=_make_db_controller([game]))
+        ctrl.set_chess_log_controller(live)
+        ctrl._source_selection = 1
+        ctrl._current_player = "Alice"
+        ctrl._color_filter = "both"
+        ctrl._resolve_games = MagicMock(return_value=[game])
+        _set_user_settings(ctrl, {
+            "ai_models": {"openai": {"api_key": "sk-test", "model": "gpt-4o"}}
+        })
+
+        self._request_with_fake_thread(ctrl)
+        # The user flags the moment while the LLM call is in flight.
+        live.tags = {"0": [flagged]}
+        ctrl._on_narrative_thread_ready("text", [], None)
+
+        _, _, n, g, m, s, _ = ctrl.get_last_narrative_metadata()
+        self.assertEqual((n, g, m, s), (1, 1, 1, 0))
+        # Control: the live accessor now says 1 flagged, so the old code would differ.
+        from app.services.chess_log_stats_service import compute_narrative_counts
+        live_counts = compute_narrative_counts([game], "Alice", "both", live.get_tags_for_game)
+        self.assertEqual(live_counts[3], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
 
