@@ -92,17 +92,47 @@ class ChessLogStorageService:
                 headers = pgn_or_headers
             if ChessLogStorageService.TAG_NAME not in headers:
                 return False
-            encoded = headers[ChessLogStorageService.TAG_NAME]
-            json_text = decode_and_decompress_to_str(encoded)
-            if ChessLogStorageService.TAG_CHECKSUM in headers:
-                stored = headers[ChessLogStorageService.TAG_CHECKSUM]
-                if compute_checksum(json_text.encode("utf-8")) != stored:
-                    return False
-            payload = json.loads(json_text)
+            payload = ChessLogStorageService._decode_headers(headers)
+            if payload is None:
+                return False
             paths_data = payload.get("paths", {})
             return ChessLogStorageService.count_tags(paths_data) > 0
         except Exception:
             return False
+
+    @staticmethod
+    def _decode_headers(headers) -> Optional[Dict[str, Any]]:
+        """Decode the CARAChessLog payload from PGN headers.
+
+        The one decoder for the tag: decompress, verify the checksum when present,
+        and parse the JSON.  Returns None on a missing tag, undecodable payload,
+        checksum mismatch, or a payload that is not a JSON object.
+        """
+        try:
+            if ChessLogStorageService.TAG_NAME not in headers:
+                return None
+            json_text = decode_and_decompress_to_str(headers[ChessLogStorageService.TAG_NAME])
+            if ChessLogStorageService.TAG_CHECKSUM in headers:
+                stored = headers[ChessLogStorageService.TAG_CHECKSUM]
+                if compute_checksum(json_text.encode("utf-8")) != stored:
+                    return None
+            payload = json.loads(json_text)
+            return payload if isinstance(payload, dict) else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _decode_payload(game: Optional[GameData]) -> Optional[Dict[str, Any]]:
+        """Decode the CARAChessLog payload of ``game``; None on any failure."""
+        if game is None or not hasattr(game, "pgn") or game.pgn is None:
+            return None
+        try:
+            chess_game = chess.pgn.read_game(StringIO(game.pgn))
+            if not chess_game:
+                return None
+            return ChessLogStorageService._decode_headers(chess_game.headers)
+        except Exception:
+            return None
 
     @staticmethod
     def load_tags(game: GameData) -> Dict[str, List[Dict[str, Any]]]:
@@ -122,25 +152,15 @@ class ChessLogStorageService:
             chess_game = chess.pgn.read_game(StringIO(game.pgn))
             if not chess_game or ChessLogStorageService.TAG_NAME not in chess_game.headers:
                 return {}
-            encoded = chess_game.headers[ChessLogStorageService.TAG_NAME]
-            json_text = decode_and_decompress_to_str(encoded)
-            if ChessLogStorageService.TAG_CHECKSUM in chess_game.headers:
-                stored = chess_game.headers[ChessLogStorageService.TAG_CHECKSUM]
-                if compute_checksum(json_text.encode("utf-8")) != stored:
-                    LoggingService.get_instance().warning(
-                        "Chess Log checksum mismatch — corrupt tag left in PGN; "
-                        "will be replaced on next save."
-                    )
-                    return {}
-            payload = json.loads(json_text)
+            payload = ChessLogStorageService._decode_headers(chess_game.headers)
+            if payload is None:
+                LoggingService.get_instance().warning(
+                    "Chess Log checksum mismatch or payload decode error — corrupt tag "
+                    "left in PGN; will be replaced on next save."
+                )
+                return {}
             paths_data: Dict[str, List[Dict[str, Any]]] = payload.get("paths", {})
             return paths_data
-        except ValueError:
-            LoggingService.get_instance().warning(
-                "Chess Log payload decode error — corrupt tag left in PGN; "
-                "will be replaced on next save."
-            )
-            return {}
         except Exception:
             return {}
 
@@ -227,12 +247,9 @@ class ChessLogStorageService:
         if game is None or not hasattr(game, "pgn") or game.pgn is None:
             return False
         try:
-            chess_game = chess.pgn.read_game(StringIO(game.pgn))
-            if not chess_game or ChessLogStorageService.TAG_NAME not in chess_game.headers:
+            payload = ChessLogStorageService._decode_payload(game)
+            if payload is None:
                 return False
-            encoded = chess_game.headers[ChessLogStorageService.TAG_NAME]
-            json_text = decode_and_decompress_to_str(encoded)
-            payload = json.loads(json_text)
             return bool(payload.get("nag_shown", False))
         except Exception:
             return False
@@ -246,12 +263,9 @@ class ChessLogStorageService:
         if game is None or not hasattr(game, "pgn") or game.pgn is None:
             return None
         try:
-            chess_game = chess.pgn.read_game(StringIO(game.pgn))
-            if not chess_game or ChessLogStorageService.TAG_NAME not in chess_game.headers:
+            payload = ChessLogStorageService._decode_payload(game)
+            if payload is None:
                 return None
-            encoded = chess_game.headers[ChessLogStorageService.TAG_NAME]
-            json_text = decode_and_decompress_to_str(encoded)
-            payload = json.loads(json_text)
             return payload.get("_check_run") or None
         except Exception:
             return None
@@ -287,15 +301,9 @@ class ChessLogStorageService:
                 return False
             # Preserve existing _check_run when no new one is supplied.
             if check_run is None and ChessLogStorageService.TAG_NAME in chess_game.headers:
-                try:
-                    _existing = json.loads(
-                        decode_and_decompress_to_str(
-                            chess_game.headers[ChessLogStorageService.TAG_NAME]
-                        )
-                    )
+                _existing = ChessLogStorageService._decode_headers(chess_game.headers)
+                if _existing is not None:
                     check_run = _existing.get("_check_run") or None
-                except Exception:
-                    pass
             if original_paths is not None:
                 filtered: Dict[str, List[Dict[str, Any]]] = {}
                 for pk, entries in paths_data.items():

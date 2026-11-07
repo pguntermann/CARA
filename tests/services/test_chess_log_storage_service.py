@@ -1046,3 +1046,84 @@ class TestDatabaseOpenFlagCorrection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSinglePayloadDecoder(unittest.TestCase):
+    """All readers share one decoder: a rejected payload yields empty everywhere (C1)."""
+
+    ENTRY = {"preset": "CLAMP", "cat": "C", "why": "x"}
+
+    def _valid_game(self):
+        game = make_game()
+        run = {"model": "m", "date": "2026-01-01T00:00:00Z"}
+        self.assertTrue(
+            ChessLogStorageService.store_tags(
+                game, {"AAAA": [dict(self.ENTRY)]}, nag_shown=True, check_run=run
+            )
+        )
+        return game
+
+    def _tamper(self, game, which):
+        """Corrupt the checksum header, or replace the payload with non-zlib bytes."""
+        import re
+
+        if which == "checksum":
+            pattern = rf'(\[{ChessLogStorageService.TAG_CHECKSUM} ")[^"]*'
+            game.pgn = re.sub(pattern, r"\g<1>deadbeefdeadbeef", game.pgn)
+        else:
+            garbage = compress_and_encode_from_str("{}")[:-8] + "AAAAAAAA"
+            pattern = rf'(\[{ChessLogStorageService.TAG_NAME} ")[^"]*'
+            game.pgn = re.sub(pattern, lambda m: m.group(1) + garbage, game.pgn)
+
+    def _assert_all_empty(self, game):
+        S = ChessLogStorageService
+        self.assertFalse(S.has_moments(game.pgn))
+        self.assertEqual(S.load_tags(game), {})
+        self.assertFalse(S.load_nag_shown(game))
+        self.assertIsNone(S.load_check_run(game))
+
+    def test_valid_round_trips_through_all_readers(self):
+        S = ChessLogStorageService
+        game = self._valid_game()
+        self.assertTrue(S.has_moments(game.pgn))
+        self.assertIn("AAAA", S.load_tags(game))
+        self.assertTrue(S.load_nag_shown(game))
+        self.assertEqual(S.load_check_run(game)["model"], "m")
+
+    def test_checksum_mismatch_rejected_by_all_readers(self):
+        game = self._valid_game()
+        self._tamper(game, "checksum")
+        self._assert_all_empty(game)
+
+    def test_undecodable_tag_rejected_by_all_readers(self):
+        game = self._valid_game()
+        self._tamper(game, "payload")
+        self._assert_all_empty(game)
+
+    def test_store_tags_does_not_carry_check_run_from_rejected_payload(self):
+        S = ChessLogStorageService
+        game = self._valid_game()
+        self._tamper(game, "checksum")
+        self.assertTrue(S.store_tags(game, {"AAAA": [dict(self.ENTRY)]}))
+        self.assertIsNone(S.load_check_run(game))
+
+    def test_store_tags_does_not_carry_check_run_from_undecodable_payload(self):
+        S = ChessLogStorageService
+        game = self._valid_game()
+        self._tamper(game, "payload")
+        self.assertTrue(S.store_tags(game, {"AAAA": [dict(self.ENTRY)]}))
+        self.assertIsNone(S.load_check_run(game))
+
+    def test_store_tags_still_preserves_check_run_from_valid_payload(self):
+        S = ChessLogStorageService
+        game = self._valid_game()
+        self.assertTrue(S.store_tags(game, {"AAAA": [dict(self.ENTRY)]}))
+        self.assertEqual(S.load_check_run(game)["model"], "m")
+
+    def test_decoder_is_called_from_exactly_one_place(self):
+        import inspect
+        import app.services.chess_log_storage_service as mod
+
+        self.assertEqual(
+            inspect.getsource(mod).count("decode_and_decompress_to_str("), 1
+        )
