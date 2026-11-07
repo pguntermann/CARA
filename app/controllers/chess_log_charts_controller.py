@@ -1250,11 +1250,16 @@ class ChessLogChartsController(QObject):
         """Reset player selection when the active database changes (sources 1 and 2 only)."""
         if self._source_selection not in (1, 2):
             return
+        self.clear_player_selection()
+        games = self._resolve_games()
+        self._start_dropdown_worker(games)
+
+    def clear_player_selection(self) -> None:
+        """Drop the selected player and everything derived from it; the view resets to match."""
         self._cancel_agg_worker()
         self._cancel_shallow_thread()
+        self._current_player = ""
         self._player_explicit_selected = False
         self._clear_result_cache()
         self.player_selection_cleared.emit()
-        games = self._resolve_games()
-        self._start_dropdown_worker(games)
         self.charts_unavailable.emit("no_player")

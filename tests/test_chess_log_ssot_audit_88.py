@@ -204,7 +204,6 @@ class TestB2ChartsNotRefreshedOnSave(unittest.TestCase):
 class TestB3PlayerComboSilentClear(unittest.TestCase):
     """B3: _on_players_ready blanks the player combo with signals blocked."""
 
-    @unittest.expectedFailure
     def test_vanished_player_clears_results_and_controller_selection(self):
         from app.views.detail_chess_log_charts_view import DetailChessLogChartsView
 
@@ -221,6 +220,46 @@ class TestB3PlayerComboSilentClear(unittest.TestCase):
         # The combo says "no player", so nothing about X may remain in force.
         self.assertFalse(ctrl.has_player_selected())
         self.assertEqual(view._last_narrative, "")
+
+    def _selected_view(self, ctrl):
+        from app.views.detail_chess_log_charts_view import DetailChessLogChartsView
+        view = DetailChessLogChartsView({})
+        view.set_controller(ctrl)
+        view._on_players_ready([("X", 1), ("Y", 2)])
+        view._player_combo.setCurrentIndex(0)
+        ctrl.set_player_selection("X")
+        return view
+
+    def test_refresh_still_listing_player_keeps_selection_and_results(self):
+        ctrl = _charts_controller()
+        view = self._selected_view(ctrl)
+        ctrl._cached_narrative = "cached about X"
+        view._last_narrative = "narrative about X"
+        view._on_players_ready([("X", 3), ("Y", 2)])
+        self.assertEqual(view._player_combo.currentData(), "X")
+        self.assertTrue(ctrl.has_player_selected())
+        self.assertEqual(ctrl._cached_narrative, "cached about X")
+        self.assertEqual(view._last_narrative, "narrative about X")
+
+    def test_vanished_player_disables_ai_buttons(self):
+        ctrl = _charts_controller()
+        view = self._selected_view(ctrl)
+        view._source_combo.blockSignals(True)
+        view._source_combo.setCurrentIndex(1)
+        view._source_combo.blockSignals(False)
+        with patch.object(ctrl, "is_ai_configured", return_value=True):
+            view._refresh_ai_state()
+            self.assertTrue(view._show_shallow_btn.isEnabled())
+            view._on_players_ready([("Y", 2)])
+            self.assertFalse(view._show_shallow_btn.isEnabled())
+            # The Narrative button is enabled by AI configuration alone (existing
+            # design); with no player the controller refuses the request instead.
+            self.assertFalse(ctrl.has_player_selected())
+            ctrl._source_selection = 1
+            failures = []
+            ctrl.narrative_failed.connect(failures.append)
+            ctrl.request_narrative()
+            self.assertEqual(failures, ["Please select a player first."])
 
 
 @requires_qt

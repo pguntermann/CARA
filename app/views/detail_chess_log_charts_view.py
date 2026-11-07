@@ -550,6 +550,9 @@ class DetailChessLogChartsView(QWidget):
         else:
             self._player_combo.setCurrentIndex(-1)
         self._player_combo.blockSignals(False)
+        if had_selection and self._player_combo.currentIndex() < 0 and self._controller:
+            # The selected player vanished from the list; the controller owns the selection.
+            self._controller.clear_player_selection()
         if not players:
             self._set_placeholder_text("No players found in this data.")
 
