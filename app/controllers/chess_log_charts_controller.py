@@ -1129,9 +1129,9 @@ class ChessLogChartsController(QObject):
             progression_line_smooth_strength=self._progression_line_smooth_strength,
             snapshot=snapshot,
         )
-        worker.charts_updated.connect(self.charts_updated)
-        worker.charts_unavailable.connect(self.charts_unavailable)
-        worker.charts_skipped.connect(self.charts_skipped)
+        worker.charts_updated.connect(lambda r, w=worker: self._forward_if_current(w, self.charts_updated, r))
+        worker.charts_unavailable.connect(lambda r, w=worker: self._forward_if_current(w, self.charts_unavailable, r))
+        worker.charts_skipped.connect(lambda n, w=worker: self._forward_if_current(w, self.charts_skipped, n))
         worker.finished.connect(self._on_agg_worker_finished)
         self._agg_worker = worker
         worker.start()
@@ -1251,6 +1251,16 @@ class ChessLogChartsController(QObject):
             except RuntimeError:
                 pass
             self._narrative_thread = None
+
+    def _forward_if_current(self, worker, signal, value) -> None:
+        """Re-emit a worker result only while *worker* is still the current one.
+
+        A cancelled or superseded worker can still have a result queued (e.g. the
+        player dropdown refresh cleared the selection while the charts were being
+        aggregated); forwarding it would draw a chart for a player no longer selected.
+        """
+        if worker is self._agg_worker:
+            signal.emit(value)
 
     def _on_agg_worker_finished(self) -> None:
         try:

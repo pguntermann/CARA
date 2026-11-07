@@ -867,6 +867,18 @@ class TestChessLogChangedRefresh(unittest.TestCase):
         ctrl._start_dropdown_worker.assert_called_once()
         ctrl._schedule_charts_refresh.assert_not_called()
 
+    def test_late_result_from_cancelled_worker_is_not_forwarded(self):
+        """A worker superseded/cancelled by clear_player_selection must not draw."""
+        ctrl = self._make_controller()
+        received = []
+        ctrl.charts_updated.connect(received.append)
+        stale, current = MagicMock(), MagicMock()
+        ctrl._agg_worker = current
+        ctrl._forward_if_current(stale, ctrl.charts_updated, {"CLAMP": 1})
+        self.assertEqual(received, [])
+        ctrl._forward_if_current(current, ctrl.charts_updated, {"CLAMP": 2})
+        self.assertEqual(received, [{"CLAMP": 2}])
+
     def test_burst_of_emits_yields_one_refresh(self):
         ctrl = self._make_controller()
         ctrl._data_changed_debounce_ms = 1
