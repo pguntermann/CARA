@@ -72,7 +72,16 @@ def game_data_updates_for_header_tag(
         if removed:
             updates["notes"] = None
     elif tag_name == "CARAChessLog":
-        updates["has_chess_log_tags"] = False if removed else True
+        # Same definition as everywhere else: at least one valid moment, not
+        # merely "tag present".
+        if removed:
+            updates["has_chess_log_tags"] = False
+        else:
+            from app.services.chess_log_storage_service import ChessLogStorageService
+
+            updates["has_chess_log_tags"] = ChessLogStorageService.has_moments(
+                {ChessLogStorageService.TAG_NAME: new_value or ""}
+            )
 
     # Keep parse-time header_values cache in sync for dynamic database columns.
     if tag_name and tag_name not in _HEAVY_HEADER_TAGS:
