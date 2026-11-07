@@ -41,13 +41,21 @@ if _QT_AVAILABLE:
     _app = QApplication.instance() or QApplication(sys.argv)
 
     from app.controllers.chess_log_charts_controller import (
-        ChessLogChartsController,
+        ChessLogChartsController as _RealChessLogChartsController,
         ChessLogAggregationWorker,
         ChessLogNarrativeThread,
         ChessLogPlayerDropdownWorker,
     )
     from app.models.database_model import DatabaseModel, GameData
     from app.services.chess_log_storage_service import ChessLogStorageService
+    from tests.chess_log_charts_helper import StorageBackedChessLogController
+
+    class ChessLogChartsController(_RealChessLogChartsController):
+        """Real controller with the required Chess Log controller injected (C5)."""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.set_chess_log_controller(StorageBackedChessLogController())
 
     class _FakeNarrativeThread(QObject):
         """Fake narrative thread: holds real signals but never actually starts."""
@@ -2721,6 +2729,50 @@ class TestChessLogAggregationWorkerReasonCodes(unittest.TestCase):
         self.assertEqual(reasons, [], "cancelled worker must not emit charts_unavailable")
         self.assertEqual(skipped, [], "cancelled worker must not emit charts_skipped")
 
+
+
+@unittest.skipUnless(_QT_AVAILABLE, "Qt not available in this environment")
+class TestColorFilterInvalidatesResults(unittest.TestCase):
+    """set_color_filter clears cached results and tells the view (C5)."""
+
+    def test_set_color_filter_clears_cache_and_emits_results_invalidated(self):
+        ctrl = ChessLogChartsController(config={}, database_controller=_make_db_controller([]))
+        ctrl._kick_debounce = MagicMock()
+        ctrl._cached_narrative = "old narrative"
+        ctrl._cached_shallow_keys = frozenset([("g", "0", "CLAMP", "")])
+        received = []
+        ctrl.results_invalidated.connect(lambda: received.append(True))
+        generation = ctrl._game_set_generation
+        ctrl.set_color_filter("white")
+        self.assertEqual(ctrl._color_filter, "white")
+        self.assertEqual(ctrl._cached_narrative, "")
+        self.assertIsNone(ctrl._cached_shallow_keys)
+        self.assertEqual(received, [True])
+        self.assertGreater(ctrl._game_set_generation, generation)
+        ctrl._kick_debounce.assert_called_once()
+
+
+@unittest.skipUnless(_QT_AVAILABLE, "Qt not available in this environment")
+class TestGetTagsForGameRequiresController(unittest.TestCase):
+    """get_tags_for_game has no storage fallback: the injected controller is required (C5)."""
+
+    def test_raises_without_injected_controller(self):
+        ctrl = _RealChessLogChartsController(
+            config={}, database_controller=_make_db_controller([])
+        )
+        with self.assertRaises(RuntimeError):
+            ctrl.get_tags_for_game(_make_game())
+
+    def test_delegates_to_injected_controller(self):
+        ctrl = _RealChessLogChartsController(
+            config={}, database_controller=_make_db_controller([])
+        )
+        cl = MagicMock()
+        cl.get_tags_for_game.return_value = {"0": []}
+        ctrl.set_chess_log_controller(cl)
+        game = _make_game()
+        self.assertEqual(ctrl.get_tags_for_game(game), {"0": []})
+        cl.get_tags_for_game.assert_called_once_with(game)
 
 
 if __name__ == "__main__":

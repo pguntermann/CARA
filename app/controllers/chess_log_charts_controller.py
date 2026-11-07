@@ -603,10 +603,17 @@ class ChessLogChartsController(QObject):
         return self._player_explicit_selected
 
     def get_tags_for_game(self, game: GameData) -> Dict[str, Any]:
-        """Return Chess Log moments for *game* (delegates to ChessLogController)."""
+        """Return Chess Log moments for *game* (delegates to ChessLogController).
+
+        The injected ChessLogController (set_chess_log_controller) is required;
+        raises RuntimeError when it is missing rather than reading storage around
+        the owner.
+        """
         if self._chess_log_controller is None:
-            from app.services.chess_log_storage_service import ChessLogStorageService
-            return ChessLogStorageService.load_resolved_paths(game)
+            raise RuntimeError(
+                "ChessLogChartsController has no ChessLogController; "
+                "call set_chess_log_controller() first"
+            )
         return self._chess_log_controller.get_tags_for_game(game)
 
     @staticmethod
@@ -840,6 +847,8 @@ class ChessLogChartsController(QObject):
 
     def set_color_filter(self, color_filter: str) -> None:
         self._color_filter = color_filter
+        self._clear_result_cache()
+        self.results_invalidated.emit()
         self._kick_debounce()
 
     def notify_selection_changed(self) -> None:

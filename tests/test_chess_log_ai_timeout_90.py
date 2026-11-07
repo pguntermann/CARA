@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from tests.chess_log_ai_settings_helper import current_service, isolate_module
+from tests.chess_log_charts_helper import StorageBackedChessLogController
 
 try:
     from PyQt6.QtWidgets import QApplication
@@ -32,6 +33,7 @@ def _config():
 
 def _controller(config=None):
     ctrl = ChessLogChartsController(config=_config() if config is None else config, database_controller=MagicMock())
+    ctrl.set_chess_log_controller(StorageBackedChessLogController())
     ctrl._source_selection = 1
     ctrl._current_player = "Alice"
     ctrl._resolve_games = MagicMock(return_value=[MagicMock()])
