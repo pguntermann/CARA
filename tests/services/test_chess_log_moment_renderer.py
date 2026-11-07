@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 from app.models.database_model import GameData
 from app.services.chess_log_moment_renderer import ChessLogMomentRenderer, MomentRef
 from app.services.chess_log_storage_service import ChessLogStorageService
+from app.utils.chess_log_prompts import THREE_BY_THREE_PROMPTS as Q
 
 _PGN = (
     '[Event "T"][Site "?"][Date "2026.01.01"][Round "?"]'
@@ -149,27 +150,68 @@ class TestMarkers3x3(unittest.TestCase):
 
     def test_every_answer_listed_in_order_with_markers_after(self):
         lines = _render(self.TAGS, "3x3", BLACK_PK).plain.splitlines()
-        body = [ln.strip() for ln in lines if ln.strip().startswith("Why")]
+        body = [ln.strip() for ln in lines[2:]]
         self.assertEqual(body, [
-            "Why1: I wanted to open the h-file [Shallow]",
-            "Why2: fine",
-            "Why3: Nf3",                      # Ignored: unmarked
-            "Why4: Be more careful [Vague]",
+            f"{Q['Why1']} I wanted to open the h-file [Shallow]",
+            f"{Q['Why2']} fine",
+            f"{Q['Why3']} Nf3",                      # Ignored: unmarked
+            f"{Q['Why4']} Be more careful [Vague]",
         ])
+
+    def test_no_why_n_labels(self):
+        self.assertNotRegex(_render(self.TAGS, "3x3", BLACK_PK).plain, r"Why\d")
 
     def test_black_move_header(self):
         self.assertIn("2… Nc6", _render(self.TAGS, "3x3", BLACK_PK).plain)
 
     def test_both_markers_on_one_answer(self):
         tags = {WHITE_PK: [_e("3x3", "Why4", "x", is_shallow=True, is_vague=True)]}
-        self.assertIn("Why4: x [Shallow] [Vague]", _render(tags, "3x3", WHITE_PK).plain)
+        self.assertIn(f"{Q['Why4']} x [Shallow] [Vague]", _render(tags, "3x3", WHITE_PK).plain)
 
     def test_blank_answer_listed_without_marker(self):
         tags = {WHITE_PK: [_e("3x3", "Why1", "a"), _e("3x3", "Why2", "", is_shallow=True)]}
         plain = _render(tags, "3x3", WHITE_PK).plain
-        self.assertIn("  Why2:\n", plain + "\n")
-        self.assertIn("  Why3:", plain)
+        self.assertIn(f"  {Q['Why2']}\n", plain + "\n")     # question, nothing after it
+        self.assertIn(f"  {Q['Why3']}\n", plain + "\n")
         self.assertNotIn("[", plain)
+
+
+class TestPlyOrder(unittest.TestCase):
+    def test_moments_listed_in_ply_order_within_a_game(self):
+        game = _game()
+        late, early, mid = "0.0.0.0", "0", "0.0.0"
+        tags = {late: [_e("CLAMP", "C", "late")], early: [_e("CLAMP", "C", "early")],
+                mid: [_e("CLAMP", "C", "mid")]}
+        ctrl = MagicMock()
+        ctrl.get_tags_for_game.return_value = tags
+        out = ChessLogMomentRenderer(ctrl, {}).render([MomentRef(game, pk, "CLAMP") for pk in (late, early, mid)])
+        self.assertEqual([w for w in re.findall(r"early|mid|late", out.plain)], ["early", "mid", "late"])
+        self.assertEqual([w for w in re.findall(r"early|mid|late", out.html)], ["early", "mid", "late"])
+
+    def test_games_keep_first_appearance_order(self):
+        g1, g2 = _game(), _game()
+        g1.white, g2.white = "First", "Second"
+        ctrl = MagicMock()
+        ctrl.get_tags_for_game.return_value = {WHITE_PK: [_e("CLAMP", "C", "n")], "0": [_e("CLAMP", "C", "n")]}
+        out = ChessLogMomentRenderer(ctrl, {}).render([
+            MomentRef(g1, WHITE_PK, "CLAMP"), MomentRef(g2, "0", "CLAMP"), MomentRef(g1, "0", "CLAMP"),
+        ])
+        self.assertLess(out.plain.index("First"), out.plain.index("Second"))
+        self.assertEqual(out.plain.count("First"), 1)
+
+
+class TestEntriesFor(unittest.TestCase):
+    def test_entries_for_replaces_controller_entries(self):
+        game = _game()
+        ctrl = MagicMock()
+        ctrl.get_tags_for_game.return_value = {WHITE_PK: [_e("CLAMP", "C", "saved text")]}
+        ref = MomentRef(game, WHITE_PK, "CLAMP")
+        out = ChessLogMomentRenderer(ctrl, {}).render(
+            [ref], entries_for=lambda r: [_e("CLAMP", "C", "pending text", is_shallow=True)]
+        )
+        self.assertIn("pending text [Shallow]", out.plain)
+        self.assertNotIn("saved text", out.plain)
+        ctrl.get_tags_for_game.assert_not_called()
 
 
 class TestHtmlMatchesText(unittest.TestCase):
