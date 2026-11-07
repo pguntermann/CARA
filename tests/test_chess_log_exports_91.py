@@ -44,7 +44,7 @@ _QT_OK = _qt_starts_cleanly()
 requires_qt = unittest.skipUnless(_QT_OK, "Qt platform plugin unavailable")
 
 if _QT_OK:
-    from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication, QWidget
     _APP = QApplication.instance() or QApplication(sys.argv[:1])
 
 _PGN = (
@@ -282,11 +282,14 @@ class TestPlayerAndSourceComeFromController(unittest.TestCase):
             self.assertEqual(self.h.ctrl.get_source_description(), "Active Database: a.pgn, b.pgn")
 
     def test_export_header_survives_a_blank_rebuilt_combo(self):
-        """After a theme rebuild the combos are blank; the export still names the player."""
+        """The export names the player and source from the controller, not the combos."""
         game = _game({"0": [_entry("CLAMP", "C", "n", is_shallow=True)]})
         self.h = _Harness([game])
         view = self.h.view()
-        self.assertEqual(view._player_combo.currentIndex(), -1)
+        for combo, index in ((view._player_combo, -1), (view._source_combo, 0)):
+            combo.blockSignals(True)
+            combo.setCurrentIndex(index)
+            combo.blockSignals(False)
         view._copy_log_to_clipboard()
         text, html = _clipboard()
         self.assertIn("Chess Log — Alice", text)
@@ -329,6 +332,77 @@ class TestThemeRebuildReadsFromController(unittest.TestCase):
         self.h.ctrl._on_shallow_thread_ready(frozenset(), vague, frozenset(vague), None)
         self.h.view()
         self.assertEqual(self.h.ctrl.get_last_shallow_result()[:2], (frozenset(), vague))
+
+
+@requires_qt
+class TestThemeRebuildRestoresSelectors(unittest.TestCase):
+    def tearDown(self):
+        self.h.close()
+
+    def test_source_player_and_timeout_shown_without_side_effects(self):
+        game = _game({"0": [_entry("CLAMP", "C", "n")]})
+        self.h = _Harness([game])
+        self.h.ctrl._source_selection = 2
+        self.h.ctrl._last_players = [("Alice", 3), ("Bob", 1)]
+        fired = []
+        for sig in ("results_invalidated", "player_selection_cleared", "charts_loading",
+                    "charts_unavailable", "charts_updated"):
+            getattr(self.h.ctrl, sig).connect(lambda *a, n=sig: fired.append(n))
+        with patch.object(self.h.ctrl, "_kick_debounce") as kick, \
+                patch.object(self.h.ctrl, "set_source_selection") as set_src, \
+                patch.object(self.h.ctrl, "set_player_selection") as set_pl, \
+                patch.object(self.h.ctrl, "get_narrative_timeout_seconds", return_value=90):
+            view = self.h.view()
+        self.assertEqual(view._source_combo.currentIndex(), 2)
+        self.assertEqual(view._player_combo.currentText(), "Alice (3 logged)")
+        self.assertEqual(view._player_combo.currentData(), "Alice")
+        self.assertEqual(view._timeout_spin.value(), 90)
+        self.assertEqual(fired, [])
+        kick.assert_not_called()
+        set_src.assert_not_called()
+        set_pl.assert_not_called()
+        self.assertEqual(self.h.ctrl.get_player_display_name(), "Alice")
+        self.assertEqual(self.h.ctrl.get_source_selection(), 2)
+
+    def test_charts_outcome_replayed_on_rebuilt_view(self):
+        self.h = _Harness([])
+        series = {"CLAMP": MagicMock()}
+        with patch("app.views.detail_chess_log_charts_view.ChessLogCategoryChartWidget") as widget:
+            widget.return_value = QWidget()
+            widget.return_value.set_series = MagicMock()
+            self.h.ctrl.charts_updated.emit(series)
+            self.h.ctrl.charts_skipped.emit(1)
+            view = self.h.view()
+        self.assertEqual(len(view._chart_widgets), 1)
+        self.assertIn("1 game not charted", view._skip_note.text())
+        self.h.ctrl.charts_unavailable.emit("no_player")
+        view = self.h.view()
+        self.assertEqual(len(view._chart_widgets), 0)
+        self.assertIn("Select a player", view._placeholder.text())
+        self.h.ctrl.charts_loading.emit()
+        self.assertEqual(self.h.ctrl.get_last_chart_events(), [])
+
+    def test_no_player_selected_shows_placeholder(self):
+        self.h = _Harness([], player="")
+        self.h.ctrl._source_selection = 1
+        self.h.ctrl._last_players = [("Alice", 3)]
+        view = self.h.view()
+        self.assertEqual(view._source_combo.currentIndex(), 1)
+        self.assertEqual(view._player_combo.currentIndex(), -1)
+        self.assertEqual(view._player_combo.lineEdit().placeholderText(), "Select player")
+
+    def test_player_kept_when_list_not_delivered_yet(self):
+        self.h = _Harness([])
+        view = self.h.view()
+        self.assertEqual(view._player_combo.currentData(), "Alice")
+
+    def test_controller_remembers_list_and_drops_it_on_source_change(self):
+        self.h = _Harness([])
+        self.h.ctrl._on_players_ready([("Alice", 2)])
+        self.assertEqual(self.h.ctrl.get_last_players(), [("Alice", 2)])
+        with patch.object(self.h.ctrl, "_start_dropdown_worker"):
+            self.h.ctrl.set_source_selection(2)
+        self.assertEqual(self.h.ctrl.get_last_players(), [])
 
 
 @requires_qt

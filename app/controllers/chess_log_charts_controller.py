@@ -549,6 +549,8 @@ class ChessLogChartsController(QObject):
         self._progression_line_smooth_strength: float = _charts_defaults["progression_line_smooth_strength"]
 
         self._dropdown_worker: Optional[ChessLogPlayerDropdownWorker] = None
+        # Last Player-dropdown list the worker produced; a rebuilt view repopulates from it.
+        self._last_players: List[Tuple[str, int]] = []
         self._agg_worker: Optional[ChessLogAggregationWorker] = None
         self._narrative_thread: Optional[ChessLogNarrativeThread] = None
         self._shallow_thread: Optional[ChessLogShallowThread] = None
@@ -601,6 +603,13 @@ class ChessLogChartsController(QObject):
         # Last resolved game-set identity key; compared in _schedule_charts_refresh to
         # detect mid-session changes (e.g. selected-game source 3/4 picks different rows).
         self._last_game_set_key: Optional[frozenset] = None
+
+        # Latest chart outcome as (kind, value) pairs; a rebuilt view replays it.
+        self._last_chart_events: List[Tuple[str, Any]] = []
+        self.charts_loading.connect(lambda: self._last_chart_events.clear())
+        self.charts_updated.connect(lambda data: self._last_chart_events.__setitem__(slice(None), [("updated", data)]))
+        self.charts_unavailable.connect(lambda why: self._last_chart_events.__setitem__(slice(None), [("unavailable", why)]))
+        self.charts_skipped.connect(lambda n: self._last_chart_events.append(("skipped", n)))
 
         self._connect_to_database_panel_model()
 
@@ -726,6 +735,18 @@ class ChessLogChartsController(QObject):
         saved or not; exports use saved flags (get_check_log_moments) instead.
         """
         return self._cached_shallow_keys, self._cached_vague_keys, self._cached_shallow_usage
+
+    def get_source_selection(self) -> int:
+        """Return the Data Source index (0=None … 4=SelectedAll)."""
+        return self._source_selection
+
+    def get_last_chart_events(self) -> List[Tuple[str, Any]]:
+        """Return the latest chart outcome: ("updated", series) / ("unavailable", reason), then ("skipped", n)."""
+        return list(self._last_chart_events)
+
+    def get_last_players(self) -> List[Tuple[str, int]]:
+        """Return the latest Player-dropdown list as (name, logged count) pairs."""
+        return list(self._last_players)
 
     def get_player_display_name(self) -> str:
         """Return the selected player's name as listed in the Player dropdown, or ''."""
@@ -946,6 +967,7 @@ class ChessLogChartsController(QObject):
         """Set the Data Source (0=None, 1=Active, 2=All, 3=SelectedActive, 4=SelectedAll)."""
         self._source_selection = source
         self._player_explicit_selected = False
+        self._last_players = []
         self._clear_result_cache()
         if source == 0:
             self._cancel_agg_worker()
@@ -1259,6 +1281,7 @@ class ChessLogChartsController(QObject):
         worker.start()
 
     def _on_players_ready(self, players: List[str]) -> None:
+        self._last_players = list(players)
         self.players_ready.emit(players)
 
     def _resolve_games(self) -> List[GameData]:

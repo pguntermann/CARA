@@ -124,7 +124,18 @@ class DetailChessLogChartsView(QWidget):
         self._tokens_spin.setValue(controller.get_narrative_token_limit())
         self._tokens_spin.blockSignals(False)
 
+        self._restore_selectors(controller)
+
         self._refresh_ai_state()
+
+        # Re-draw the controller's latest chart outcome (no refresh is requested).
+        for kind, value in controller.get_last_chart_events():
+            if kind == "updated":
+                self._on_charts_updated(value)
+            elif kind == "unavailable":
+                self._on_charts_unavailable(value)
+            elif kind == "skipped":
+                self._on_charts_skipped(value)
 
         # Re-display any results cached in the controller (e.g. after a theme rebuild).
         # Called after signal connections so _on_narrative_ready/_refresh_ai_state work.
@@ -135,6 +146,29 @@ class DetailChessLogChartsView(QWidget):
         if shallow_keys or vague_keys or shallow_usage:
             self._shallow_token_label.setText(self._format_token_usage(shallow_usage))
             self._refresh_ai_state()
+
+    def _restore_selectors(self, controller: ChessLogChartsController) -> None:
+        """Show the controller's source, player and timeout; signals blocked so nothing reselects."""
+        self._timeout_spin.blockSignals(True)
+        self._timeout_spin.setValue(controller.get_narrative_timeout_seconds())
+        self._timeout_spin.blockSignals(False)
+
+        self._source_combo.blockSignals(True)
+        self._source_combo.setCurrentIndex(controller.get_source_selection())
+        self._source_combo.blockSignals(False)
+
+        player = controller.get_player_display_name() if controller.has_player_selected() else ""
+        self._player_combo.blockSignals(True)
+        self._player_combo.clear()
+        for name, count in controller.get_last_players():
+            self._player_combo.addItem(f"{name} ({count} logged)", name)
+        idx = self._player_combo.findData(player) if player else -1
+        if player and idx < 0:
+            # List not delivered yet; players_ready replaces this item when it arrives.
+            self._player_combo.addItem(player, player)
+            idx = self._player_combo.count() - 1
+        self._player_combo.setCurrentIndex(idx)
+        self._player_combo.blockSignals(False)
 
     def refresh_ai_state(self) -> None:
         """Called externally when AI model settings change."""

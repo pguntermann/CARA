@@ -62,6 +62,9 @@ class TestCheckLogsModelResolutionLog(unittest.TestCase):
         mock_ctrl.get_last_narrative_result.return_value = ("", [], None)
         mock_ctrl.get_last_shallow_result.return_value = (frozenset(), frozenset(), None)
         mock_ctrl.get_cached_shallow_model_label.return_value = ""
+        mock_ctrl.get_source_selection.return_value = 0
+        mock_ctrl.get_last_players.return_value = []
+        mock_ctrl.has_player_selected.return_value = False
 
         view = DetailChessLogChartsView(config={})
         view.set_controller(mock_ctrl)

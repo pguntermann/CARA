@@ -59,6 +59,10 @@ def _make_stub_controller(ai_configured: bool = False, models=None, timeout: int
     ctrl.get_narrative_timeout_seconds.return_value = timeout
     ctrl.get_narrative_token_limit.return_value = 12000
     ctrl.get_narrative_model_override.return_value = None
+    ctrl.get_source_selection.return_value = 0
+    ctrl.get_last_players.return_value = []
+    ctrl.has_player_selected.return_value = False
+    ctrl.get_player_display_name.return_value = ""
     ctrl.get_last_narrative_result.return_value = ("", [], None)
     ctrl.get_last_shallow_result.return_value = (frozenset(), frozenset(), None)
     # Simulate signal attributes so connect() calls succeed
