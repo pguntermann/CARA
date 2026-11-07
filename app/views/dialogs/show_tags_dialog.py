@@ -79,6 +79,7 @@ from app.utils.chess_log_preset_order import CLAMP_ORDER, CCT_ORDER
 from app.utils.chess_log_prompts import THREE_BY_THREE_PROMPTS as _3X3_PROMPTS
 from app.utils.pgn_variation_path import decode_path
 from app.views.dialogs._tag_row_helpers import (
+    chess_log_miniboard_settings,
     game_header_text as _game_header_text,
     node_info as _node_info_fn,
     ply_for_path as _ply_for_path_fn,
@@ -91,7 +92,7 @@ _PRESET_ORDER = ["CLAMP", "CCT", "3x3"]
 _3X3_KEYS = list(_3X3_PROMPTS.keys())
 
 # Base pixel size at 1× scale; multiply by scale_factor for the actual placeholder size.
-# 163 * 1.25 ≈ 204, preserving the original 204px placeholder at the default 1.25× scale.
+# 163 px times the default Chess Log scale gives the original 204px placeholder.
 _MINI_BOARD_BASE_PX = 163
 
 
@@ -136,7 +137,7 @@ class _TagRowWidget(QFrame):
         show_ignore_checkbox: bool = False,
         best_move: Optional[chess.Move] = None,
         is_flipped: bool = False,
-        scale_factor: float = 1.25,
+        scale_factor: Optional[float] = None,
         show_played: bool = True,
         show_best: bool = True,
         parent=None,
@@ -148,6 +149,10 @@ class _TagRowWidget(QFrame):
         self._bg_rgb = bg_rgb
         self._text_color = text_color
         self._show_ignore_checkbox = show_ignore_checkbox
+        if scale_factor is None:
+            from app.utils.miniature_board_scales import CHESS_LOG, default_miniature_board_scales
+
+            scale_factor = default_miniature_board_scales()[CHESS_LOG]
         self._scale_factor: float = float(scale_factor)
         self._show_played: bool = bool(show_played)
         self._show_best: bool = bool(show_best)
@@ -823,22 +828,7 @@ class ShowTagsDialog(QDialog):
 
     def _setup_ui(self) -> None:
         # Read Chess Log display settings once (scale + arrow toggles).
-        try:
-            from app.services.user_settings_service import UserSettingsService as _USS
-            from app.utils.miniature_board_scales import CHESS_LOG as _CL_SCALE_KEY
-            from app.utils.miniature_board_arrows import (
-                CHESS_LOG_PLAYED as _CL_PLAYED,
-                CHESS_LOG_BEST_ALTERNATIVE as _CL_BEST,
-            )
-            _uss = _USS.get_instance()
-            _board_scale = float(_uss.get_miniature_boards().get(_CL_SCALE_KEY, 1.25))
-            _cl_arrows = _uss.get_miniature_board_arrows()
-            _show_played = bool(_cl_arrows.get(_CL_PLAYED, True))
-            _show_best = bool(_cl_arrows.get(_CL_BEST, True))
-        except Exception:
-            _board_scale = 1.25
-            _show_played = True
-            _show_best = True
+        _board_scale, _show_played, _show_best = chess_log_miniboard_settings()
 
         br, bg, bb = self._bg_rgb
         self.setStyleSheet(

@@ -78,3 +78,38 @@ def node_info(
         return (fen, node.move, move_label, mover_is_black)
     except Exception:
         return ("", None, path_key, False)
+
+
+def chess_log_miniboard_settings() -> Tuple[float, bool, bool]:
+    """Return ``(scale, show_played, show_best)`` for Chess Log mini boards.
+
+    Read through the settings owner's accessors; the owner's ``normalize_*``
+    functions supply every default, so this module holds no fallback values of
+    its own.  Falls back to the owner's defaults when settings are unavailable.
+    """
+    from app.utils.miniature_board_arrows import (
+        CHESS_LOG_BEST_ALTERNATIVE,
+        CHESS_LOG_PLAYED,
+        normalize_miniature_board_arrows,
+    )
+    from app.utils.miniature_board_scales import (
+        CHESS_LOG,
+        normalize_miniature_board_scales,
+    )
+
+    try:
+        from app.services.user_settings_service import UserSettingsService
+
+        uss = UserSettingsService.get_instance()
+        raw_scales = uss.get_miniature_boards()
+        raw_arrows = uss.get_miniature_board_arrows()
+    except Exception:
+        raw_scales = None
+        raw_arrows = None
+    scales = normalize_miniature_board_scales(raw_scales)
+    arrows = normalize_miniature_board_arrows(raw_arrows)
+    return (
+        float(scales[CHESS_LOG]),
+        bool(arrows[CHESS_LOG_PLAYED]),
+        bool(arrows[CHESS_LOG_BEST_ALTERNATIVE]),
+    )

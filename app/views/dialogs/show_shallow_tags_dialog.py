@@ -41,6 +41,7 @@ from app.utils.chess_log_best_move import resolve_best_move_for_path
 from app.utils.help_icon import make_help_icon
 from app.utils.pgn_variation_path import decode_path
 from app.views.dialogs._tag_row_helpers import (
+    chess_log_miniboard_settings,
     game_header_text as _game_header_text,
     node_info as _node_info_fn,
     ply_for_path as _ply_for_path_fn,
@@ -301,22 +302,7 @@ class ShowShallowTagsDialog(QDialog):
 
     def _setup_ui(self) -> None:
         # Read Chess Log display settings once (scale + arrow toggles).
-        try:
-            from app.services.user_settings_service import UserSettingsService as _USS
-            from app.utils.miniature_board_scales import CHESS_LOG as _CL_SCALE_KEY
-            from app.utils.miniature_board_arrows import (
-                CHESS_LOG_PLAYED as _CL_PLAYED,
-                CHESS_LOG_BEST_ALTERNATIVE as _CL_BEST,
-            )
-            _uss = _USS.get_instance()
-            _board_scale = float(_uss.get_miniature_boards().get(_CL_SCALE_KEY, 1.25))
-            _cl_arrows = _uss.get_miniature_board_arrows()
-            _show_played = bool(_cl_arrows.get(_CL_PLAYED, True))
-            _show_best = bool(_cl_arrows.get(_CL_BEST, True))
-        except Exception:
-            _board_scale = 1.25
-            _show_played = True
-            _show_best = True
+        _board_scale, _show_played, _show_best = chess_log_miniboard_settings()
 
         br, bg, bb = self._bg_rgb
         self.setStyleSheet(f"QDialog {{ background-color: rgb({br},{bg},{bb}); }}")
