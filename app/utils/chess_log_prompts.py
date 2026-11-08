@@ -1,4 +1,4 @@
-"""Canonical 3x3 Why-question prompt strings (GM Noel Studer's wording)."""
+"""Canonical 3x3 Why-question prompt strings (GM Noël Studer's wording)."""
 
 from typing import Dict
 

@@ -26,7 +26,7 @@ Chess Log adapts existing frameworks rather than inventing new methodology:
 
 - **CLAMP** — a categorization of common cognitive failure modes in a player's thinking process, developed by **Dr. Can Kabadayi**.
 - **CCT** (Checks, Captures, Threats) — long-standing, widely used chess wisdom rather than one person's named framework.
-- **The 3x3 Method** — a structured post-game reflection technique developed by **GM Noel Studer**: find exactly three moments per game worth a takeaway, and for each one ask three "Whys." Reference: [YouTube — "How To Analyze Your Chess Games (the simple way)"](https://www.youtube.com/watch?v=shma5hsckww), [written summary](https://chemcoolchess.co.za/blog/Better-Chess-Analysis-The-3x3-Method).
+- **The 3x3 Method** — a structured post-game reflection technique developed by **GM Noël Studer**: find exactly three moments per game worth a takeaway, and for each one ask three "Whys." Reference: [YouTube — "How To Analyze Your Chess Games (the simple way)"](https://www.youtube.com/watch?v=shma5hsckww), [written summary](https://chemcoolchess.co.za/blog/Better-Chess-Analysis-The-3x3-Method).
 
 Chess Log's own contribution is the tagging/recording layer and the trend reporting built on top of them. Other related checklists (TRC, CCTB, Silman's Imbalances) exist and could be added as presets later if the feature takes off — not needed for v1.
 

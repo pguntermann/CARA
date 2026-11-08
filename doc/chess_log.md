@@ -34,7 +34,7 @@ Column width key: `"col_log"` in `ui.panels.database.table.column_widths` (all t
 
 Three presets: **CLAMP**, **CCT**, **3x3**. The player selects one active preset in the Chess Log Settings dialog (Chess Log menu → "Chess Log Settings…"), mirroring the Engines/AI Summary setup pattern. CLAMP and CCT both allow multiple letters per moment.
 
-3x3 is the sole preset with free-form text at log time. Its four Whys use GM Noel Studer's exact wording:
+3x3 is the sole preset with free-form text at log time. Its four Whys use GM Noël Studer's exact wording:
 - "Why did I choose that move?"
 - "Why is my move not ideal?"
 - "Why is the better move better than my chosen move?"

@@ -939,7 +939,7 @@ class Test3x3StructureBlock(unittest.TestCase):
     def test_3x3_block_studer_attribution_present(self):
         game = _make_game(entries_per_path={"0": [_threex("Why3", "text")]})
         prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
-        self.assertIn("GM Noel Studer", prompt)
+        self.assertIn("GM Noël Studer", prompt)
 
     def test_3x3_block_absent_when_no_3x3_data(self):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
