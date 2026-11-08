@@ -124,6 +124,7 @@
                                 <li><a href="#annotations">4.5.7 Annotations</a></li>
                                 <li><a href="#ai-summary">4.5.8 AI Summary</a></li>
                                 <li><a href="#notes">4.5.9 Notes</a></li>
+                                <li><a href="#chess-log-tab">4.5.10 Chess Log</a></li>
                             </ul>
                         </li>
                         <li><a href="#keyboard-shortcuts">4.6 Keyboard Shortcuts</a></li>
@@ -317,6 +318,8 @@
                     <li><strong>Moves List:</strong> Centralized table view that encapsulates all important per-move information in one place. The moves list displays move notation, evaluations, move classifications, best move alternatives, Centipawn Loss (CPL) values, engine depth, material counts, FEN positions, and more across 32 available columns. The system features a flexible column profile management system, allowing you to create, save, and switch between different view profiles. Each profile can customize which columns are visible, their display order, and column widths, enabling you to tailor the view to your specific analysis needs—whether focusing on opening transitions, move assessment, or material tracking.</li>
                     
                     <li><strong>Player Statistics:</strong> A dedicated <strong>Player Stats</strong> tab aggregates results across many <em>analyzed</em> games for one player at a time: overview figures, an optional <strong>activity heatmap</strong> (when you played), accuracy and move-quality charts, date-based progression charts, openings and endgame summaries, best and worst games, significant moves, and automatic error-pattern hints. You can show or hide each section to tailor the page. See <a href="#viewing-player-statistics">section 5.7</a> for a full walkthrough.</li>
+
+                    <li><strong>Chess Log:</strong> A self-review layer where you record, in your own words, why a move went wrong. Pick a logging method (CLAMP, CCT, or GM Noël Studer's 3x3 Method) in <span class="menu-item">Chess Log → Chess Log Settings…</span>, then right-click a move in the Moves List and choose <span class="menu-item">Log this moment…</span> to note which kind of mistake it was and why. The <strong>Chess Log</strong> tab charts how your logged mistakes change over time and can ask an AI provider for a Narrative Summary of recurring themes. <strong>Check Logs</strong> uses AI to flag notes that don't diagnose the move, and 3x3 lessons that give you nothing to act on. Logged moments are stored in a PGN metadata tag with the game. See <a href="#chess-log-task">section 5.9</a> for a full walkthrough.</li>
                     
                     <li><strong>Manual Analysis:</strong> Perform continuous engine analysis on any position with MultiPV support. You can navigate through game positions while maintaining continuous analysis of the current position. Hovering over principal variation moves displays a beautiful optional miniature board showing the resulting position. You can freeze the displayed PV lines while the engine keeps searching, and—when the assigned engine reports UCI W/D/L—optionally show a win/draw/loss probability bar for the best line. Positional plan exploration extracts piece trajectories from PV lines, visualizing how pieces move through the engine's recommended plan on the chessboard. You can explore positional plans for up to three PV lines (PV1, PV2, PV3) independently, with configurable options for the number of pieces to track and exploration depth.</li>
                     
@@ -440,6 +443,11 @@
                 <ul>
                     <li><strong>Tibono2:</strong> For his work on the ELO estimation formulas, the brilliancy detection system, testing and identifying bugs.</li>
                     <li><strong>Leto:</strong> For his feature suggestions and also testing and identifying bugs.</li>
+                </ul>
+                <p>Chess Log builds on two published game-review methods:</p>
+                <ul>
+                    <li><strong>Dr. Can Kabadayi:</strong> For the CLAMP method, taught in his Chessable course <a href="https://www.chessable.com/preventing-blunders-in-chess/course/258968/" target="_blank"><em>Preventing Blunders in Chess</em></a>. For a free introduction, see his video <a href="https://www.youtube.com/watch?v=9PV6XchL240" target="_blank"><em>The CLAMP Method: Your New Weapon Against Chess Blunders</em></a>.</li>
+                    <li><strong>GM Noël Studer:</strong> For GM Noël Studer's 3x3 Method of game review, explained in his video <a href="https://www.youtube.com/watch?v=shma5hsckww" target="_blank"><em>How To Analyze Your Chess Games (the simple way)</em></a>.</li>
                 </ul>
             </div>
         </section>
@@ -928,7 +936,7 @@
                 </ul>
                 <p>These changes modify the game's actual PGN content which will persist when you save the database.</p>
                 
-                <p>Below the PGN Notation Pane, the Detail Panel contains seven tabs, each offering distinct functionality for analyzing and working with the active game:</p>
+                <p>Below the PGN Notation Pane, the Detail Panel contains ten tabs, each offering distinct functionality for analyzing and working with the active game:</p>
                 
                 <h5 id="moves-list">4.5.1 Moves List</h5>
                 <p>The Moves List tab displays all moves in a table format with comprehensive per-move information: move notation, evaluations, move classifications, best move alternatives, Centipawn Loss (CPL) values, engine depth, material counts, FEN positions, and more. You can customize which columns are visible and their order using column profiles. The active move is highlighted as you navigate; click any move to jump to that position in the game. Access this tab using <span class="menu-item">View → Moves List</span> or press <code>F1</code>.</p>
@@ -946,7 +954,7 @@
                 </ul>
                 <p>You can modify any of these default profiles or create your own custom profiles. For smaller adjustments, you can reorder columns by dragging and dropping column headers in the moves list, resize columns by dragging column borders, and show or hide columns using the <span class="menu-item">Moves List</span> menu. For configuring multiple columns at once, use <span class="menu-item">Moves List → Setup Profile...</span> (see <a href="#setup-profile">section 6.6.5</a>). After making changes, save them with <span class="menu-item">Moves List → Save Profile</span> (to update the current profile) or <span class="menu-item">Moves List → Save Profile as...</span> (to create a new profile with a custom name). Custom profiles you create will also be accessible via number keys <code>1</code> through <code>9</code> based on their position in the profile list.</p>
                 
-                <p>Right-clicking in the table opens a context menu to copy the cell value under the cursor or to export the table as CSV or TSV (visible columns only or all columns).</p>
+                <p>Right-clicking in the table opens a context menu to copy the cell value under the cursor or to export the table as CSV or TSV (visible columns only or all columns). The same menu offers <span class="menu-item">Log this moment…</span> and <span class="menu-item">Show Logged Moments</span> for Chess Log (see <a href="#chess-log-logging">section 5.9.3</a>).</p>
                 
                 <p>For a complete reference of all available columns and their descriptions, see <a href="#moves-list-columns-reference">section 7.7 "Moves List Columns Reference"</a>.</p>
                 
@@ -1115,6 +1123,10 @@
                 <p>Open the Notes tab from <span class="menu-item">View → Notes</span> or press <code>F9</code>.</p>
                 
                 <img src="screenshots/notes_view.png" alt="CARA Notes View - Plain-text editor for game notes with move notation linking; Notes menu and View menu provide access and shortcuts" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
+
+                <h5 id="chess-log-tab">4.5.10 Chess Log</h5>
+                <p>The <strong>Chess Log</strong> tab shows the moments you have logged with Chess Log across many games: how often each kind of mistake comes up and how that changes over time. Open it with <span class="menu-item">View → Chess Log</span> or press <code>F10</code>.</p>
+                <p>Pick a <strong>Data Source</strong> and a <strong>Player</strong> to see one chart per logging method (CLAMP and CCT; GM Noël Studer's 3x3 Method moments are summarized in the Narrative Summary instead of charted). With an AI provider configured, you can also run <strong>Check Logs</strong> on your notes and generate a <strong>Narrative Summary</strong>. See <a href="#chess-log-tab-guide">section 5.9.8</a> for details, and <a href="#chess-log-task">section 5.9 Chess Log</a> for the whole workflow, from logging a moment to exporting a report.</p>
             </div>
             <div class="outline-item">
                 <h4 id="keyboard-shortcuts">4.6 Keyboard Shortcuts</h4>
@@ -2201,7 +2213,7 @@
                     <li><strong>Record the moment:</strong><br>
                     For CLAMP or CCT, select one or more buttons and, if you like, write a note in <strong>Why did this matter? (optional)</strong>. For GM Noël Studer's 3x3 Method, answer as many of the four questions as apply. Click <strong>OK</strong>.</li>
                 </ol>
-                <p><strong>Which method the dialog uses.</strong> If the move already has logged entries, the dialog uses their method. Otherwise, if the game has moments at other moves, it uses the method used most in this game. Otherwise it uses the method chosen in Chess Log Settings. Ties go to the Chess Log Settings method.</p>
+                <p><strong>Which method the dialog uses.</strong> If the move already has logged entries, the dialog uses their method; if they come from more than one method, it uses the most common one. Otherwise, if the game has moments at other moves, it uses the method used most in this game. Otherwise it uses the method chosen in Chess Log Settings. Ties go to the Chess Log Settings method.</p>
                 <p><strong>Also tagged.</strong> When the same move also has entries from another method, an "Also tagged:" line lists them. You are editing only the entries of the dialog's method.</p>
                 <p><strong>Logging the same move again.</strong> Logging a move again replaces that method's entries at the move, so this is also how you change a logged moment from the Moves List.</p>
                 <p><strong>No category.</strong> For CLAMP and CCT you may click <strong>OK</strong> with only a note; the moment is saved without a category. With neither a category nor a note, the dialog shows "Select a category, or add a note to save uncategorized."</p>
@@ -2211,14 +2223,14 @@
 
                 <h5 id="chess-log-reviewing">5.9.4 Reviewing and editing logged moments</h5>
                 <p><strong>One game.</strong> Right-click any move in the Moves List and choose <span class="menu-item">Show Logged Moments</span> to open the <strong>Logged Moments</strong> dialog. The item is unavailable, with the tooltip "No logged moments in this game.", when the game has none.</p>
-                <p><strong>All games.</strong> <span class="menu-item">Chess Log → Show Logged Moments for All Games</span> opens the <strong>Show Logged Moments for All Games</strong> dialog for every game in the active database that has moments, with a heading line per game (players, result, date, and number of moves). With only one such game the dialog is titled <strong>Logged Moments</strong>. If the active database has none, the status bar shows "No tagged games in the active database".</p>
+                <p><strong>All games.</strong> <span class="menu-item">Chess Log → Show Logged Moments for All Games</span> opens the <strong>Show Logged Moments for All Games</strong> dialog for every game in the active database that has moments, with a heading line per game (players, result, date, and number of moves). With only one such game the dialog is titled <strong>Logged Moments</strong>. If the active database has none, the status bar shows "No logged games in the active database".</p>
                 <p><strong>In the dialog.</strong> Each row shows:</p>
                 <ul>
                     <li>A miniature board turned so the side that moved is at the bottom, with the played move and (when the game has analysis) the best alternative drawn as arrows.</li>
                     <li>The categories (CLAMP and CCT checkboxes) or the four questions (GM Noël Studer's 3x3 Method).</li>
                     <li>The answers, which you can edit.</li>
                 </ul>
-                <p><strong>Miniature boards.</strong> Board size and arrows follow <span class="menu-item">View → Miniature Boards → Chess Log</span> (scale <span class="menu-item">1.0x</span> to <span class="menu-item">2.0x</span>, default <span class="menu-item">1.25x</span>; <span class="menu-item">Show Played Move</span> and <span class="menu-item">Show Best Alternative Move</span>; see <a href="#miniature-boards">section 6.15.15</a>). The setting applies to this dialog and to the Check Logs dialog, and is read when the dialog opens. The <strong>Log this moment</strong> dialog has no board. PDF exports always use a fixed board size with both arrows.</p>
+                <p><strong>Miniature boards.</strong> Board size and arrows follow <span class="menu-item">View → Miniature Boards → Chess Log</span> (scale <span class="menu-item">1.0x</span> to <span class="menu-item">2.0x</span>, default <span class="menu-item">1.25x</span>; <span class="menu-item">Show Played Move</span> and <span class="menu-item">Show Best Alternative Move</span>; see <a href="#miniature-boards">section 6.15.16</a>). The setting applies to this dialog and to the Check Logs dialog, and is read when the dialog opens. The <strong>Log this moment</strong> dialog has no board. PDF exports always use a fixed board size with both arrows.</p>
                 <p><strong>Shallow and Vague chips.</strong> An answer flagged by Check Logs shows a <strong>Shallow</strong> or <strong>Vague</strong> chip (see <a href="#chess-log-check-logs">section 5.9.6</a>). When you start editing a flagged answer its chip fades out. On <strong>Save</strong>, an edited answer loses its flag and its Ignore; if you put back exactly the original text before saving, the flag stays.</p>
                 <p><strong>Ignore.</strong> Flagged answers have an <strong>Ignore</strong> checkbox. When it is ticked, the chip is shown faded and Check Logs leaves that answer alone. This dialog is the place to untick an Ignore you set earlier.</p>
                 <p><strong>Moves that no longer match.</strong> If the game's moves were edited after logging and a moment no longer matches a move in the game, it is not listed; a note at the bottom says how many could not be shown.</p>
@@ -2335,7 +2347,7 @@
                     <li>"No players found in this data."</li>
                     <li>"No chart data for this selection." with "3x3 moments are not shown in charts — use Generate Narrative Summary below." when the selection has only 3x3 moments.</li>
                     <li>"No chart data for this selection." with a line saying how many games with CLAMP/CCT moments have no date, "and charts need dated games."</li>
-                    <li>"No Chess Log moments in the selected data." with "Tag some via right-click on a move in the Moves List."</li>
+                    <li>"No Chess Log moments in the selected data." with "Log some via right-click on a move in the Moves List."</li>
                 </ul>
                 <p><strong>AI controls.</strong> Check Logs is described in <a href="#chess-log-check-logs">section 5.9.6</a> and the Narrative Summary in <a href="#chess-log-narrative">section 5.9.9</a>. Without a provider, the tab shows "Configure an AI provider in AI Summary → AI Model Settings to enable narrative summaries.", with a link that opens AI Model Settings.</p>
 
@@ -2768,6 +2780,8 @@
                     <li><strong>Position Columns:</strong> ECO codes, Opening names, FEN positions</li>
                 </ul>
                 <p>Toggle any column's visibility by selecting it from the appropriate submenu. Changes are applied immediately but are not persisted until you save the profile.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
+
+                <p><strong>Chess Log entries in the Moves List context menu:</strong> Right-clicking a move in the Moves List also offers <span class="menu-item">Log this moment…</span> (see <a href="#chess-log-logging">section 5.9.3</a>) and <span class="menu-item">Show Logged Moments</span> (see <a href="#chess-log-reviewing">section 5.9.4</a>). <span class="menu-item">Show Logged Moments</span> is unavailable when the game has no logged moments.</p>
             </div>
 
             <!-- Game Analysis Menu -->
@@ -3023,6 +3037,8 @@
                 
                 <h5>6.12.6 Include PGN header tags in pre-prompt</h5>
                 <p>Toggles whether PGN header tags (player names, ELO ratings, event information, etc.) are included in the pre-prompt sent to the AI model. When enabled, the AI has access to this PGN header context, providing more informed responses.</p>
+
+                <p><strong>Chess Log:</strong> Check Logs and the Narrative Summary on the Chess Log tab use the provider and model configured here; changes apply right away. Chess Log has its own timeout on the Chess Log tab, so <strong>Request timeout (seconds)</strong> here applies to AI Summary only. See <a href="#chess-log-task">section 5.9</a>.</p>
             </div>
 
             <!-- Notes Menu -->
@@ -3064,7 +3080,7 @@
                 <p>Toggles whether logged moves show a small icon to the left of the move in the Moves List. The setting is saved in your user settings.<br>See <a href="#chess-log-logging">section 5.9.3</a> for more information.</p>
 
                 <h5>6.14.8 Time series settings</h5>
-                <p>The six chart options of the Chess Log tab: <span class="menu-item">Progression bins</span>, <span class="menu-item">Binning mode</span>, <span class="menu-item">X axis layout</span>, <span class="menu-item">Max gap segment (calendar days)</span>, <span class="menu-item">Progression line style</span>, and <span class="menu-item">Smoothing strength</span>. They work as in Player Stats but are stored separately. The submenu, with the separator above it, is hidden when the Chess Log tab is hidden through <span class="menu-item">View → Show/Hide</span>; the rest of the Chess Log menu stays, because you can still log and review moments from the Moves List.<br>See <a href="#ps-accuracy-progression">section 5.7.9</a> and <a href="#chess-log-tab-guide">section 5.9.8</a> for more information.</p>
+                <p>The six chart options of the Chess Log tab: <span class="menu-item">Progression bins</span>, <span class="menu-item">Binning mode</span>, <span class="menu-item">X axis layout</span>, <span class="menu-item">Max gap segment (calendar days)</span>, <span class="menu-item">Progression line style</span>, and <span class="menu-item">Smoothing strength</span>. They work as in Player Stats but are stored separately. The submenu is hidden while the Chess Log tab is hidden (see <a href="#view-show-hide">section 6.15.13</a>).<br>See <a href="#ps-accuracy-progression">section 5.7.9</a> and <a href="#chess-log-tab-guide">section 5.9.8</a> for more information.</p>
             </div>
 
             <!-- View Menu -->
@@ -3123,18 +3139,23 @@
                 <p><strong>Shortcut:</strong> <code>F9</code></p>
                 <p>Switches the Detail Panel to the <strong>Notes</strong> tab.<br>See <a href="#notes">section 4.5.9</a> for more information.</p>
 
-                <h5>6.15.12 Show/Hide</h5>
-                <p>Checkable items that show or hide Detail Panel tabs and, where applicable, their related top-level menus (for example hiding <strong>Player Stats</strong> hides both the tab and the Player Stats menu). Opening Explorer, PGN header tags, and Game Summary are tab-only; the Game Analysis menu remains available when Game Summary is hidden. At least one detail tab must stay visible. Choices are saved in your user settings when the application exits. View menu shortcuts (F1–F10) for a hidden tab are disabled until you show it again. Automatic tab switches during analysis (Moves List / Game Summary) are skipped if that tab is hidden.</p>
+                <h5>6.15.12 Chess Log</h5>
+                <p><strong>Shortcut:</strong> <code>F10</code></p>
+                <p>Switches the Detail Panel to the <strong>Chess Log</strong> tab.<br>See <a href="#chess-log-tab">section 4.5.10</a> for more information.</p>
 
-                <h5>6.15.13 Hide PGN Pane</h5>
+                <h5 id="view-show-hide">6.15.13 Show/Hide</h5>
+                <p>Checkable items that show or hide Detail Panel tabs and, where applicable, their related top-level menus (for example hiding <strong>Player Stats</strong> hides both the tab and the Player Stats menu). Opening Explorer, PGN header tags, and Game Summary are tab-only; the Game Analysis menu remains available when Game Summary is hidden. At least one detail tab must stay visible. Choices are saved in your user settings when the application exits. View menu shortcuts (F1–F10) for a hidden tab are disabled until you show it again. Automatic tab switches during analysis (Moves List / Game Summary) are skipped if that tab is hidden.</p>
+                <p>Hiding <strong>Chess Log</strong> hides the tab and its <span class="menu-item">Time series settings</span> submenu, but the Chess Log menu stays, because you can still log and review moments from the Moves List.</p>
+
+                <h5>6.15.14 Hide PGN Pane</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+↑</code> / <code>⌘+Shift+↑</code></p>
                 <p>Toggles the visibility of the PGN notation pane in the Detail Panel to free more space for the analysis tabs. You can also double-click the splitter handle between the PGN pane and the tabs.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
 
-                <h5>6.15.14 Hide Database Panel</h5>
+                <h5>6.15.15 Hide Database Panel</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code></p>
                 <p>Toggles the visibility of the Database Panel to free more space for the Main and Detail panels.<br>See <a href="#three-panel-layout">section 4.2</a> for more information.</p>
 
-                <h5 id="miniature-boards">6.15.15 Miniature Boards</h5>
+                <h5 id="miniature-boards">6.15.16 Miniature Boards</h5>
                 <p>Sets the size of the small chessboards CARA shows in several places, and which move arrows they draw. The submenu has one entry per place:</p>
                 <ul>
                     <li><span class="menu-item">Manual Analysis</span> — the miniature preview shown when you hover over a move in a PV line (see section 6.8.5). Also offers <span class="menu-item">Show Move Arrow</span>.</li>
@@ -3393,6 +3414,25 @@
     }
 }</code></pre>
                 <p>These options affect the saved file format only; on-screen PGN colors are set in the theme file (see <a href="#customizing-themes">section 7.1.4</a>).</p>
+                <p><strong>Example C: Chess Log AI prompts</strong></p>
+                <ol>
+                    <li>Open <code>config.json</code>.</li>
+                    <li>Navigate to <code>prompts → chess_log</code>.</li>
+                    <li>Edit the prompt you want to change.</li>
+                </ol>
+                <p>There are eight entries. <code>narrative_system</code>, <code>narrative_preamble</code>, <code>narrative_step</code>, <code>narrative_glossaries</code>, <code>narrative_3x3_structure</code> and <code>narrative_3x3_moment_framing</code> build the Narrative Summary request; <code>classifier</code> (CLAMP and CCT notes) and <code>classifier_3x3</code> (GM Noël Studer's 3x3 Method answers) build the Check Logs request. Each prompt is one JSON string, with line breaks written as <code>\n</code>; <code>narrative_glossaries</code> holds one such string per method. Keep the <code>{…}</code> placeholders in <code>narrative_preamble</code> and <code>classifier_3x3</code> unchanged. Restart CARA after editing, and see the backup warning at the top of <a href="#customizing-config">section 7.1</a>.</p>
+                <p><strong>Example D: Chess Log default timeout</strong></p>
+                <ol>
+                    <li>Open <code>config.json</code>.</li>
+                    <li>Navigate to <code>ui → panels → detail → chess_log_charts → ai</code>.</li>
+                    <li>Adjust <code>"default_timeout_seconds"</code>.</li>
+                </ol>
+                <pre><code>"chess_log_charts": {
+    "ai": {
+        "default_timeout_seconds": 120
+    }
+}</code></pre>
+                <p>This is the Chess Log timeout used until you change <strong>Timeout (s)</strong> on the Chess Log tab; after that, your value is kept in <code>user_settings.json</code> (see <a href="#chess-log-narrative">section 5.9.9</a>).</p>
                 
                 <h5 id="config-formula-examples">7.1.3 Formulas in config.json</h5>
                 <p>Estimated ELO, accuracy, and related expressions are under <code>game_analysis</code>:</p>
@@ -3541,6 +3581,7 @@
                     <li><strong>ai_models:</strong> AI model configurations for OpenAI and Anthropic providers</li>
                     <li><strong>ai_summary:</strong> AI Summary preferences</li>
                     <li><strong>annotations:</strong> Annotation color palette and font settings</li>
+                    <li><strong>chess_log:</strong> Chess Log preferences: <code>active_preset</code> (method for new moments), <code>highlight_chess_log_moves_in_list</code>, <code>ai_timeout_seconds</code> (Chess Log's AI timeout), and <code>charts</code> (the six Time series settings)</li>
                 </ul>
                 
                 <h5>7.2.2 Manual Editing Considerations</h5>
@@ -3579,7 +3620,7 @@
             
             <div class="outline-item">
                 <h4 id="pgn-metadata-tags">7.4 PGN Metadata Tags Used by CARA</h4>
-                <p>CARA uses several custom PGN metadata tags to store analysis data and annotations. Understanding these tags can help you work with CARA-generated PGN files in other applications or manually inspect the stored data.</p>
+                <p>CARA uses several custom PGN metadata tags to store analysis data, annotations, notes, and Chess Log moments. Understanding these tags can help you work with CARA-generated PGN files in other applications or manually inspect the stored data.</p>
                 
                 <h5>7.4.1 Analysis Data Tags</h5>
                 <p>When "Store Analysis results in PGN Tag" is enabled, CARA stores analysis data in compressed format:</p>
