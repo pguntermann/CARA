@@ -126,7 +126,7 @@ class TestAttributionLabels(unittest.TestCase):
 
     def test_threexthree_attribution_present(self):
         dlg, _ = _make_dialog("CLAMP")
-        self.assertIn("Developed by GM Noel Studer", self._attribution_texts(dlg))
+        self.assertIn("Developed by GM Noël Studer", self._attribution_texts(dlg))
 
     def test_exactly_two_attributions(self):
         """Exactly two attribution labels exist — CLAMP and 3x3."""

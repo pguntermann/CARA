@@ -96,7 +96,7 @@ class ChessLogSettingsDialog(QDialog):
 
         preset_attributions = {
             "CLAMP": "Developed by Dr. Can Kabadayi",
-            "3x3": "Developed by GM Noel Studer",
+            "3x3": "Developed by GM Noël Studer",
         }
 
         dim_color = (
