@@ -1000,6 +1000,9 @@ class TestOrphanRowSkipped(unittest.TestCase):
         notice_texts = [lbl.text() for lbl in labels if "could not be located" in lbl.text()]
         self.assertEqual(len(notice_texts), 1, "Expected exactly one orphan notice label")
         self.assertIn("1 tagged moment", notice_texts[0])
+        # Straight apostrophe, as in the rest of CARA's UI text
+        self.assertIn("the game's moves may have been edited", notice_texts[0])
+        self.assertNotIn("’", notice_texts[0])
 
 
 # ---------------------------------------------------------------------------

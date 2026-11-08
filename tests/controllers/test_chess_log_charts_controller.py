@@ -1110,6 +1110,65 @@ class TestChessLogShallowThreadSignalShape(unittest.TestCase):
         self.assertGreater(len(ready[0]), 0)
 
 
+def _five_notes():
+    return [(i, _NOTE_GAMES[i], f"path/{i}", "CLAMP", f"note {i}") for i in range(5)]
+
+
+def _real_shallow_config():
+    """The shipped config.json, so the assertions cover the wording the user actually sees."""
+    import json
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[2] / "app" / "config" / "config.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@unittest.skipUnless(_QT_AVAILABLE, "Qt not available in this environment")
+class TestShallowThreadMessagePlurals(unittest.TestCase):
+    """The plural suffix follows the number in front of "note": {total} in the partial notice,
+    {count} in the error.  A 1-of-1 partial cannot happen (one unreadable note out of one is the
+    all-failed error), so the single-note case is the error's "None of the 1 note"."""
+
+    def _run(self, unparsed, notes, config=None):
+        thread = _make_shallow_thread(notes=notes, config=config)
+        failed, partial = [], []
+        thread.shallow_failed.connect(failed.append)
+        thread.shallow_partial.connect(partial.append)
+        with patch(
+            "app.services.chess_log_shallow_service.classify_notes",
+            return_value=_shallow_result(shallow_keys=[], unparsed_indices=unparsed),
+        ):
+            thread.run()
+        return failed, partial
+
+    def test_one_of_five_says_notes(self):
+        failed, partial = self._run((0,), _five_notes())
+        self.assertEqual(failed, [])
+        self.assertEqual(partial, ["1 of 5 notes couldn't be classified — left unchanged. Flagged 0."])
+
+    def test_four_of_five_says_notes(self):
+        _, partial = self._run((0, 1, 2, 3), _five_notes())
+        self.assertEqual(partial, ["4 of 5 notes couldn't be classified — left unchanged. Flagged 0."])
+
+    def test_one_of_one_is_the_error_with_singular_note(self):
+        failed, partial = self._run((0,), _five_notes()[:1])
+        self.assertEqual(partial, [])
+        self.assertEqual(len(failed), 1)
+        self.assertTrue(failed[0].startswith("None of the 1 note could be classified."), failed[0])
+
+    def test_error_plural_follows_total_sent(self):
+        failed, _ = self._run((0, 1, 2, 3, 4), _five_notes())
+        self.assertTrue(failed[0].startswith("None of the 5 notes could be classified."), failed[0])
+
+    def test_shipped_wording_one_of_five(self):
+        _, partial = self._run((0,), _five_notes(), config=_real_shallow_config())
+        self.assertEqual(partial, ["1 of 5 notes couldn't be classified — left unchanged. Flagged 0."])
+
+    def test_shipped_wording_one_of_one(self):
+        failed, _ = self._run((0,), _five_notes()[:1], config=_real_shallow_config())
+        self.assertEqual(failed, ["None of the 1 note could be classified. "
+                                  "Try again; the model's reply couldn't be read."])
+
+
 @unittest.skipUnless(_QT_AVAILABLE, "Qt not available in this environment")
 class TestChessLogChartsControllerGetAvailableModels(unittest.TestCase):
     """Characterisation tests for get_available_models() — pin behaviour before extraction.

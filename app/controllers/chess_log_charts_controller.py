@@ -366,7 +366,7 @@ class ChessLogShallowThread(QThread):
                 msg = tmpl.format(
                     unparsed=total_unparsed,
                     total=total_input,
-                    s_suffix=s(total_unparsed),
+                    s_suffix=s(total_input),  # the noun follows {total}: "1 of 5 notes"
                     flagged=total_flagged,
                 )
                 self.shallow_partial.emit(msg)

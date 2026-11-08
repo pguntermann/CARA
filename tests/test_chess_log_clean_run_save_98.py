@@ -190,7 +190,7 @@ class TestIgnoredAndUnreadableStayUnchecked(unittest.TestCase):
 
     def test_unreadable_answer_not_recorded(self):
         env = _Env()
-        _run_view(env, _view(env), env.classified(indexes=(0,)), partial="1 of 2 notes couldn’t be classified", answer=True)
+        _run_view(env, _view(env), env.classified(indexes=(0,)), partial="1 of 2 notes couldn't be classified", answer=True)
         e1 = env.clc.get_tags_for_game(env.games[0])["0"][0]
         e2 = env.clc.get_tags_for_game(env.games[1])["0"][0]
         self.assertIn("check_hash", e1)
@@ -202,8 +202,10 @@ class TestIgnoredAndUnreadableStayUnchecked(unittest.TestCase):
     def test_partial_notice_shown_in_the_same_message(self):
         env = _Env()
         ask, _ = _run_view(env, _view(env), env.classified(indexes=(0,)),
-                           partial="1 of 2 notes couldn’t be classified", answer=False)
-        self.assertIn("1 of 2 notes couldn’t be classified", ask)
+                           partial="1 of 2 notes couldn't be classified", answer=False)
+        # The notice is HTML-escaped into the rich-text message (' -> &#x27;); compare the text the user sees.
+        import html
+        self.assertIn("1 of 2 notes couldn't be classified", html.unescape(ask))
         self.assertIn("great job", ask)
         self.assertIn("Save records these notes as checked", ask)
 
