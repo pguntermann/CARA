@@ -1054,7 +1054,7 @@ class DetailChessLogChartsView(QWidget):
         player_name, source_label = self._export_header()
         suggested = default_chess_log_charts_pdf_filename(player_name)
         path, _ = QFileDialog.getSaveFileName(
-            self, "Export PDF report", suggested, "PDF Files (*.pdf)"
+            self, "Export PDF Report", suggested, "PDF Files (*.pdf)"
         )
         if not path:
             return

@@ -46,7 +46,7 @@ class ChessLogSettingsDialog(QDialog):
         self._setup_ui()
         self._apply_styling()
         self._apply_size()
-        self.setWindowTitle("Chess Log settings")
+        self.setWindowTitle("Chess Log Settings")
 
     # ------------------------------------------------------------------
     # Config

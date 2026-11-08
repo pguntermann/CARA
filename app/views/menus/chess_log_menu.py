@@ -17,7 +17,7 @@ def setup_chess_log_menu(mw, menu_bar: QMenuBar) -> None:
     chess_log_menu = menu_bar.addMenu("Chess Log")
     mw._apply_menu_styling(chess_log_menu)
 
-    mw.chess_log_settings_action = QAction("Chess Log settings…", mw)
+    mw.chess_log_settings_action = QAction("Chess Log Settings…", mw)
     mw.chess_log_settings_action.triggered.connect(mw._show_chess_log_settings)
     chess_log_menu.addAction(mw.chess_log_settings_action)
 
@@ -40,11 +40,11 @@ def setup_chess_log_menu(mw, menu_bar: QMenuBar) -> None:
     mw.save_all_chess_logs_action.triggered.connect(mw._save_chess_logs_for_all_games)
     chess_log_menu.addAction(mw.save_all_chess_logs_action)
 
-    mw.show_all_chess_logs_action = QAction("Show logged moments for all games", mw)
+    mw.show_all_chess_logs_action = QAction("Show Logged Moments for All Games", mw)
     mw.show_all_chess_logs_action.triggered.connect(mw._show_chess_logs_for_all_games)
     chess_log_menu.addAction(mw.show_all_chess_logs_action)
 
-    mw.show_saved_shallow_logs_action = QAction("Show Shallow/Vague logs", mw)
+    mw.show_saved_shallow_logs_action = QAction("Show Shallow/Vague Logs", mw)
     mw.show_saved_shallow_logs_action.setToolTip(
         "Open stored Check Logs results for this database — shows saved Shallow and Vague chips."
     )
@@ -53,7 +53,7 @@ def setup_chess_log_menu(mw, menu_bar: QMenuBar) -> None:
 
     chess_log_menu.addSeparator()
 
-    mw.highlight_chess_log_moves_action = QAction("Highlight logged moments in Moves List", mw)
+    mw.highlight_chess_log_moves_action = QAction("Highlight Logged Moments in Moves List", mw)
     mw.highlight_chess_log_moves_action.setCheckable(True)
     mw.highlight_chess_log_moves_action.setChecked(False)
     mw.highlight_chess_log_moves_action.triggered.connect(mw._on_highlight_chess_log_moves_toggled)

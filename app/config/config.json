@@ -875,7 +875,7 @@
       "shallow": {
         "button_save": "Save",
         "button_cancel": "Cancel",
-        "help_text": "Check Logs — what the chips mean\n\nCheck Logs reads each answer on its own.\n\nShallow (3x3) marks a Why answer that could fit almost any move: it doesn't name a piece, square, plan, threat or idea from this position. Short answers are fine if they're concrete. Answers that repeat each other from a different angle are fine too.\n\nShallow (CLAMP / CCT) marks a note that gives no diagnosis of the move: it only says you don't understand why the move was bad, it isn't about the move at all, or it writes the move off without saying what you missed, intended, or should have played. Any concrete point — a hung piece, a missed tactic, your intent, a better move — makes it Deep. CLAMP and CCT notes have no lesson, so they never get a Vague chip.\n\nVague marks a lesson that gives you nothing to do next game. A concrete habit or check counts as a real lesson, even a short one, such as \"count attackers and defenders\". Shrugs and \"try harder\" are vague.\n\nBlank answers are never flagged.\n\nIgnore stops a chip from coming back. To undo it, untick Ignore in Show logged moments and click Save. If you edit an answer, its Ignore is cleared and the answer is checked again.\n\nEvery run checks every answer again from its current text. Nothing is saved into your games until you click Save.",
+        "help_text": "Check Logs — what the chips mean\n\nCheck Logs reads each answer on its own.\n\nShallow (3x3) marks a Why answer that could fit almost any move: it doesn't name a piece, square, plan, threat or idea from this position. Short answers are fine if they're concrete. Answers that repeat each other from a different angle are fine too.\n\nShallow (CLAMP / CCT) marks a note that gives no diagnosis of the move: it only says you don't understand why the move was bad, it isn't about the move at all, or it writes the move off without saying what you missed, intended, or should have played. Any concrete point — a hung piece, a missed tactic, your intent, a better move — makes it Deep. CLAMP and CCT notes have no lesson, so they never get a Vague chip.\n\nVague marks a lesson that gives you nothing to do next game. A concrete habit or check counts as a real lesson, even a short one, such as \"count attackers and defenders\". Shrugs and \"try harder\" are vague.\n\nBlank answers are never flagged.\n\nIgnore stops a chip from coming back. To undo it, untick Ignore in Show Logged Moments and click Save. If you edit an answer, its Ignore is cleared and the answer is checked again.\n\nEvery run checks every answer again from its current text. Nothing is saved into your games until you click Save.",
         "labels": {
           "shallow": {
             "text": "Shallow",
@@ -889,7 +889,7 @@
         }
       },
       "chess_log_settings": {
-        "title": "Chess Log settings",
+        "title": "Chess Log Settings",
         "width": 440,
         "height": 360
       },
@@ -906,7 +906,7 @@
           "none_found": {
             "title": "Nothing Flagged",
             "message_template": "No shallow notes or vague lessons found — great job.",
-            "save_explanation": "Save records these notes as checked, so Show Shallow/Vague logs won't count them as new."
+            "save_explanation": "Save records these notes as checked, so Show Shallow/Vague Logs won't count them as new."
           }
         }
       },

@@ -1,9 +1,7 @@
 """#13: exact Chess Log UI wording — four Whys, tab name, log wording, menu case, Pawn Promotion.
 
 Each test pins one user-visible string so the manual's quotes stay in step with the app.
-Menu labels and the dialog titles that echo them use sentence case (the Notes menu's style);
-Chess Log, Moves List, CLAMP, CCT, 3x3, PDF, AI, Narrative Summary and the Shallow/Vague chip
-names keep their capitals.
+Menu labels and dialog titles keep their Title Case (the part-C case change was reverted).
 """
 
 from __future__ import annotations
@@ -70,11 +68,11 @@ class TestSettingsDialogWording(unittest.TestCase):
     def test_clamp_description_says_pawn_promotion(self):
         self.assertIn("Checks · Loose Pieces · Alignment · Mobility · Pawn Promotion", _labels(self._dialog()))
 
-    def test_window_title_sentence_case(self):
-        self.assertEqual(self._dialog().windowTitle(), "Chess Log settings")
+    def test_window_title(self):
+        self.assertEqual(self._dialog().windowTitle(), "Chess Log Settings")
 
-    def test_config_title_sentence_case(self):
-        self.assertEqual(_config()["ui"]["dialogs"]["chess_log_settings"]["title"], "Chess Log settings")
+    def test_config_title(self):
+        self.assertEqual(_config()["ui"]["dialogs"]["chess_log_settings"]["title"], "Chess Log Settings")
 
 
 @requires_qt
@@ -90,13 +88,13 @@ class TestChessLogMenuLabels(unittest.TestCase):
         mw._apply_menu_styling = lambda menu: None
         mw.config = {}
         setup_chess_log_menu(mw, mw.menuBar())
-        self.assertEqual(mw.chess_log_settings_action.text(), "Chess Log settings…")
+        self.assertEqual(mw.chess_log_settings_action.text(), "Chess Log Settings…")
         self.assertEqual(mw.clear_chess_log_action.text(), "Clear Chess Log for current game")
         self.assertEqual(mw.save_chess_log_action.text(), "Save Chess Log to current game")
         self.assertEqual(mw.save_all_chess_logs_action.text(), "Save Chess Logs for all games")
-        self.assertEqual(mw.show_all_chess_logs_action.text(), "Show logged moments for all games")
-        self.assertEqual(mw.show_saved_shallow_logs_action.text(), "Show Shallow/Vague logs")
-        self.assertEqual(mw.highlight_chess_log_moves_action.text(), "Highlight logged moments in Moves List")
+        self.assertEqual(mw.show_all_chess_logs_action.text(), "Show Logged Moments for All Games")
+        self.assertEqual(mw.show_saved_shallow_logs_action.text(), "Show Shallow/Vague Logs")
+        self.assertEqual(mw.highlight_chess_log_moves_action.text(), "Highlight Logged Moments in Moves List")
 
     def test_tab_context_menu_labels(self):
         from PyQt6.QtWidgets import QWidget
@@ -109,14 +107,13 @@ class TestChessLogMenuLabels(unittest.TestCase):
         menu = build_chess_log_charts_context_menu(view, section_name="chart_CLAMP")
         texts = [a.text() for a in menu.actions() if not a.isSeparator()]
         self.assertEqual(texts, ["Copy section to clipboard", "Copy log to clipboard",
-                                 "Export PDF report", "Export Narrative Summary"])
+                                 "Export PDF Report", "Export Narrative Summary"])
 
     def test_moves_list_context_menu_source(self):
         """The Moves List context menu builds its Chess Log entries from these literals."""
         src = (_ROOT / "app" / "views" / "detail_moveslist_view.py").read_text(encoding="utf-8")
         self.assertIn('menu.addAction("Log this moment…")', src)
-        self.assertIn('menu.addAction("Show logged moments")', src)
-        self.assertNotIn('"Show Logged Moments"', src)
+        self.assertIn('menu.addAction("Show Logged Moments")', src)
 
 
 @requires_qt
@@ -151,7 +148,7 @@ class TestLogWording(unittest.TestCase):
     def test_logged_moments_single_game_title(self):
         from app.services.chess_log_storage_service import ChessLogStorageService as S
         dlg = self._show_tags({"0": [S.make_entry("CLAMP", "M", "x")]})
-        self.assertEqual(dlg.windowTitle(), "Logged moments")
+        self.assertEqual(dlg.windowTitle(), "Logged Moments")
 
     def test_logged_moments_all_games_title(self):
         from app.models.database_model import GameData
@@ -159,7 +156,7 @@ class TestLogWording(unittest.TestCase):
         ctrl = MagicMock()
         ctrl.get_tags_for_game.return_value = {}
         games = [GameData(game_number=1, pgn=MAINLINE_PGN), GameData(game_number=2, pgn=MAINLINE_PGN)]
-        self.assertEqual(ShowTagsDialog({}, games, ctrl).windowTitle(), "Show logged moments for all games")
+        self.assertEqual(ShowTagsDialog({}, games, ctrl).windowTitle(), "Show Logged Moments for All Games")
 
     def test_orphan_notice_logged_moments(self):
         from app.services.chess_log_storage_service import ChessLogStorageService as S
@@ -194,7 +191,7 @@ class TestShallowVagueLogsTitles(unittest.TestCase):
         fake = self._fake([GameData(game_number=1, pgn=MAINLINE_PGN)], MagicMock())
         with patch("app.views.dialogs.message_dialog.MessageDialog.show_information") as info:
             MainWindow._show_saved_shallow_logs(fake)
-        self.assertEqual(info.call_args[0][1], "Shallow/Vague logs")
+        self.assertEqual(info.call_args[0][1], "Shallow/Vague Logs")
 
     def test_no_saved_results_message_title(self):
         from app.main_window import MainWindow
@@ -205,7 +202,7 @@ class TestShallowVagueLogsTitles(unittest.TestCase):
         ctrl.has_any_checked_answer.return_value = False
         with patch("app.views.dialogs.message_dialog.MessageDialog.show_information") as info:
             MainWindow._show_saved_shallow_logs(self._fake([game], ctrl))
-        self.assertEqual(info.call_args[0][1], "Shallow/Vague logs")
+        self.assertEqual(info.call_args[0][1], "Shallow/Vague Logs")
 
     def test_dialog_window_title(self):
         from app.main_window import MainWindow
@@ -217,18 +214,17 @@ class TestShallowVagueLogsTitles(unittest.TestCase):
         ctrl.get_shallow_vague_keys.return_value = (frozenset({("k",)}), frozenset())
         with patch("app.views.dialogs.show_shallow_tags_dialog.ShowShallowTagsDialog") as dlg:
             MainWindow._show_saved_shallow_logs(self._fake([game], ctrl))
-        self.assertEqual(dlg.call_args.kwargs["window_title"], "Shallow/Vague logs")
+        self.assertEqual(dlg.call_args.kwargs["window_title"], "Shallow/Vague Logs")
 
 
 class TestConfigWording(unittest.TestCase):
     def test_save_explanation_names_menu_item(self):
         msg = _config()["ui"]["dialogs"]["chess_log_messages"]["shallow_notes"]["none_found"]["save_explanation"]
-        self.assertEqual(msg, "Save records these notes as checked, so Show Shallow/Vague logs won't count them as new.")
+        self.assertEqual(msg, "Save records these notes as checked, so Show Shallow/Vague Logs won't count them as new.")
 
     def test_help_text_names_menu_item(self):
         help_text = _config()["ui"]["dialogs"]["shallow"]["help_text"]
-        self.assertIn("untick Ignore in Show logged moments and click Save.", help_text)
-        self.assertNotIn("Show Logged Moments", help_text)
+        self.assertIn("untick Ignore in Show Logged Moments and click Save.", help_text)
 
 
 @requires_qt
@@ -253,7 +249,7 @@ class TestChartCopyLine(unittest.TestCase):
 
     def test_export_pdf_file_dialog_title(self):
         src = (_ROOT / "app" / "views" / "detail_chess_log_charts_view.py").read_text(encoding="utf-8")
-        self.assertIn('self, "Export PDF report", suggested', src)
+        self.assertIn('self, "Export PDF Report", suggested', src)
         self.assertIn('self, "Export Narrative Summary", suggested', src)
 
 

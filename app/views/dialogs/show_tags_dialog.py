@@ -729,7 +729,7 @@ class ShowTagsDialog(QDialog):
 
         self._setup_ui()
         self.setWindowTitle(
-            "Show logged moments for all games" if len(self._games) > 1 else "Logged moments"
+            "Show Logged Moments for All Games" if len(self._games) > 1 else "Logged Moments"
         )
 
     # ------------------------------------------------------------------
