@@ -30,7 +30,7 @@ class ChessLogSettingsDialog(QDialog):
     __init__(config, user_settings_service, parent=None).
     """
 
-    _PRESETS = ["CLAMP", "CCT", "3x3"]
+    _PRESETS = ["3x3", "CLAMP", "CCT"]
     _PRESET_DISPLAY_NAMES = {"3x3": "3x3 Method"}
 
     def __init__(self, config: Dict[str, Any], user_settings_service, parent=None) -> None:
@@ -39,8 +39,8 @@ class ChessLogSettingsDialog(QDialog):
         self._user_settings_service = user_settings_service
 
         chess_log = user_settings_service.get_chess_log()
-        raw_preset = chess_log.get("active_preset", "CLAMP")
-        self._active_preset: str = raw_preset if raw_preset in _VALID_PRESETS else "CLAMP"
+        raw_preset = chess_log.get("active_preset", "3x3")
+        self._active_preset: str = raw_preset if raw_preset in _VALID_PRESETS else "3x3"
 
         self._load_config()
         self._setup_ui()
@@ -195,7 +195,7 @@ class ChessLogSettingsDialog(QDialog):
 
     def _on_ok(self) -> None:
         selected_preset = next(
-            (name for name, rb in self._radio_buttons.items() if rb.isChecked()), "CLAMP"
+            (name for name, rb in self._radio_buttons.items() if rb.isChecked()), "3x3"
         )
         self._user_settings_service.update_chess_log_settings({
             "active_preset": selected_preset,

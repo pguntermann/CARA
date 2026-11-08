@@ -64,18 +64,23 @@ class TestPresetAccessors(unittest.TestCase):
         ctrl, _ = make_controller(user_settings_service=uss)
         self.assertEqual(ctrl.get_active_preset(), "CCT")
 
-    def test_get_active_preset_defaults_to_clamp_when_no_service(self):
+    def test_get_active_preset_defaults_to_3x3_when_no_service(self):
         ctrl, _ = make_controller(user_settings_service=None)
-        self.assertEqual(ctrl.get_active_preset(), "CLAMP")
+        self.assertEqual(ctrl.get_active_preset(), "3x3")
 
-    def test_get_active_preset_defaults_to_clamp_when_key_missing(self):
+    def test_get_active_preset_defaults_to_3x3_when_key_missing(self):
         uss = MagicMock()
         uss.get_chess_log.return_value = {}  # chess_log key exists but active_preset missing
         ctrl, _ = make_controller(user_settings_service=uss)
-        self.assertEqual(ctrl.get_active_preset(), "CLAMP")
+        self.assertEqual(ctrl.get_active_preset(), "3x3")
 
-    def test_get_active_preset_coerces_unknown_preset_to_clamp(self):
+    def test_get_active_preset_coerces_unknown_preset_to_3x3(self):
         uss = make_user_settings_mock(active_preset="Custom")
+        ctrl, _ = make_controller(user_settings_service=uss)
+        self.assertEqual(ctrl.get_active_preset(), "3x3")
+
+    def test_get_active_preset_keeps_saved_clamp(self):
+        uss = make_user_settings_mock(active_preset="CLAMP")
         ctrl, _ = make_controller(user_settings_service=uss)
         self.assertEqual(ctrl.get_active_preset(), "CLAMP")
 

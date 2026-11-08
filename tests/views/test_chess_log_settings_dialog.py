@@ -54,8 +54,35 @@ def _make_dialog(active_preset="CLAMP"):
 
 
 @requires_qt
+class TestPresetOrder(unittest.TestCase):
+    """3x3 is listed first, then CLAMP, then CCT."""
+
+    def test_presets_list_order(self):
+        from app.views.dialogs.chess_log_settings_dialog import ChessLogSettingsDialog
+        self.assertEqual(ChessLogSettingsDialog._PRESETS, ["3x3", "CLAMP", "CCT"])
+
+    def test_radio_buttons_shown_in_order(self):
+        from PyQt6.QtWidgets import QRadioButton
+        dlg, _ = _make_dialog("CLAMP")
+        dlg.show()
+        _APP.processEvents()
+        buttons = sorted(dlg.findChildren(QRadioButton), key=lambda rb: rb.mapTo(dlg, rb.rect().topLeft()).y())
+        self.assertEqual([rb.text() for rb in buttons], ["3x3 Method", "CLAMP", "CCT"])
+        dlg.close()
+
+
+@requires_qt
 class TestPresetPreselect(unittest.TestCase):
-    def test_clamp_preselected_by_default(self):
+    def test_3x3_preselected_when_no_saved_preset(self):
+        from app.views.dialogs.chess_log_settings_dialog import ChessLogSettingsDialog
+        uss = MagicMock()
+        uss.get_chess_log.return_value = {}
+        dlg = ChessLogSettingsDialog({}, uss)
+        self.assertTrue(dlg._radio_buttons["3x3"].isChecked())
+        for name in ("CLAMP", "CCT"):
+            self.assertFalse(dlg._radio_buttons[name].isChecked())
+
+    def test_saved_clamp_preselected(self):
         dlg, _ = _make_dialog("CLAMP")
         self.assertTrue(dlg._radio_buttons["CLAMP"].isChecked())
         for name in ("CCT", "3x3"):
@@ -69,9 +96,9 @@ class TestPresetPreselect(unittest.TestCase):
         dlg, _ = _make_dialog("3x3")
         self.assertTrue(dlg._radio_buttons["3x3"].isChecked())
 
-    def test_unknown_preset_falls_back_to_clamp(self):
+    def test_unknown_preset_falls_back_to_3x3(self):
         dlg, _ = _make_dialog("Custom")
-        self.assertTrue(dlg._radio_buttons["CLAMP"].isChecked())
+        self.assertTrue(dlg._radio_buttons["3x3"].isChecked())
 
 
 @requires_qt

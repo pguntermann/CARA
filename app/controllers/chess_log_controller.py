@@ -101,9 +101,9 @@ class ChessLogController(QObject):
     def get_active_preset(self) -> str:
         """Return the currently active Chess Log preset name (e.g. 'CLAMP')."""
         if self._user_settings_service is None:
-            return "CLAMP"
-        preset = self._user_settings_service.get_chess_log().get("active_preset", "CLAMP")
-        return preset if preset in {"CLAMP", "CCT", "3x3"} else "CLAMP"
+            return "3x3"
+        preset = self._user_settings_service.get_chess_log().get("active_preset", "3x3")
+        return preset if preset in {"CLAMP", "CCT", "3x3"} else "3x3"
 
     def preset_for_logging(self) -> str:
         """Return the preset to use when opening MomentDialog at the active path.

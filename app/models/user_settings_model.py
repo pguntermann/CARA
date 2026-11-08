@@ -666,7 +666,7 @@ class UserSettingsModel(QObject):
         """Get Chess Log settings (active_preset)."""
         raw = self._settings.get("chess_log", {})
         if not isinstance(raw, dict):
-            return {"active_preset": "CLAMP"}
+            return {"active_preset": "3x3"}
         return raw.copy()
 
     def set_chess_log(self, settings: Dict[str, Any]) -> None:

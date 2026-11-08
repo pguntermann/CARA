@@ -1215,6 +1215,6 @@
     "overrides": {}
   },
   "chess_log": {
-    "active_preset": "CLAMP"
+    "active_preset": "3x3"
   }
 }
