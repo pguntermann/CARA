@@ -221,7 +221,7 @@
                                 <li><a href="#chess-log-reviewing">5.9.4 Reviewing and editing logged moments</a></li>
                                 <li><a href="#chess-log-saving">5.9.5 Saving your Chess Log</a></li>
                                 <li><a href="#chess-log-check-logs">5.9.6 Check Logs</a></li>
-                                <li><a href="#chess-log-shallow-vague">5.9.7 Show Shallow/Vague logs</a></li>
+                                <li><a href="#chess-log-shallow-vague">5.9.7 Show Shallow/Vague Logs</a></li>
                                 <li><a href="#chess-log-tab-guide">5.9.8 The Chess Log tab</a></li>
                                 <li><a href="#chess-log-narrative">5.9.9 Narrative Summary</a></li>
                                 <li><a href="#chess-log-exporting">5.9.10 Exporting and sharing</a></li>
@@ -319,7 +319,7 @@
                     
                     <li><strong>Player Statistics:</strong> A dedicated <strong>Player Stats</strong> tab aggregates results across many <em>analyzed</em> games for one player at a time: overview figures, an optional <strong>activity heatmap</strong> (when you played), accuracy and move-quality charts, date-based progression charts, openings and endgame summaries, best and worst games, significant moves, and automatic error-pattern hints. You can show or hide each section to tailor the page. See <a href="#viewing-player-statistics">section 5.7</a> for a full walkthrough.</li>
 
-                    <li><strong>Chess Log:</strong> A self-review layer where you record, in your own words, why a move went wrong. Pick a logging method (CLAMP, CCT, or GM Noël Studer's 3x3 Method) in <span class="menu-item">Chess Log → Chess Log settings…</span>, then right-click a move in the Moves List and choose <span class="menu-item">Log this moment…</span> to note which kind of mistake it was and why. The <strong>Chess Log</strong> tab charts how your logged mistakes change over time and can ask an AI provider for a Narrative Summary of recurring themes. <strong>Check Logs</strong> uses AI to flag notes that don't diagnose the move, and 3x3 lessons that give you nothing to act on. Logged moments are stored in a PGN metadata tag with the game. See <a href="#chess-log-task">section 5.9</a> for a full walkthrough.</li>
+                    <li><strong>Chess Log:</strong> A self-review layer where you record, in your own words, why a move went wrong. Pick a logging method (CLAMP, CCT, or GM Noël Studer's 3x3 Method) in <span class="menu-item">Chess Log → Chess Log Settings…</span>, then right-click a move in the Moves List and choose <span class="menu-item">Log this moment…</span> to note which kind of mistake it was and why. The <strong>Chess Log</strong> tab charts how your logged mistakes change over time and can ask an AI provider for a Narrative Summary of recurring themes. <strong>Check Logs</strong> uses AI to flag notes that don't diagnose the move, and 3x3 lessons that give you nothing to act on. Logged moments are stored in a PGN metadata tag with the game. See <a href="#chess-log-task">section 5.9</a> for a full walkthrough.</li>
                     
                     <li><strong>Manual Analysis:</strong> Perform continuous engine analysis on any position with MultiPV support. You can navigate through game positions while maintaining continuous analysis of the current position. Hovering over principal variation moves displays a beautiful optional miniature board showing the resulting position. You can freeze the displayed PV lines while the engine keeps searching, and—when the assigned engine reports UCI W/D/L—optionally show a win/draw/loss probability bar for the best line. Positional plan exploration extracts piece trajectories from PV lines, visualizing how pieces move through the engine's recommended plan on the chessboard. You can explore positional plans for up to three PV lines (PV1, PV2, PV3) independently, with configurable options for the number of pieces to track and exploration depth.</li>
                     
@@ -954,7 +954,7 @@
                 </ul>
                 <p>You can modify any of these default profiles or create your own custom profiles. For smaller adjustments, you can reorder columns by dragging and dropping column headers in the moves list, resize columns by dragging column borders, and show or hide columns using the <span class="menu-item">Moves List</span> menu. For configuring multiple columns at once, use <span class="menu-item">Moves List → Setup Profile...</span> (see <a href="#setup-profile">section 6.6.5</a>). After making changes, save them with <span class="menu-item">Moves List → Save Profile</span> (to update the current profile) or <span class="menu-item">Moves List → Save Profile as...</span> (to create a new profile with a custom name). Custom profiles you create will also be accessible via number keys <code>1</code> through <code>9</code> based on their position in the profile list.</p>
                 
-                <p>Right-clicking in the table opens a context menu to copy the cell value under the cursor or to export the table as CSV or TSV (visible columns only or all columns). The same menu offers <span class="menu-item">Log this moment…</span> and <span class="menu-item">Show logged moments</span> for Chess Log (see <a href="#chess-log-logging">section 5.9.3</a>).</p>
+                <p>Right-clicking in the table opens a context menu to copy the cell value under the cursor or to export the table as CSV or TSV (visible columns only or all columns). The same menu offers <span class="menu-item">Log this moment…</span> and <span class="menu-item">Show Logged Moments</span> for Chess Log (see <a href="#chess-log-logging">section 5.9.3</a>).</p>
                 
                 <p>For a complete reference of all available columns and their descriptions, see <a href="#moves-list-columns-reference">section 7.7 "Moves List Columns Reference"</a>.</p>
                 
@@ -2162,7 +2162,7 @@
                 <h5 id="chess-log-getting-started">5.9.1 Getting started</h5>
                 <ol>
                     <li><strong>Choose a logging method:</strong><br>
-                    Use <span class="menu-item">Chess Log → Chess Log settings…</span> to open the <strong>Chess Log settings</strong> dialog. Under <strong>Active Preset</strong>, choose <strong>CLAMP</strong>, <strong>CCT</strong>, or <strong>3x3 Method</strong> (GM Noël Studer's 3x3 Method), then click <strong>OK</strong>. The choice is saved in your user settings. You can switch at any time; a database can hold moments logged with different methods. The methods are described in <a href="#chess-log-methods">section 5.9.2</a>.</li>
+                    Use <span class="menu-item">Chess Log → Chess Log Settings…</span> to open the <strong>Chess Log Settings</strong> dialog. Under <strong>Active Preset</strong>, choose <strong>CLAMP</strong>, <strong>CCT</strong>, or <strong>3x3 Method</strong> (GM Noël Studer's 3x3 Method), then click <strong>OK</strong>. The choice is saved in your user settings. You can switch at any time; a database can hold moments logged with different methods. The methods are described in <a href="#chess-log-methods">section 5.9.2</a>.</li>
                     <li><strong>Optional — set up AI:</strong><br>
                     Check Logs and the Narrative Summary use the provider configured in <span class="menu-item">AI Summary → AI Model Settings...</span> (see <a href="#ai-model-settings">section 6.12.1</a>). Any supported cloud provider works, and so does a local LLM through a custom endpoint (see <a href="#custom-ai-endpoint">section 7.9</a>). Logging moments does not need AI.</li>
                 </ol>
@@ -2213,17 +2213,17 @@
                     <li><strong>Record the moment:</strong><br>
                     For CLAMP or CCT, select one or more buttons and, if you like, write a note in <strong>Why did this matter? (optional)</strong>. For GM Noël Studer's 3x3 Method, answer as many of the four questions as apply. Click <strong>OK</strong>.</li>
                 </ol>
-                <p><strong>Which method the dialog uses.</strong> If the move already has logged entries, the dialog uses their method; if they come from more than one method, it uses the most common one. Otherwise, if the game has moments at other moves, it uses the method used most in this game. Otherwise it uses the method chosen in Chess Log settings. Ties go to the Chess Log settings method.</p>
+                <p><strong>Which method the dialog uses.</strong> If the move already has logged entries, the dialog uses their method; if they come from more than one method, it uses the most common one. Otherwise, if the game has moments at other moves, it uses the method used most in this game. Otherwise it uses the method chosen in Chess Log Settings. Ties go to the Chess Log Settings method.</p>
                 <p><strong>Also logged.</strong> When the same move also has entries from another method, an "Also logged:" line lists them. You are editing only the entries of the dialog's method.</p>
                 <p><strong>Logging the same move again.</strong> Logging a move again replaces that method's entries at the move, so this is also how you change a logged moment from the Moves List.</p>
                 <p><strong>No category.</strong> For CLAMP and CCT you may click <strong>OK</strong> with only a note; the moment is saved without a category. With neither a category nor a note, the dialog shows "Select a category, or add a note to save uncategorized."</p>
                 <p><strong>How many moments.</strong> Aim for about three moments per game: enough to see a pattern, few enough that each one still stands out when you review the game later. That is why CARA asks for confirmation when a game already has three moments and you log a new move, with any method. The <strong>Chess Log — More than three moments?</strong> dialog appears before the Log this moment dialog opens and ends with "Add this moment anyway?"; choose <strong>Yes</strong> or <strong>No</strong>. Whichever you answer, CARA doesn't ask again for the rest of the session, nor again for that game once the game is saved.</p>
                 <p><strong>What OK does.</strong> The moment is kept in memory with the game. The database is not marked as having unsaved changes yet (see <a href="#chess-log-saving">section 5.9.5</a>). The <strong>Log</strong> column of the game table (see <a href="#game-table">section 4.4.2</a>) and the Moves List icon update immediately.</p>
-                <p><strong>Highlight in Moves List.</strong> <span class="menu-item">Chess Log → Highlight logged moments in Moves List</span> shows a small icon to the left of each logged move, in the Moves List's own colors. The setting is saved in your user settings.</p>
+                <p><strong>Highlight in Moves List.</strong> <span class="menu-item">Chess Log → Highlight Logged Moments in Moves List</span> shows a small icon to the left of each logged move, in the Moves List's own colors. The setting is saved in your user settings.</p>
 
                 <h5 id="chess-log-reviewing">5.9.4 Reviewing and editing logged moments</h5>
-                <p><strong>One game.</strong> Right-click any move in the Moves List and choose <span class="menu-item">Show logged moments</span> to open the <strong>Logged moments</strong> dialog. The item is unavailable, with the tooltip "No logged moments in this game.", when the game has none.</p>
-                <p><strong>All games.</strong> <span class="menu-item">Chess Log → Show logged moments for all games</span> opens the <strong>Show logged moments for all games</strong> dialog for every game in the active database that has moments, with a heading line per game (players, result, date, and number of moves). With only one such game the dialog is titled <strong>Logged moments</strong>. If the active database has none, the status bar shows "No logged games in the active database".</p>
+                <p><strong>One game.</strong> Right-click any move in the Moves List and choose <span class="menu-item">Show Logged Moments</span> to open the <strong>Logged Moments</strong> dialog. The item is unavailable, with the tooltip "No logged moments in this game.", when the game has none.</p>
+                <p><strong>All games.</strong> <span class="menu-item">Chess Log → Show Logged Moments for All Games</span> opens the <strong>Show Logged Moments for All Games</strong> dialog for every game in the active database that has moments, with a heading line per game (players, result, date, and number of moves). With only one such game the dialog is titled <strong>Logged Moments</strong>. If the active database has none, the status bar shows "No logged games in the active database".</p>
                 <p><strong>In the dialog.</strong> Each row shows:</p>
                 <ul>
                     <li>A miniature board turned so the side that moved is at the bottom, with the played move and (when the game has analysis) the best alternative drawn as arrows.</li>
@@ -2269,12 +2269,12 @@
                             <td>Yes, each affected database</td>
                         </tr>
                         <tr>
-                            <td><strong>Save</strong> in Logged moments</td>
+                            <td><strong>Save</strong> in Logged Moments</td>
                             <td>The games whose rows you changed.</td>
                             <td>Yes, for those games' databases</td>
                         </tr>
                         <tr>
-                            <td><strong>Save</strong> in Check Logs or Shallow/Vague logs</td>
+                            <td><strong>Save</strong> in Check Logs or Shallow/Vague Logs</td>
                             <td>The games whose answers, flags or Ignore choices changed, and, after a live Check Logs run, the record of which answers were checked.</td>
                             <td>Yes, for those games' databases</td>
                         </tr>
@@ -2303,7 +2303,7 @@
                 <p><strong>Results.</strong> What you see depends on the outcome:</p>
                 <ul>
                     <li><strong>Some answers flagged:</strong> The <strong>Check Logs</strong> dialog opens with the flagged moments.</li>
-                    <li><strong>Nothing flagged:</strong> A <strong>Nothing Flagged</strong> message says "No shallow notes or vague lessons found — great job." followed by "Save records these notes as checked, so Show Shallow/Vague logs won't count them as new." Click <strong>Save</strong> to record the answers as checked; Shallow or Vague flags left from an earlier run are removed from answers that came back clean, and the affected databases are marked as having unsaved changes. Click <strong>Cancel</strong>, or close the window, to discard the run.</li>
+                    <li><strong>Nothing flagged:</strong> A <strong>Nothing Flagged</strong> message says "No shallow notes or vague lessons found — great job." followed by "Save records these notes as checked, so Show Shallow/Vague Logs won't count them as new." Click <strong>Save</strong> to record the answers as checked; Shallow or Vague flags left from an earlier run are removed from answers that came back clean, and the affected databases are marked as having unsaved changes. Click <strong>Cancel</strong>, or close the window, to discard the run.</li>
                     <li><strong>Nothing to check:</strong> If the run checked no answers (for example, every answer is ignored), <strong>Nothing Flagged</strong> shows only its first sentence, with <strong>OK</strong> and no <strong>Save</strong>.</li>
                     <li><strong>Some notes could not be read:</strong> If the AI's reply could not be read for some notes, a notice such as "2 of 40 notes couldn't be classified — left unchanged. Flagged 3." appears at the top of the Check Logs dialog, or first in the Nothing Flagged message. Those answers are left as they were and still count as not checked; <strong>Save</strong> records only the answers that could be read.</li>
                     <li><strong>No note could be read:</strong> <strong>Check Logs Error</strong> appears with "Could not classify notes:" and "None of the <em>N</em> notes could be classified. Try again; the model's reply couldn't be read.", where <em>N</em> is the number of notes sent. Nothing is flagged or recorded.</li>
@@ -2315,11 +2315,11 @@
                     <li><strong>Vague</strong> on the lesson (the fourth question): "This lesson gives you nothing to do next game. Name a concrete habit or check, such as "count attackers and defenders"." A short concrete habit counts.</li>
                 </ul>
                 <p>Each answer is judged on its own, and blank answers are never flagged. Each chip's tooltip ends with "Tick Ignore if you disagree."</p>
-                <p><strong>In the dialog.</strong> The ⓘ icon next to the title (tooltip "What do the chips mean?") opens <strong>Check Logs — Help</strong>, which explains the chips and Ignore. Edit an answer to improve it (its chip fades), or tick <strong>Ignore</strong> to keep the chip from coming back while the text stays the same. <strong>Save</strong> stores the flags, your edits and Ignore choices in the games and records which answers were checked, so Show Shallow/Vague logs can tell new notes from checked ones; it marks the databases as having unsaved changes. <strong>Cancel</strong>, or closing the window, discards the whole run: nothing is stored.</p>
+                <p><strong>In the dialog.</strong> The ⓘ icon next to the title (tooltip "What do the chips mean?") opens <strong>Check Logs — Help</strong>, which explains the chips and Ignore. Edit an answer to improve it (its chip fades), or tick <strong>Ignore</strong> to keep the chip from coming back while the text stays the same. <strong>Save</strong> stores the flags, your edits and Ignore choices in the games and records which answers were checked, so Show Shallow/Vague Logs can tell new notes from checked ones; it marks the databases as having unsaved changes. <strong>Cancel</strong>, or closing the window, discards the whole run: nothing is stored.</p>
                 <p><strong>When Ignore lapses.</strong> If you edit an answer, its Ignore is cleared and the answer is checked again on the next run. Every run checks every answer again from its current text.</p>
 
-                <h5 id="chess-log-shallow-vague">5.9.7 Show Shallow/Vague logs</h5>
-                <p><span class="menu-item">Chess Log → Show Shallow/Vague logs</span> opens the same dialog, titled <strong>Shallow/Vague logs</strong>, with the flags saved in the games of the <strong>active database</strong>. No AI request is made, so you can review earlier Check Logs results at any time.</p>
+                <h5 id="chess-log-shallow-vague">5.9.7 Show Shallow/Vague Logs</h5>
+                <p><span class="menu-item">Chess Log → Show Shallow/Vague Logs</span> opens the same dialog, titled <strong>Shallow/Vague Logs</strong>, with the flags saved in the games of the <strong>active database</strong>. No AI request is made, so you can review earlier Check Logs results at any time.</p>
                 <ul>
                     <li>A banner at the top counts answers that haven't been checked yet, for example "3 notes haven't been checked yet (new or edited since the last Check Logs). Run Check Logs to check them."</li>
                     <li><strong>Save</strong> applies your edits and Ignore choices; it does not record new checks.</li>
@@ -2369,14 +2369,14 @@
                 <ul>
                     <li><span class="menu-item">Copy section to clipboard</span> — on a chart, copies the line "Category chart — CLAMP: see Chess Log tab in CARA." (or CCT; charts are not copied as images); on the narrative, copies it as formatted text, with a Markdown plain-text version.</li>
                     <li><span class="menu-item">Copy log to clipboard</span> — a text report: player and source, one line per chart, the narrative if generated, then the saved Check Logs flags.</li>
-                    <li><span class="menu-item">Export PDF report</span> — a PDF with the charts as pictures, the narrative and the saved Check Logs flags with boards.</li>
+                    <li><span class="menu-item">Export PDF Report</span> — a PDF with the charts as pictures, the narrative and the saved Check Logs flags with boards.</li>
                     <li><span class="menu-item">Export Narrative Summary</span> — a PDF of the narrative only. If there is none yet, a <strong>No Narrative</strong> message says "Generate a Narrative Summary first."</li>
                 </ul>
-                <p>The Check Logs part of <span class="menu-item">Copy log to clipboard</span> and <span class="menu-item">Export PDF report</span> lists only flags saved in the games, for the selected player's own moves, never results of a run you haven't saved. The report header's flagged count (for example "· 4 Shallow" or "· 4 Shallow/Vague") also counts saved flags only.</p>
+                <p>The Check Logs part of <span class="menu-item">Copy log to clipboard</span> and <span class="menu-item">Export PDF Report</span> lists only flags saved in the games, for the selected player's own moves, never results of a run you haven't saved. The report header's flagged count (for example "· 4 Shallow" or "· 4 Shallow/Vague") also counts saved flags only.</p>
                 <p><strong>From the dialogs.</strong></p>
                 <ul>
-                    <li><strong>Logged moments:</strong> <strong>Copy to clipboard</strong> copies the moments as formatted text with a plain-text version, ready to paste into a chess.com forum post (tested in chess.com's normal forum editor, not its HTML view); the boards are not copied. <strong>Export to PDF</strong> saves the rows as shown, boards included. Both use what is on screen, including unsaved edits.</li>
-                    <li><strong>Check Logs and Shallow/Vague logs:</strong> <strong>Copy to clipboard</strong> and <strong>Export to PDF</strong> also use what is on screen until you click <strong>Save</strong>, including flags from the current run, your edits and Ignore choices. An answer you have edited loses its marker, as Save would remove its flag.</li>
+                    <li><strong>Logged Moments:</strong> <strong>Copy to clipboard</strong> copies the moments as formatted text with a plain-text version, ready to paste into a chess.com forum post (tested in chess.com's normal forum editor, not its HTML view); the boards are not copied. <strong>Export to PDF</strong> saves the rows as shown, boards included. Both use what is on screen, including unsaved edits.</li>
+                    <li><strong>Check Logs and Shallow/Vague Logs:</strong> <strong>Copy to clipboard</strong> and <strong>Export to PDF</strong> also use what is on screen until you click <strong>Save</strong>, including flags from the current run, your edits and Ignore choices. An answer you have edited loses its marker, as Save would remove its flag.</li>
                 </ul>
                 <p><strong>Copy format.</strong> <span class="menu-item">Copy log to clipboard</span> on the tab and <strong>Copy to clipboard</strong> in the Check Logs dialog use the same format. Each moment is listed whole, game by game in move order. A flagged answer has <code>[Shallow]</code> or <code>[Vague]</code> after the answer text; ignored answers are unmarked. Answers for GM Noël Studer's 3x3 Method are labeled with their question, for example "Why did I choose that move? I wanted to double rooks. [Shallow]". A moment whose move can't be found reads "Unknown move".</p>
                 <div class="tip-box">
@@ -2781,7 +2781,7 @@
                 </ul>
                 <p>Toggle any column's visibility by selecting it from the appropriate submenu. Changes are applied immediately but are not persisted until you save the profile.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
 
-                <p><strong>Chess Log entries in the Moves List context menu:</strong> Right-clicking a move in the Moves List also offers <span class="menu-item">Log this moment…</span> (see <a href="#chess-log-logging">section 5.9.3</a>) and <span class="menu-item">Show logged moments</span> (see <a href="#chess-log-reviewing">section 5.9.4</a>). <span class="menu-item">Show logged moments</span> is unavailable when the game has no logged moments.</p>
+                <p><strong>Chess Log entries in the Moves List context menu:</strong> Right-clicking a move in the Moves List also offers <span class="menu-item">Log this moment…</span> (see <a href="#chess-log-logging">section 5.9.3</a>) and <span class="menu-item">Show Logged Moments</span> (see <a href="#chess-log-reviewing">section 5.9.4</a>). <span class="menu-item">Show Logged Moments</span> is unavailable when the game has no logged moments.</p>
             </div>
 
             <!-- Game Analysis Menu -->
@@ -3056,8 +3056,8 @@
                 <h4 id="chess-log-menu">6.14 Chess Log Menu</h4>
                 <p>The <span class="menu-item">Chess Log</span> menu manages the moments you log in your games: choosing a method, saving or clearing them, reviewing them, and the chart settings of the <strong>Chess Log</strong> tab. Logging itself starts from the Moves List context menu; see <a href="#chess-log-task">section 5.9 Chess Log</a>.</p>
 
-                <h5>6.14.1 Chess Log settings…</h5>
-                <p>Opens the <strong>Chess Log settings</strong> dialog, where you choose the method for new moments under <strong>Active Preset</strong>: <strong>CLAMP</strong>, <strong>CCT</strong>, or <strong>3x3 Method</strong>. Each method shows a short description, and CLAMP and GM Noël Studer's 3x3 Method show their author ("Developed by Dr. Can Kabadayi", "Developed by GM Noël Studer"). <strong>Cancel</strong> discards the change; <strong>OK</strong> saves it in your user settings. When a game already has moments, Log this moment may use that game's method instead.<br>See <a href="#chess-log-logging">section 5.9.3</a> for more information.</p>
+                <h5>6.14.1 Chess Log Settings…</h5>
+                <p>Opens the <strong>Chess Log Settings</strong> dialog, where you choose the method for new moments under <strong>Active Preset</strong>: <strong>CLAMP</strong>, <strong>CCT</strong>, or <strong>3x3 Method</strong>. Each method shows a short description, and CLAMP and GM Noël Studer's 3x3 Method show their author ("Developed by Dr. Can Kabadayi", "Developed by GM Noël Studer"). <strong>Cancel</strong> discards the change; <strong>OK</strong> saves it in your user settings. When a game already has moments, Log this moment may use that game's method instead.<br>See <a href="#chess-log-logging">section 5.9.3</a> for more information.</p>
 
                 <h5>6.14.2 Clear Chess Log for current game</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+L</code> / <code>⌘+Shift+L</code></p>
@@ -3070,13 +3070,13 @@
                 <h5>6.14.4 Save Chess Logs for all games</h5>
                 <p>Saves the Chess Log changes of every game in any open database that has unsaved ones, and reports in the status bar how many games were saved (and any that failed).<br>See <a href="#chess-log-saving">section 5.9.5</a> for more information.</p>
 
-                <h5>6.14.5 Show logged moments for all games</h5>
-                <p>Opens the Logged moments dialog for every game in the active database with logged moments, grouped by game.<br>See <a href="#chess-log-reviewing">section 5.9.4</a> for more information.</p>
+                <h5>6.14.5 Show Logged Moments for All Games</h5>
+                <p>Opens the Logged Moments dialog for every game in the active database with logged moments, grouped by game.<br>See <a href="#chess-log-reviewing">section 5.9.4</a> for more information.</p>
 
-                <h5>6.14.6 Show Shallow/Vague logs</h5>
+                <h5>6.14.6 Show Shallow/Vague Logs</h5>
                 <p>Opens the saved Check Logs results for the active database without a new AI request.<br>See <a href="#chess-log-shallow-vague">section 5.9.7</a> for more information.</p>
 
-                <h5>6.14.7 Highlight logged moments in Moves List</h5>
+                <h5>6.14.7 Highlight Logged Moments in Moves List</h5>
                 <p>Toggles whether logged moves show a small icon to the left of the move in the Moves List. The setting is saved in your user settings.<br>See <a href="#chess-log-logging">section 5.9.3</a> for more information.</p>
 
                 <h5>6.14.8 Time series settings</h5>
@@ -3163,7 +3163,7 @@
                     <li><span class="menu-item">Game Summary Highlight Cards</span> — the boards on the highlight cards in the Game Summary tab. Also offers <span class="menu-item">Show Played Move</span> and <span class="menu-item">Show Best Alternative Move</span>.</li>
                     <li><span class="menu-item">Opening Encyclopedia</span> — the boards in Opening Encyclopedia articles.</li>
                     <li><span class="menu-item">Move Link Tooltips</span> — the board shown when you hover over a linked move, for example in Game Summary, AI Summary or Notes. Also offers <span class="menu-item">Show Played Move</span> and <span class="menu-item">Show Best Alternative Move</span>.</li>
-                    <li><span class="menu-item">Chess Log</span> — the boards in the Logged moments, Check Logs and Shallow/Vague logs dialogs. Also offers <span class="menu-item">Show Played Move</span> and <span class="menu-item">Show Best Alternative Move</span>.</li>
+                    <li><span class="menu-item">Chess Log</span> — the boards in the Logged Moments, Check Logs and Shallow/Vague Logs dialogs. Also offers <span class="menu-item">Show Played Move</span> and <span class="menu-item">Show Best Alternative Move</span>.</li>
                 </ul>
                 <p>Each entry offers the scale factors <span class="menu-item">1.0x</span>, <span class="menu-item">1.25x</span>, <span class="menu-item">1.5x</span>, <span class="menu-item">1.75x</span>, and <span class="menu-item">2.0x</span>. The default is <span class="menu-item">1.25x</span> for Manual Analysis and Chess Log and <span class="menu-item">1.0x</span> for the others; all arrow options are on by default. Your choices are saved in your user settings.<br>See <a href="#chess-log-reviewing">section 5.9.4</a> for the Chess Log boards.</p>
             </div>
