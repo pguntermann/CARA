@@ -212,16 +212,16 @@
                                 <li><a href="#managing-annotations">5.8.3 Managing Annotations</a></li>
                             </ul>
                         </li>
-                        <li><a href="#copying-moving-games">5.9 Copying and Moving Games</a>
+                        <li><a href="#copying-moving-games">5.10 Copying and Moving Games</a>
                             <ul>
-                                <li><a href="#copying-selected-games">5.9.1 Copying Selected Games</a></li>
-                                <li><a href="#cutting-selected-games">5.9.2 Cutting Selected Games</a></li>
-                                <li><a href="#pasting-games">5.9.3 Pasting Games into a Database</a></li>
-                                <li><a href="#copying-active-game-pgn">5.9.4 Copying the Active Game PGN</a></li>
-                                <li><a href="#copying-pasting-positions">5.9.5 Copying and Pasting Board Positions</a></li>
+                                <li><a href="#copying-selected-games">5.10.1 Copying Selected Games</a></li>
+                                <li><a href="#cutting-selected-games">5.10.2 Cutting Selected Games</a></li>
+                                <li><a href="#pasting-games">5.10.3 Pasting Games into a Database</a></li>
+                                <li><a href="#copying-active-game-pgn">5.10.4 Copying the Active Game PGN</a></li>
+                                <li><a href="#copying-pasting-positions">5.10.5 Copying and Pasting Board Positions</a></li>
                             </ul>
                         </li>
-                        <li><a href="#regex-editor">5.10 Regex Editor</a></li>
+                        <li><a href="#regex-editor">5.11 Regex Editor</a></li>
                     </ul>
                 </li>
                 <li><a href="#reference">6. Complete Reference</a>
@@ -239,9 +239,9 @@
                         <li><a href="#engines-menu">6.11 Engines Menu</a></li>
                         <li><a href="#ai-summary-menu">6.12 AI Summary Menu</a></li>
                         <li><a href="#notes-menu">6.13 Notes Menu</a></li>
-                        <li><a href="#view-menu">6.14 View Menu</a></li>
-                        <li><a href="#help-menu">6.15 Help Menu</a></li>
-                        <li><a href="#complete-keyboard-shortcuts">6.16 Complete Keyboard Shortcuts</a></li>
+                        <li><a href="#view-menu">6.15 View Menu</a></li>
+                        <li><a href="#help-menu">6.16 Help Menu</a></li>
+                        <li><a href="#complete-keyboard-shortcuts">6.17 Complete Keyboard Shortcuts</a></li>
                     </ul>
                 </li>
                 <li><a href="#advanced-topics">7. Advanced Topics</a>
@@ -1101,7 +1101,7 @@
             </div>
             <div class="outline-item">
                 <h4 id="keyboard-shortcuts">4.6 Keyboard Shortcuts</h4>
-                <p>Below you can find a list of the most common keyboard shortcuts (application defaults), allowing you to work efficiently with the features described in this section. You can customize these bindings in CARA—see <a href="#customizing-keyboard-shortcuts">section 6.14.2</a>. For a complete reference of all default keyboard shortcuts organized by category, see <a href="#complete-keyboard-shortcuts">section 6.16</a>.</p>
+                <p>Below you can find a list of the most common keyboard shortcuts (application defaults), allowing you to work efficiently with the features described in this section. You can customize these bindings in CARA—see <a href="#customizing-keyboard-shortcuts">section 6.15.2</a>. For a complete reference of all default keyboard shortcuts organized by category, see <a href="#complete-keyboard-shortcuts">section 6.17</a>.</p>
                 
                 <h5>4.6.1 Navigation</h5>
                 <ul>
@@ -1433,7 +1433,7 @@
                     <strong>Quick Tip:</strong> You can save the current operations list as a named plan with the save toolbar button, then load it later from the load button. The load menu also includes <strong>Delete plan…</strong> if you want to remove a saved plan. Plans store only the operations list—not Target Games or Smart Update.
                 </div>
 
-                <p>If you enable <strong>Use regex</strong> on a <strong>Replace PGN header tag values</strong> operation, the <strong>Find</strong> field is treated as a regular expression. For a guided walkthrough of the editor (explanation, sample text, building blocks, and saved patterns), see <a href="#regex-editor">section 5.10 Regex Editor</a>. Here are a few practical examples you can try:</p>
+                <p>If you enable <strong>Use regex</strong> on a <strong>Replace PGN header tag values</strong> operation, the <strong>Find</strong> field is treated as a regular expression. For a guided walkthrough of the editor (explanation, sample text, building blocks, and saved patterns), see <a href="#regex-editor">section 5.11 Regex Editor</a>. Here are a few practical examples you can try:</p>
                 <div class="regex-examples-desktop column-table-wrapper">
                 <table class="column-table">
                     <thead>
@@ -2119,10 +2119,10 @@
             </div>
 
             <div class="outline-item">
-                <h4 id="copying-moving-games">5.9 Copying and Moving Games</h4>
+                <h4 id="copying-moving-games">5.10 Copying and Moving Games</h4>
                 <p>CARA provides practical copy, cut, and paste functionality that allows you to move games between databases, share games with other applications, and work with board positions. This section covers all clipboard operations for games and positions. You can also copy, cut, or paste selected games from the database table's right-click context menu (see <a href="#interacting-table">section 4.4.3</a>).</p>
                 
-                <h5 id="copying-selected-games">5.9.1 Copying Selected Games</h5>
+                <h5 id="copying-selected-games">5.10.1 Copying Selected Games</h5>
                 <p>To copy one or more games from a database to the clipboard:</p>
                 <ol>
                     <li><strong>Select games:</strong><br>
@@ -2133,7 +2133,7 @@
                 </ol>
                 <p>The copied games are stored as standard PGN text, separated by double newlines. You can paste them into another database in CARA, or into any other application that accepts PGN text.</p>
                 
-                <h5 id="cutting-selected-games">5.9.2 Cutting Selected Games</h5>
+                <h5 id="cutting-selected-games">5.10.2 Cutting Selected Games</h5>
                 <p>To move games from one database to another (or remove them from a database):</p>
                 <ol>
                     <li><strong>Select games:</strong><br>
@@ -2144,7 +2144,7 @@
                 </ol>
                 <p>The cut games are stored as PGN text in your clipboard, ready to be pasted into another database. The source database is marked as having unsaved changes.</p>
                 
-                <h5 id="pasting-games">5.9.3 Pasting Games into a Database</h5>
+                <h5 id="pasting-games">5.10.3 Pasting Games into a Database</h5>
                 <p>To paste games from the clipboard into a database:</p>
                 <ol>
                     <li><strong>Ensure PGN is in clipboard:</strong><br>
@@ -2162,7 +2162,7 @@
                     <strong>Quick Tip:</strong> You can use copy/cut and paste to move games between databases. For example, copy games from one database tab, switch to another database tab, and paste them there. This is useful for organizing your game collections or creating filtered subsets of games.
                 </div>
                 
-                <h5 id="copying-active-game-pgn">5.9.4 Copying the Active Game PGN</h5>
+                <h5 id="copying-active-game-pgn">5.10.4 Copying the Active Game PGN</h5>
                 <p>To copy the currently active game's PGN to the clipboard:</p>
                 <ol>
                     <li><strong>Ensure a game is active:</strong><br>
@@ -2173,7 +2173,7 @@
                 </ol>
                 <p>This copies the full PGN notation of the active game, including all metadata tags, moves, comments, and variations. You can then paste it into another application or share it with others.</p>
                 
-                <h5 id="copying-pasting-positions">5.9.5 Copying and Pasting Board Positions</h5>
+                <h5 id="copying-pasting-positions">5.10.5 Copying and Pasting Board Positions</h5>
                 <p>CARA also supports copying and pasting board positions using FEN (Forsyth-Edwards Notation):</p>
                 <ul>
                     <li><strong>Copy FEN:</strong> Use <span class="menu-item">Edit → Copy FEN</span> (<code>Shift+F</code>) to copy the current board position as FEN notation to your system clipboard. This is useful for sharing specific positions or setting up positions in other chess applications.</li>
@@ -2183,7 +2183,7 @@
             </div>
 
             <div class="outline-item">
-                <h4 id="regex-editor">5.10 Regex Editor</h4>
+                <h4 id="regex-editor">5.11 Regex Editor</h4>
                 <p>CARA includes a shared <strong>Regex Editor</strong> for building and testing regular expressions. You open it with the small <strong>.*</strong> control on a pattern field. It is available from:</p>
                 <ul>
                     <li><strong>Bulk Operations</strong> — when <strong>Use regex</strong> is enabled on a <strong>Replace PGN header tag values</strong> step (see <a href="#bulk-operations">section 5.3.3</a>)</li>
@@ -2281,31 +2281,31 @@
                 
                 <h5>6.2.1 Copy FEN</h5>
                 <p><strong>Shortcut:</strong> <code>Shift+F</code></p>
-                <p>Copies the current board position as FEN (Forsyth-Edwards Notation) to your system clipboard.<br>See <a href="#copying-pasting-positions">section 5.9.5</a> for more information.</p>
+                <p>Copies the current board position as FEN (Forsyth-Edwards Notation) to your system clipboard.<br>See <a href="#copying-pasting-positions">section 5.10.5</a> for more information.</p>
                 
                 <h5>6.2.2 Copy PGN</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+P</code> / <code>⌘+P</code></p>
-                <p>Copies the currently active game's complete PGN text to your system clipboard.<br>See <a href="#copying-active-game-pgn">section 5.9.4</a> for more information.</p>
+                <p>Copies the currently active game's complete PGN text to your system clipboard.<br>See <a href="#copying-active-game-pgn">section 5.10.4</a> for more information.</p>
                 
                 <h5>6.2.3 Copy selected Games</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+C</code> / <code>⌘+C</code></p>
-                <p>Copies the selected games from the active database to your system clipboard as PGN text. The games remain in the source database.<br>See <a href="#copying-selected-games">section 5.9.1</a> for more information.</p>
+                <p>Copies the selected games from the active database to your system clipboard as PGN text. The games remain in the source database.<br>See <a href="#copying-selected-games">section 5.10.1</a> for more information.</p>
                 
                 <h5>6.2.4 Cut selected Games</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+X</code> / <code>⌘+X</code></p>
-                <p>Copies the selected games to your system clipboard and removes them from the source database.<br>See <a href="#cutting-selected-games">section 5.9.2</a> for more information.</p>
+                <p>Copies the selected games to your system clipboard and removes them from the source database.<br>See <a href="#cutting-selected-games">section 5.10.2</a> for more information.</p>
                 
                 <h5>6.2.5 Paste FEN to Board</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+F</code> / <code>⌘+F</code></p>
-                <p>Pastes a FEN position from your clipboard and updates the chessboard to that position. The active game is cleared when a FEN is pasted.<br>See <a href="#copying-pasting-positions">section 5.9.5</a> for more information.</p>
+                <p>Pastes a FEN position from your clipboard and updates the chessboard to that position. The active game is cleared when a FEN is pasted.<br>See <a href="#copying-pasting-positions">section 5.10.5</a> for more information.</p>
                 
                 <h5>6.2.6 Paste PGN to Clipboard DB</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Alt+V</code> / <code>⌘+⌥+V</code></p>
-                <p>Pastes PGN text from your system clipboard into the Clipboard database. All games in the clipboard are added, and the first game becomes active.<br>See <a href="#copy-from-clipboard">section 5.2.1</a> and <a href="#pasting-games">section 5.9.3</a> for more information.</p>
+                <p>Pastes PGN text from your system clipboard into the Clipboard database. All games in the clipboard are added, and the first game becomes active.<br>See <a href="#copy-from-clipboard">section 5.2.1</a> and <a href="#pasting-games">section 5.10.3</a> for more information.</p>
                 
                 <h5>6.2.7 Paste PGN to active DB</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+V</code> / <code>⌘+V</code></p>
-                <p>Pastes PGN text from your system clipboard into the currently active database. All games in the clipboard are added, and the first game becomes active.<br>See <a href="#copy-from-clipboard">section 5.2.1</a> and <a href="#pasting-games">section 5.9.3</a> for more information.</p>
+                <p>Pastes PGN text from your system clipboard into the currently active database. All games in the clipboard are added, and the first game becomes active.<br>See <a href="#copy-from-clipboard">section 5.2.1</a> and <a href="#pasting-games">section 5.10.3</a> for more information.</p>
             </div>
 
             <!-- Board Menu -->
@@ -2783,13 +2783,13 @@
 
             <!-- View Menu -->
             <div class="outline-item">
-                <h4 id="view-menu">6.14 View Menu</h4>
+                <h4 id="view-menu">6.15 View Menu</h4>
                 <p>The <span class="menu-item">View</span> menu provides quick access to panel visibility, detail-tab switching, visual theme selection, and keyboard shortcut customization.</p>
 
-                <h5>6.14.1 Theme</h5>
+                <h5>6.15.1 Theme</h5>
                 <p>Switches the active application theme. Each theme uses its own style configuration file, which controls colors, fonts, spacing, borders, and other UI appearance settings. See <a href="#customizing-themes">section 7.1.4</a> and <a href="#creating-themes">section 7.1.5</a> for more information about theme files and custom themes.</p>
 
-                <h5 id="customizing-keyboard-shortcuts">6.14.2 Keyboard Shortcuts...</h5>
+                <h5 id="customizing-keyboard-shortcuts">6.15.2 Keyboard Shortcuts...</h5>
                 <p>Opens the Keyboard Shortcuts dialog, where you can view and change most menu and navigation shortcuts. Changes apply immediately and are saved in your user settings.</p>
                 <img src="screenshots/keyboard_shortcuts_dialog.png" alt="CARA Keyboard Shortcuts dialog - Filterable table of categories, actions, and shortcuts with Clear All, Restore Defaults, and Close" style="max-width: 100%; height: auto; margin: 25px auto; border-radius: 5px; border: 1px solid rgb(60, 60, 65);" />
                 <p>The dialog lists bindable actions by <strong>Category</strong>, <strong>Action</strong>, and current <strong>Shortcut</strong>. Use the filter box to narrow the list. Nested menu items show their submenu path in the Action column (for example <em>Set miniature preview scale factor › 1.25x</em>).</p>
@@ -2801,80 +2801,80 @@
                 </ul>
                 <p>Some dynamic menus (for example Open Recent, Theme, and profile/column pickers) are excluded from customization.</p>
 
-                <h5>6.14.3 Moves List</h5>
+                <h5>6.15.3 Moves List</h5>
                 <p><strong>Shortcut:</strong> <code>F1</code></p>
                 <p>Switches the Detail Panel to the <strong>Moves List</strong> tab.<br>See <a href="#moves-list">section 4.5.1</a> for more information.</p>
 
-                <h5>6.14.4 PGN header tags</h5>
+                <h5>6.15.4 PGN header tags</h5>
                 <p><strong>Shortcut:</strong> <code>F2</code></p>
                 <p>Switches the Detail Panel to the <strong>PGN header tags</strong> tab.<br>See <a href="#metadata">section 4.5.2</a> for more information.</p>
 
-                <h5>6.14.5 Manual Analysis</h5>
+                <h5>6.15.5 Manual Analysis</h5>
                 <p><strong>Shortcut:</strong> <code>F3</code></p>
                 <p>Switches the Detail Panel to the <strong>Manual Analysis</strong> tab.<br>See <a href="#manual-analysis">section 4.5.3</a> for more information.</p>
 
-                <h5>6.14.6 Opening Explorer</h5>
+                <h5>6.15.6 Opening Explorer</h5>
                 <p><strong>Shortcut:</strong> <code>F4</code></p>
                 <p>Switches the Detail Panel to the <strong>Opening Explorer</strong> tab. From there (and from the game information header) you can open matching Opening Encyclopedia articles when available.<br>See <a href="#opening-explorer">section 4.5.4</a> and <a href="#opening-encyclopedia">section 4.5.4.1</a> for more information.</p>
 
-                <h5>6.14.7 Game Summary</h5>
+                <h5>6.15.7 Game Summary</h5>
                 <p><strong>Shortcut:</strong> <code>F5</code></p>
                 <p>Switches the Detail Panel to the <strong>Game Summary</strong> tab.<br>See <a href="#game-summary">section 4.5.5</a> for more information.</p>
 
-                <h5>6.14.8 Player Stats</h5>
+                <h5>6.15.8 Player Stats</h5>
                 <p><strong>Shortcut:</strong> <code>F6</code></p>
                 <p>Switches the Detail Panel to the <strong>Player Stats</strong> tab.<br>See <a href="#player-stats">section 4.5.6</a> for more information.</p>
 
-                <h5>6.14.9 Annotations</h5>
+                <h5>6.15.9 Annotations</h5>
                 <p><strong>Shortcut:</strong> <code>F7</code></p>
                 <p>Switches the Detail Panel to the <strong>Annotations</strong> tab.<br>See <a href="#annotations">section 4.5.7</a> for more information.</p>
 
-                <h5>6.14.10 AI Summary</h5>
+                <h5>6.15.10 AI Summary</h5>
                 <p><strong>Shortcut:</strong> <code>F8</code></p>
                 <p>Switches the Detail Panel to the <strong>AI Summary</strong> tab.<br>See <a href="#ai-summary">section 4.5.8</a> for more information.</p>
 
-                <h5>6.14.11 Notes</h5>
+                <h5>6.15.11 Notes</h5>
                 <p><strong>Shortcut:</strong> <code>F9</code></p>
                 <p>Switches the Detail Panel to the <strong>Notes</strong> tab.<br>See <a href="#notes">section 4.5.9</a> for more information.</p>
 
-                <h5>6.14.12 Show/Hide</h5>
+                <h5>6.15.12 Show/Hide</h5>
                 <p>Checkable items that show or hide Detail Panel tabs and, where applicable, their related top-level menus (for example hiding <strong>Player Stats</strong> hides both the tab and the Player Stats menu). Opening Explorer, PGN header tags, and Game Summary are tab-only; the Game Analysis menu remains available when Game Summary is hidden. At least one detail tab must stay visible. Choices are saved in your user settings when the application exits. View menu shortcuts (F1–F10) for a hidden tab are disabled until you show it again. Automatic tab switches during analysis (Moves List / Game Summary) are skipped if that tab is hidden.</p>
 
-                <h5>6.14.13 Hide PGN Pane</h5>
+                <h5>6.15.13 Hide PGN Pane</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+↑</code> / <code>⌘+Shift+↑</code></p>
                 <p>Toggles the visibility of the PGN notation pane in the Detail Panel to free more space for the analysis tabs. You can also double-click the splitter handle between the PGN pane and the tabs.<br>See <a href="#detail-panel">section 4.5</a> for more information.</p>
 
-                <h5>6.14.14 Hide Database Panel</h5>
+                <h5>6.15.14 Hide Database Panel</h5>
                 <p><strong>Shortcut:</strong> <code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code></p>
                 <p>Toggles the visibility of the Database Panel to free more space for the Main and Detail panels.<br>See <a href="#three-panel-layout">section 4.2</a> for more information.</p>
             </div>
 
             <!-- Help Menu -->
             <div class="outline-item">
-                <h4 id="help-menu">6.15 Help Menu</h4>
+                <h4 id="help-menu">6.16 Help Menu</h4>
                 
-                <h5>6.15.1 Open Manual</h5>
+                <h5>6.16.1 Open Manual</h5>
                 <p>Opens the application manual in your default web browser, providing comprehensive documentation and instructions for using CARA.</p>
                 
-                <h5>6.15.2 Watch Video Tutorials</h5>
+                <h5>6.16.2 Watch Video Tutorials</h5>
                 <p>Opens the CARA Chess YouTube channel in your default web browser, where you can watch video tutorials for using CARA.</p>
                 
-                <h5>6.15.3 Visit GitHub Repository</h5>
+                <h5>6.16.3 Visit GitHub Repository</h5>
                 <p>Opens the CARA project repository on GitHub in your default web browser, where you can view the source code, report issues, or contribute to the project.</p>
                 
-                <h5>6.15.4 Check for Updates...</h5>
+                <h5>6.16.4 Check for Updates...</h5>
                 <p>Checks if a newer version of CARA is available.</p>
                 
-                <h5>6.15.5 About...</h5>
+                <h5>6.16.5 About...</h5>
                 <p>Opens the About dialog displaying application information, including the application name, version number, description, and copyright information. The dialog provides a quick reference for identifying the CARA version you are using.</p>
             </div>
 
             <!-- Keyboard Shortcuts Reference -->
             <div class="outline-item">
-                <h4 id="complete-keyboard-shortcuts">6.16 Complete Keyboard Shortcuts</h4>
-                <p>This section provides a comprehensive reference of the default keyboard shortcuts in CARA. You can customize most of these bindings—see <a href="#customizing-keyboard-shortcuts">section 6.14.2</a>.</p>
+                <h4 id="complete-keyboard-shortcuts">6.17 Complete Keyboard Shortcuts</h4>
+                <p>This section provides a comprehensive reference of the default keyboard shortcuts in CARA. You can customize most of these bindings—see <a href="#customizing-keyboard-shortcuts">section 6.15.2</a>.</p>
                 
-                <h5>6.16.1 Game Navigation</h5>
+                <h5>6.17.1 Game Navigation</h5>
                 <p>Essential shortcuts for navigating through games:</p>
                 <ul>
                     <li><code>→</code> (Right Arrow): Navigate to next move along the active path; with variation navigation enabled, opens the branch selector when multiple continuations exist (also confirms a highlighted branch)</li>
@@ -2886,7 +2886,7 @@
                     <li><code>Esc</code>: Dismiss the branch selector</li>
                 </ul>
                 
-                <h5>6.16.2 Detail Panel Tabs</h5>
+                <h5>6.17.2 Detail Panel Tabs</h5>
                 <p>Quick access to different analysis views:</p>
                 <ul>
                     <li><code>F1</code>: Switch to Moves List tab</li>
@@ -2902,7 +2902,7 @@
                     <li><code>Ctrl+Shift+↓</code> / <code>⌘+Shift+↓</code>: Toggle database panel visibility</li>
                 </ul>
                 
-                <h5>6.16.3 Game Analysis</h5>
+                <h5>6.17.3 Game Analysis</h5>
                 <p>Shortcuts for analyzing games:</p>
                 <ul>
                     <li><code>Ctrl+G</code> / <code>⌘+G</code>: Start game analysis for the current game</li>
@@ -2911,7 +2911,7 @@
                     <li><code>Ctrl+Shift+N</code> / <code>⌘+Shift+N</code>: Toggle normalized evaluation graph mode</li>
                 </ul>
                 
-                <h5>6.16.4 File Operations</h5>
+                <h5>6.17.4 File Operations</h5>
                 <p>Standard file management shortcuts:</p>
                 <ul>
                     <li><code>Ctrl+O</code> / <code>⌘+O</code>: Open PGN database</li>
@@ -2922,7 +2922,7 @@
                     <li><code>Ctrl+Q</code> / <code>⌘+Q</code>: Close application</li>
                 </ul>
                 
-                <h5>6.16.5 Importing and Opening Games</h5>
+                <h5>6.17.5 Importing and Opening Games</h5>
                 <p>Shortcuts for importing and opening games:</p>
                 <ul>
                     <li><code>Ctrl+V</code> / <code>⌘+V</code>: Paste PGN to active database</li>
@@ -2930,7 +2930,7 @@
                     <li><code>Ctrl+Shift+I</code> / <code>⌘+Shift+I</code>: Import games from online platforms</li>
                 </ul>
                 
-                <h5>6.16.6 Copy and Cut Operations</h5>
+                <h5>6.17.6 Copy and Cut Operations</h5>
                 <p>Shortcuts for copying and moving game data:</p>
                 <ul>
                     <li><code>Ctrl+P</code> / <code>⌘+P</code>: Copy active game PGN to clipboard</li>
@@ -2940,7 +2940,7 @@
                     <li><code>Ctrl+X</code> / <code>⌘+X</code>: Cut selected games to clipboard</li>
                 </ul>
                 
-                <h5>6.16.7 Moves List Column Profiles</h5>
+                <h5>6.17.7 Moves List Column Profiles</h5>
                 <p>Shortcuts for managing and switching column profiles:</p>
                 <ul>
                     <li><code>1</code> - <code>9</code>: Switch to column profile 1 through 9</li>
@@ -2949,7 +2949,7 @@
                     <li><code>Ctrl+Shift+Delete</code> / <code>⌘+Shift+Delete</code>: Remove current profile</li>
                 </ul>
                 
-                <h5>6.16.8 Board Display Options</h5>
+                <h5>6.17.8 Board Display Options</h5>
                 <p>Shortcuts for toggling board display elements:</p>
                 <ul>
                     <li><code>X</code>: Rotate board 180 degrees</li>
@@ -2969,7 +2969,7 @@
                     <li><code>Alt+L</code> / <code>⌥+L</code>: Toggle annotations layer</li>
                 </ul>
 
-                <h5>6.16.9 Manual Analysis</h5>
+                <h5>6.17.9 Manual Analysis</h5>
                 <p>Shortcuts for manual position analysis:</p>
                 <ul>
                     <li><code>Alt+M</code> / <code>⌥+M</code>: Start or stop continuous engine analysis</li>
@@ -2977,7 +2977,7 @@
                     <li><code>Alt+R</code> / <code>⌥+R</code>: Remove principal variation line</li>
                 </ul>
                 
-                <h5>6.16.10 Annotations</h5>
+                <h5>6.17.10 Annotations</h5>
                 <p>Shortcuts for managing annotations:</p>
                 <ul>
                     <li><code>Ctrl+Alt+S</code>: Save annotations to current game</li>
@@ -2985,13 +2985,13 @@
                     <li><code>Ctrl+Shift+D</code> / <code>⌘+Shift+D</code>: Clear all annotations for current game</li>
                 </ul>
                 
-                <h5>6.16.11 Engine Management</h5>
+                <h5>6.17.11 Engine Management</h5>
                 <p>Shortcuts for managing chess engines:</p>
                 <ul>
                     <li><code>Ctrl+E</code>: Add engine</li>
                 </ul>
                 
-                <h5>6.16.12 Database Operations</h5>
+                <h5>6.17.12 Database Operations</h5>
                 <p>Shortcuts for database management and bulk operations:</p>
                 <ul>
                     <li><code>Ctrl+Shift+F</code> / <code>⌘+Shift+F</code>: Search games across databases</li>
@@ -3001,7 +3001,7 @@
                     <li><code>Ctrl+Alt+C</code> / <code>⌘+Alt+C</code>: Clear Clipboard database</li>
                 </ul>
                 
-                <h5>6.16.13 PGN Display Options</h5>
+                <h5>6.17.13 PGN Display Options</h5>
                 <p>Shortcuts for controlling PGN notation display:</p>
                 <ul>
                     <li><code>Ctrl+M</code> / <code>⌘+M</code>: Toggle metadata display</li>
@@ -3012,7 +3012,7 @@
                     <li><code>Ctrl+R</code> / <code>⌘+R</code>: Toggle results display</li>
                 </ul>
                 
-                <h5>6.16.14 Notes</h5>
+                <h5>6.17.14 Notes</h5>
                 <p>Shortcuts for game notes:</p>
                 <ul>
                     <li><code>Ctrl+Shift+E</code>: Clear notes for current game</li>
@@ -3293,7 +3293,7 @@
                 </ul>
                 <p>Each annotation includes its type, position, color, size, rotation, and other properties. The data is compressed and encoded to keep PGN files clean and manageable.</p>
                 
-                <h5>7.4.3 Tag Visibility</h5>
+                <h5>7.4.4 Tag Visibility</h5>
                 <p>These custom tags are automatically hidden from the PGN Notation Pane display to keep the move notation clean. They are always excluded from PGN view, regardless of the "Show Non-Standard Tags" setting. The tags remain in the PGN file and are preserved when saving databases.</p>
             </div>
             
