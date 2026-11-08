@@ -729,7 +729,7 @@ class ShowTagsDialog(QDialog):
 
         self._setup_ui()
         self.setWindowTitle(
-            "Show Logged Moments for All Games" if len(self._games) > 1 else "Logged Moments"
+            "Show logged moments for all games" if len(self._games) > 1 else "Logged moments"
         )
 
     # ------------------------------------------------------------------
@@ -840,7 +840,7 @@ class ShowTagsDialog(QDialog):
         root.setSpacing(8)
 
         if not self._rows_data:
-            lbl = QLabel("No tagged moments found.")
+            lbl = QLabel("No logged moments found.")
             tr, tg, tb = self._text_color_rgb
             lbl.setStyleSheet(f"color: rgb({tr},{tg},{tb});")
             root.addWidget(lbl)
@@ -904,8 +904,8 @@ class ShowTagsDialog(QDialog):
             if orphan_count > 0:
                 s = "s" if orphan_count != 1 else ""
                 notice = QLabel(
-                    f"Note: {orphan_count} tagged moment{s} could not be located "
-                    f"— the game's moves may have been edited after tagging."
+                    f"Note: {orphan_count} logged moment{s} could not be located "
+                    f"— the game's moves may have been edited after logging."
                 )
                 tr, tg, tb = self._text_color_rgb
                 notice.setStyleSheet(

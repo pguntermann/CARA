@@ -636,7 +636,7 @@ class DetailMovesListView(QWidget):
             lambda _checked=False, idx=index: self._on_tag_moment(idx)
         )
 
-        show_tags_action = menu.addAction("Show Logged Moments")
+        show_tags_action = menu.addAction("Show logged moments")
         can_show = (
             self._chess_log_controller is not None
             and self._game_model is not None

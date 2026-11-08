@@ -46,7 +46,7 @@ class ChessLogSettingsDialog(QDialog):
         self._setup_ui()
         self._apply_styling()
         self._apply_size()
-        self.setWindowTitle("Chess Log Settings")
+        self.setWindowTitle("Chess Log settings")
 
     # ------------------------------------------------------------------
     # Config
@@ -89,9 +89,9 @@ class ChessLogSettingsDialog(QDialog):
         self._radio_buttons: Dict[str, QRadioButton] = {}
 
         preset_descriptions = {
-            "CLAMP": "Checks · Loose Pieces · Alignment · Mobility · Promotion",
+            "CLAMP": "Checks · Loose Pieces · Alignment · Mobility · Pawn Promotion",
             "CCT": "Checks · Captures · Threats",
-            "3x3": "Three guided Whys per game moment",
+            "3x3": "Four guided Whys per game moment",
         }
 
         preset_attributions = {

@@ -420,8 +420,8 @@ class ShowShallowTagsDialog(QDialog):
             if orphan_count > 0:
                 s = "s" if orphan_count != 1 else ""
                 notice = QLabel(
-                    f"Note: {orphan_count} tagged moment{s} could not be located "
-                    f"— the game's moves may have been edited after tagging."
+                    f"Note: {orphan_count} logged moment{s} could not be located "
+                    f"— the game's moves may have been edited after logging."
                 )
                 tr, tg, tb = self._text_color_rgb
                 notice.setStyleSheet(

@@ -1524,11 +1524,11 @@ class MainWindow(QMainWindow):
             return
         games = [g for g in db.get_all_games() if getattr(g, "has_chess_log_tags", False)]
         if not games:
-            MessageDialog.show_information(self.config, "Shallow/Vague Logs", "No logged games in the active database.", self)
+            MessageDialog.show_information(self.config, "Shallow/Vague logs", "No logged games in the active database.", self)
             return
         if not chess_log_controller.has_any_checked_answer(games):
             MessageDialog.show_information(
-                self.config, "Shallow/Vague Logs",
+                self.config, "Shallow/Vague logs",
                 "No saved Check Logs results for this database. "
                 "Run Check Logs from the Chess Log tab first.",
                 self,
@@ -1563,7 +1563,7 @@ class MainWindow(QMainWindow):
             vague_keys=vague_keys,
             classified_keys=frozenset(),
             check_run_info=None,
-            window_title="Shallow/Vague Logs",
+            window_title="Shallow/Vague logs",
             saved_mode=True,
             parent=self,
         )

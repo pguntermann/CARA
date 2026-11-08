@@ -127,7 +127,7 @@ class ChessLogHTMLService:
         for preset in chart_preset_names:
             parts.append(
                 f"<p>Category chart — {html.escape(preset, quote=False)}: "
-                f"see Chess Log Charts tab in CARA.</p>"
+                f"see Chess Log tab in CARA.</p>"
             )
         if narrative_text:
             parts.append(_narrative_body_html(narrative_text))

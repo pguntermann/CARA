@@ -848,7 +848,7 @@ class ChessLogController(QObject):
             return ConfirmationDialog.show_confirmation(
                 self.config,
                 "Chess Log — More than three moments?",
-                "You already have three tagged moments in this game. "
+                "You already have three logged moments in this game. "
                 "Three tends to be the sweet spot — enough to see a pattern, "
                 "few enough that each one still stands out when you review the "
                 "game later. Piling on more can dilute the lesson rather than "

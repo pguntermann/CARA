@@ -285,7 +285,7 @@ class MomentDialog(QDialog):
         for e in other_entries:
             by_preset[e.get("preset", "?")].append(e.get("cat", "?"))
         parts = [f"{', '.join(cats)} ({preset})" for preset, cats in by_preset.items()]
-        lbl = QLabel("Also tagged: " + " · ".join(parts))
+        lbl = QLabel("Also logged: " + " · ".join(parts))
         lbl.setWordWrap(True)
         lbl.setFont(QFont(self._label_font, max(8, self._label_size - 1)))
         mr, mg, mb = self._muted_rgb

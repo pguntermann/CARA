@@ -875,7 +875,7 @@ class DetailChessLogChartsView(QWidget):
         from PyQt6.QtCore import QMimeData
         if section_name.startswith("chart_"):
             preset = section_name[len("chart_"):]
-            text = f"Category chart — {preset}: see Chess Log Charts tab in CARA."
+            text = f"Category chart — {preset}: see Chess Log tab in CARA."
             if text:
                 QApplication.clipboard().setText(text)
         elif section_name == "narrative":
@@ -925,7 +925,7 @@ class DetailChessLogChartsView(QWidget):
         lines.append("")
         for widget in self._chart_widgets:
             preset = (widget.property("section_name") or "").replace("chart_", "")
-            lines.append(f"Category chart — {preset}: see Chess Log Charts tab in CARA.")
+            lines.append(f"Category chart — {preset}: see Chess Log tab in CARA.")
         lines.append("")
         narrative = self._narrative_text().strip()
         if narrative:
@@ -1054,7 +1054,7 @@ class DetailChessLogChartsView(QWidget):
         player_name, source_label = self._export_header()
         suggested = default_chess_log_charts_pdf_filename(player_name)
         path, _ = QFileDialog.getSaveFileName(
-            self, "Export PDF Report", suggested, "PDF Files (*.pdf)"
+            self, "Export PDF report", suggested, "PDF Files (*.pdf)"
         )
         if not path:
             return

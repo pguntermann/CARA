@@ -24,7 +24,7 @@ def build_chess_log_charts_context_menu(view, *, section_name: Optional[str]) ->
     copy_log.triggered.connect(view._copy_log_to_clipboard)
 
     menu.addSeparator()
-    export_pdf = menu.addAction("Export PDF Report")
+    export_pdf = menu.addAction("Export PDF report")
     export_pdf.triggered.connect(view._export_pdf_report)
 
     export_narrative = menu.addAction("Export Narrative Summary")

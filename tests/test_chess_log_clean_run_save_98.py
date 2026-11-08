@@ -50,7 +50,7 @@ _CONFIG = {
         "none_found": {
             "title": "Nothing Flagged",
             "message_template": "No shallow notes or vague lessons found — great job.",
-            "save_explanation": "Save records these notes as checked, so Show Shallow/Vague Logs won't count them as new.",
+            "save_explanation": "Save records these notes as checked, so Show Shallow/Vague logs won't count them as new.",
         },
     }}}}
 }
@@ -161,7 +161,7 @@ class TestCleanRunSaveAndCancel(unittest.TestCase):
         env = _Env()
         ask, _ = _run_view(env, _view(env), env.classified(), answer=False)
         self.assertIn("No shallow notes or vague lessons found — great job.", ask)
-        self.assertIn("Save records these notes as checked, so Show Shallow/Vague Logs won't count them as new.", ask)
+        self.assertIn("Save records these notes as checked, so Show Shallow/Vague logs won't count them as new.", ask)
 
     def test_nothing_is_written_without_an_explicit_save(self):
         env = _Env()
