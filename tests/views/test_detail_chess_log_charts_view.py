@@ -896,6 +896,15 @@ class TestDetailChessLogChartsViewUndatedMessages(unittest.TestCase):
         self.assertFalse(view._placeholder.isHidden())
         self.assertTrue(view._charts_container.isHidden())
 
+    def test_no_data_exact_string_uses_log_wording(self):
+        view = self._make_view()
+        view._on_charts_unavailable("no_data")
+        self.assertEqual(
+            view._placeholder.text(),
+            "No Chess Log moments in the selected data.\n"
+            "Log some via right-click on a move in the Moves List.",
+        )
+
     def test_no_dated_clamp_cct_singular_exact_string(self):
         view = self._make_view()
         view._on_charts_unavailable("no_dated_clamp_cct:1:0")

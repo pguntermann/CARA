@@ -3183,6 +3183,15 @@ class TestNothingFlaggedMessage(unittest.TestCase):
         with open(path) as f:
             return json.load(f)
 
+    def test_show_all_logged_moments_with_none_sets_log_wording_status(self):
+        """Show Logged Moments for All Games with no logged games → status uses "logged", not "tagged"."""
+        from app.main_window import MainWindow
+        game = _make_game()
+        game.has_chess_log_tags = False
+        fake = self._make_fake_window([game], self._make_ctrl_mock(has_checked=False, unchecked_count=0))
+        MainWindow._show_chess_logs_for_all_games(fake)
+        fake.controller.set_status.assert_called_once_with("No logged games in the active database")
+
     def test_all_checked_shows_nothing_flagged_message(self):
         """All answers checked + nothing flagged → MessageDialog with exact config wording."""
         from unittest.mock import patch

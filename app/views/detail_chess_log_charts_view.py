@@ -549,7 +549,7 @@ class DetailChessLogChartsView(QWidget):
         else:
             self._set_placeholder_text(
                 "No Chess Log moments in the selected data.\n"
-                "Tag some via right-click on a move in the Moves List."
+                "Log some via right-click on a move in the Moves List."
             )
         self._show_placeholder()
 

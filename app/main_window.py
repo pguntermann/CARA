@@ -1494,7 +1494,7 @@ class MainWindow(QMainWindow):
             return
         games = [g for g in db.get_all_games() if getattr(g, "has_chess_log_tags", False)]
         if not games:
-            self.controller.set_status("No tagged games in the active database")
+            self.controller.set_status("No logged games in the active database")
             return
         chess_log_controller = self.controller.get_chess_log_controller()
         if not chess_log_controller:
