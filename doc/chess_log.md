@@ -18,6 +18,8 @@ Chess Log writes only its own `CARAChessLog*` headers — it does **not** inject
 - `CARAChessLog` / `CARAChessLogInfo` / `CARAChessLogChecksum` — Chess Log moments
 - `CARAGameTags` — whole-game chip tags (independent of Chess Log)
 
+The Chess Log tags are handled like the other CARA tags (#97, approved by Philipp): `PgnFormatterService._remove_cara_tags` hides them from the PGN Notation pane (even with View → PGN header tags on) and from the PGN that AI Summary sends, and they are in the "heavy payload" skip-lists (`pgn_service._extract_game_data`, `game_data_header_sync._HEAVY_HEADER_TAGS`) so the base64 payload is not cached in `header_values`. Chess Log itself reads the headers of `game.pgn` via `chess.pgn`, never the filtered text, so the stored tags are untouched. Tests: `tests/services/test_chess_log_tags_hidden.py`.
+
 ## Vocabulary
 
 "Moment" in all user-facing text; `tag`/`tagged` is acceptable in internal code. Avoids collision with `CARAGameTags` whole-game chips.

@@ -1021,6 +1021,7 @@ class PgnService:
                 "CARAAnalysisData",
                 "CARAAnnotations",
                 "CARANotes",
+                "CARAChessLog",
             }
             header_values = {}
             if headers:

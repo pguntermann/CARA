@@ -30,6 +30,7 @@ _HEAVY_HEADER_TAGS = frozenset(
         "CARAAnalysisData",
         "CARAAnnotations",
         "CARANotes",
+        "CARAChessLog",
     }
 )
 
