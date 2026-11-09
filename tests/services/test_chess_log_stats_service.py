@@ -121,7 +121,7 @@ class TestPresetSeparation(unittest.TestCase):
             white="Alice", black="Bob", date="2025.06.01",
             entries_per_path={
                 "0": [_clamp_entry("C")],
-                "0.0": [_cct_entry("Checks")],
+                "0.0.0": [_cct_entry("Checks")],   # both on Alice's (White's) own moves
             },
         )
 
@@ -169,7 +169,7 @@ class TestPlayerFilter(unittest.TestCase):
         g1 = _make_game(white="Alice", black="Bob", date="2025.01.01",
                         entries_per_path={"0": [_clamp_entry("C")]})
         g2 = _make_game(white="Carlos", black="Alice", date="2025.02.01",
-                        entries_per_path={"0": [_clamp_entry("L")]})
+                        entries_per_path={"0.0": [_clamp_entry("L")]})   # Alice's (Black's) own move
         g3 = _make_game(white="Carlos", black="Bob", date="2025.03.01",
                         entries_per_path={"0": [_clamp_entry("M")]})
         return [g1, g2, g3]
@@ -187,7 +187,14 @@ class TestPlayerFilter(unittest.TestCase):
     def test_color_filter_black_only(self):
         result = aggregate(self._two_games(), player="Alice", color_filter="black", get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         total = sum(b.total for b in result.series["CLAMP"].bins)
-        self.assertEqual(total, 1)  # only g2 (Alice is Black)
+        self.assertEqual(total, 1)  # only g2 (Alice is Black), her own move "0.0"
+
+    def test_color_filter_black_excludes_opponent_move(self):
+        # Alice is Black; the only moment is on White's (Carlos's) move → not Alice's.
+        g = _make_game(white="Carlos", black="Alice", date="2025.02.01",
+                       entries_per_path={"0": [_clamp_entry("L")]})
+        result = aggregate([g], player="Alice", color_filter="black", get_tags_for_game=ChessLogStorageService.load_resolved_paths)
+        self.assertEqual(result.series, {})
 
     def test_no_player_includes_all_games(self):
         result = aggregate(self._two_games(), player="", get_tags_for_game=ChessLogStorageService.load_resolved_paths)
@@ -260,8 +267,8 @@ class TestCanonicalCategoryOrder(unittest.TestCase):
     def test_uncategorized_always_last_in_canonical_order(self):
         paths = {
             "0": [_clamp_entry("P")],
-            "0.0": [_clamp_entry("")],
-            "0.0.0": [_clamp_entry("C")],
+            "0.0.0": [_clamp_entry("")],
+            "0.0.0.0.0": [_clamp_entry("C")],   # all on Alice's (White's) own moves
         }
         game = _make_game(white="Alice", black="Bob", date="2025.06.01",
                           entries_per_path=paths)
@@ -1000,7 +1007,7 @@ class TestAggregateSkipCounting(unittest.TestCase):
     def test_has_3x3_true_alongside_clamp(self):
         game = _make_game(entries_per_path={
             "0": [_clamp_entry("C")],
-            "0.0": [_threexthree_entry("Why1", "x")],
+            "0.0.0": [_threexthree_entry("Why1", "x")],   # Alice's (White's) own move
         })
         result = aggregate([game], player="Alice", get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertTrue(result.has_3x3)

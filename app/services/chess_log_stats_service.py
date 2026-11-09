@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from app.models.database_model import GameData
 from app.services.chess_log_storage_service import ChessLogStorageService
-from app.utils.chess_log_color_scoping import color_from_path_key
+from app.utils.chess_log_color_scoping import own_moves_paths
 from app.utils.player_matcher import game_matches_player_color
 from app.services.player_stats_service import (
     _calendar_bin_center_time_pct,
@@ -99,8 +99,9 @@ def aggregate(
 
     Args:
         games:            Games to scan (from Data Source selection).
-        player:           Player name to scope to (case-insensitive). Empty string
-                          skips player filtering — all moments in all games.
+        player:           Player name to scope to (case-insensitive): only moments
+                          on that player's own moves count (``own_moves_paths``).
+                          Empty string skips player filtering — all moments in all games.
         color_filter:     "white" / "black" / "both" — further scope to games where
                           the player had that color.
         chart_cfg:        Optional config dict with ``target_progression_bins`` and
@@ -133,7 +134,7 @@ def aggregate(
         if not game_matches_player_color(game, player_cf, color_filter):
             continue
 
-        paths_data = get_tags_for_game(game)
+        paths_data = own_moves_paths(game, get_tags_for_game(game), player_cf)
         if not paths_data:
             continue
         ordinal = _game_date_ordinal_for_trends(game.date or "")
@@ -205,26 +206,15 @@ def get_all_players(
         if not paths_data:
             continue
 
-        # Determine which (color, preset) pairs appear in this game.
-        color_preset_pairs: Set[Tuple[str, str]] = set()
-        for path_key, entries in paths_data.items():
-            color = color_from_path_key(path_key)
-            if not color:
-                continue
-            for entry in entries:
-                preset = entry.get("preset", "")
-                if preset:
-                    color_preset_pairs.add((color, preset))
-
-        # Credit the player whose color appears, once per (player, preset) per game.
+        # Credit each player once per preset per game, from their own moves only.
         seen_player_preset: Set[Tuple[str, str]] = set()
-        for name, color in ((game.white, "white"), (game.black, "black")):
+        for name in (game.white, game.black):
             if not (name and name.strip()):
                 continue
             n = name.strip()
-            for cp_color, preset in color_preset_pairs:
-                if cp_color != color:
-                    continue
+            own = own_moves_paths(game, paths_data, n.casefold())
+            presets = {e.get("preset", "") for entries in own.values() for e in entries} - {""}
+            for preset in presets:
                 if (n, preset) not in seen_player_preset:
                     seen_player_preset.add((n, preset))
                     per_preset_counts.setdefault(n, {})
@@ -259,8 +249,8 @@ def compute_narrative_counts(
     - s_flagged:      moments with any Shallow or Vague flag (Ignored flags count)
     - has_3x3:        True if any counted moment uses the 3x3 preset
 
-    Only path_keys whose color matches the player's own color in each game are
-    counted; opponent-tagged moves are excluded.  Never-checked moments (no
+    Only moments on the player's own moves are counted (``own_moves_paths``);
+    opponent-tagged moves are excluded.  Never-checked moments (no
     is_shallow/is_vague) are not counted in s_flagged.
     """
     player_cf = (player or "").casefold().strip()
@@ -275,28 +265,12 @@ def compute_narrative_counts(
         if not getattr(game, "has_chess_log_tags", False):
             continue
 
-        # Determine which color is the player in this game.
-        white_cf = (game.white or "").casefold().strip()
-        black_cf = (game.black or "").casefold().strip()
-        if player_cf and white_cf == player_cf:
-            player_color: Optional[str] = "white"
-        elif player_cf and black_cf == player_cf:
-            player_color = "black"
-        else:
-            player_color = None
-
-        tags = get_tags_fn(game)
+        tags = own_moves_paths(game, get_tags_fn(game), player_cf)
         game_has_moment = False
 
         for path_key, entries in tags.items():
             if not entries:
                 continue
-            # Exclude opponent's path_keys (skip when color is known and mismatched).
-            if player_color is not None:
-                pk_color = color_from_path_key(path_key)
-                if pk_color is not None and pk_color != player_color:
-                    continue
-
             # Group entries by preset — each (path_key, preset) pair = one moment.
             by_preset: Dict[str, List[Dict[str, Any]]] = {}
             for e in entries:

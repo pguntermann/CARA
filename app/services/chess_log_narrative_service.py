@@ -25,6 +25,7 @@ from app.services.ai_service import AIService, TokenUsage
 from app.services.chess_log_stats_service import ChessLogPresetSeries, aggregate
 from app.services.chess_log_storage_service import ChessLogStorageService
 from app.services.notes_storage_service import NotesStorageService
+from app.utils.chess_log_color_scoping import own_moves_paths
 from app.utils.player_matcher import game_matches_player_color as _game_matches_player_color
 
 
@@ -124,7 +125,7 @@ def build_prompt(
         if not _game_matches_player_color(game, player_cf, color_filter):
             continue
 
-        paths_data = get_tags_for_game(game)
+        paths_data = own_moves_paths(game, get_tags_for_game(game), player_cf)
         if paths_data:
             for entries in paths_data.values():
                 has_3x3_notes = any(
@@ -234,7 +235,7 @@ def generate_narrative(
     """
     player_cf = (player or "").casefold().strip()
     has_data = any(
-        bool(get_tags_for_game(g))
+        bool(own_moves_paths(g, get_tags_for_game(g), player_cf))
         for g in games
         if _game_matches_player_color(g, player_cf, color_filter)
     )

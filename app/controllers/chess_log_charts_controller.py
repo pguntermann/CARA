@@ -38,7 +38,7 @@ from app.services.chess_log_stats_service import (
 )
 from app.services.chess_log_storage_service import ChessLogStorageService
 from app.services.user_settings_service import UserSettingsService
-from app.utils.chess_log_color_scoping import color_from_path_key
+from app.utils.chess_log_color_scoping import own_moves_paths
 from app.utils.player_matcher import game_matches_player_color
 from app.utils.ai_provider_config import (
     get_available_models as _get_available_models,
@@ -773,7 +773,7 @@ class ChessLogChartsController(QObject):
         flags count, never a classifier verdict that was cancelled or edited since,
         so the result agrees with Show Shallow/Vague Logs and the narrative header's
         flagged count.  Scope mirrors compute_narrative_counts: games matching the
-        player and colour filter, and only the player's own path_keys.
+        player and colour filter, and only the player's own moves (``own_moves_paths``).
         """
         chess_log_ctrl = self._chess_log_controller
         if chess_log_ctrl is None or not self._current_player:
@@ -787,16 +787,10 @@ class ChessLogChartsController(QObject):
         shallow_keys, vague_keys = chess_log_ctrl.get_shallow_vague_keys(games)
         moments: List[CheckLogMoment] = []
         for game in games:
-            white_cf = (game.white or "").casefold().strip()
-            black_cf = (game.black or "").casefold().strip()
-            player_color = "white" if white_cf == player_cf else "black" if black_cf == player_cf else None
-            for path_key, entries in chess_log_ctrl.get_tags_for_game(game).items():
+            own = own_moves_paths(game, chess_log_ctrl.get_tags_for_game(game), player_cf)
+            for path_key, entries in own.items():
                 if not entries:
                     continue
-                if player_color is not None:
-                    pk_color = color_from_path_key(path_key)
-                    if pk_color is not None and pk_color != player_color:
-                        continue
                 by_preset: Dict[str, List[Dict[str, Any]]] = {}
                 for e in entries:
                     if e.get("preset", ""):
