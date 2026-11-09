@@ -2195,7 +2195,7 @@
                     <li><strong>M:</strong> Mobility — trapped piece or lack of safe squares</li>
                     <li><strong>P:</strong> Pawn Promotion — promotion race or endgame dynamics</li>
                 </ul>
-                <p>Select one or more letters (a mistake can fit more than one) and, if you like, write a note in <strong>Why did this matter? (optional)</strong>. Always write a descriptive note: the letters only feed the charts, while the Narrative Summary works from the text of your notes, so a CLAMP or CCT moment without a note gives it almost nothing to work with.</p>
+                <p>Select one or more letters (a mistake can fit more than one) and, if you like, write a note in <strong>Why did this matter? (optional)</strong>. Always write a descriptive note. The letters give the charts and the Narrative Summary a count of which checks you miss, but only your note says why, and that is what the summary needs to find patterns in your thinking.</p>
                 <p><em>Example:</em> You played 19. Bd2 and later saw that 19. Nb5 would have forked the loose rook on a7 and the undefended bishop on d6. Right-click White's 19. Bd2 in the Moves List, choose <span class="menu-item">Log this moment…</span>, select <strong>L</strong> and <strong>A</strong>, and note "After 18... Bd6 both the bishop on d6 and the rook on a7 were loose. I didn't check for loose pieces before 19. Bd2 and missed 19. Nb5 forking them."</p>
                 <p><strong>CCT.</strong> Checks, Captures, Threats: a widely used checklist taught by many coaches. The dialog shows one button per word:</p>
                 <ul>
@@ -2206,21 +2206,23 @@
                 <p><em>Example:</em> You played 24... Qd7 and only afterward saw 24... Bxh2+, winning a pawn with check. Right-click Black's 24... Qd7, choose <span class="menu-item">Log this moment…</span>, select <strong>Checks</strong>, and note "After 24. Rd1 I only thought about the d-file and missed that h2 was now defended only by the king. I didn't look at checks before 24... Qd7 and missed Bxh2+, winning a pawn with check."</p>
 
                 <h5 id="chess-log-logging">5.9.3 Logging a moment</h5>
-                <p>Logging a moment takes a few seconds from the Moves List, and every moment you log feeds the charts and the Narrative Summary. To log a moment:</p>
+                <p>Logging a moment takes a few seconds from the Moves List, and every moment you log feeds the charts and the Narrative Summary.</p>
+                <p><strong>Which moves to log.</strong> If you are a beginner or an early intermediate player, let the engine choose for you: analyze the game, open its <strong>Game Summary</strong> tab (see <a href="#game-summary">section 4.5.5</a>), find your three worst moves under <strong>Critical Moments</strong>, and log those. If you are more experienced, use your own judgment. A critical moment doesn't always show up as a large drop in the evaluation: it can be the move where you chose the wrong plan, or the moment you missed what your opponent was threatening. Either way, keep it to about three moments per game (see <a href="#chess-log-how-many">How many moments</a> below).</p>
+                <p>To log a moment:</p>
                 <ol>
                     <li><strong>Open the game:</strong><br>
                     Open the game in the main panel and switch to the Moves List (<code>F1</code>).</li>
                     <li><strong>Right-click the move:</strong><br>
                     Right-click the White or Black move you want to log and choose <span class="menu-item">Log this moment…</span>. CARA jumps to that move and opens the <strong>Log this moment</strong> dialog. Its title shows the move and side, for example "Log this moment — 19. Bd2 (White)".</li>
                     <li><strong>Record the moment:</strong><br>
-                    For CLAMP or CCT, select one or more buttons and write a note in <strong>Why did this matter? (optional)</strong>; the Narrative Summary works from the note, not the buttons. For GM Noël Studer's 3x3 Method, answer as many of the four questions as apply. Click <strong>OK</strong>.</li>
+                    For CLAMP or CCT, select one or more buttons and write a note in <strong>Why did this matter? (optional)</strong>; the Narrative Summary learns why from the note. For GM Noël Studer's 3x3 Method, answer as many of the four questions as apply. Click <strong>OK</strong>.</li>
                 </ol>
                 <p><strong>Using CLAMP or CCT after the game.</strong> When you log a moment with CLAMP or CCT, run the checklist twice: once on your opponent's previous move (what it threatened, or left loose, that the checklist would have caught) and once on your move (which check you missed). Select the letters or words that apply and write that reasoning in <strong>Why did this matter? (optional)</strong>. A note that says what you missed and why is what makes the Narrative Summary useful (see <a href="#chess-log-narrative">section 5.9.9</a>).</p>
                 <p><strong>Which method the dialog uses.</strong> If the move already has logged entries, the dialog uses their method; if they come from more than one method, it uses the most common one. Otherwise, if the game has moments at other moves, it uses the method used most in this game. Otherwise it uses the method chosen in Chess Log Settings. Ties go to the Chess Log Settings method.</p>
                 <p><strong>Also logged.</strong> When the same move also has entries from another method, an "Also logged:" line lists them. You are editing only the entries of the dialog's method.</p>
                 <p><strong>Logging the same move again.</strong> Logging a move again replaces that method's entries at the move, so this is also how you change a logged moment from the Moves List.</p>
                 <p><strong>No category.</strong> For CLAMP and CCT you may click <strong>OK</strong> with only a note; the moment is saved without a category. With neither a category nor a note, the dialog shows "Select a category, or add a note to save uncategorized."</p>
-                <p><strong>How many moments.</strong> Aim for about three moments per game: enough to see a pattern, few enough that each one still stands out when you review the game later. That is why CARA asks for confirmation when a game already has three moments and you log a new move, with any method. The <strong>Chess Log — More than three moments?</strong> dialog appears before the Log this moment dialog opens and ends with "Add this moment anyway?"; choose <strong>Yes</strong> or <strong>No</strong>. Whichever you answer, CARA doesn't ask again for the rest of the session, nor again for that game once the game is saved.</p>
+                <p id="chess-log-how-many"><strong>How many moments.</strong> Aim for about three moments per game: enough to see a pattern, few enough that each one still stands out when you review the game later. That is why CARA asks for confirmation when a game already has three moments and you log a new move, with any method. The <strong>Chess Log — More than three moments?</strong> dialog appears before the Log this moment dialog opens and ends with "Add this moment anyway?"; choose <strong>Yes</strong> or <strong>No</strong>. Whichever you answer, CARA doesn't ask again for the rest of the session, nor again for that game once the game is saved.</p>
                 <p><strong>What OK does.</strong> The moment is kept in memory with the game. The database is not marked as having unsaved changes yet (see <a href="#chess-log-saving">section 5.9.5</a>). The <strong>Log</strong> column of the game table (see <a href="#game-table">section 4.4.2</a>) and the Moves List icon update immediately.</p>
                 <p><strong>Highlight in Moves List.</strong> <span class="menu-item">Chess Log → Highlight Logged Moments in Moves List</span> shows a small icon to the left of each logged move, in the Moves List's own colors. The setting is saved in your user settings.</p>
 
@@ -2357,53 +2359,48 @@
 
                 <h5 id="chess-log-narrative">5.9.9 Narrative Summary</h5>
                 <p>This is where Chess Log pays off. Everything you log, and every note you sharpen with Check Logs, comes together here: the summary tells you what you are doing wrong in general, and what to work on.</p>
-                <p>The Narrative Summary is an AI-written reflection on your logged moments in three parts: <strong>Patterns &amp; Recurrent Themes</strong>, <strong>Tactical Breakdown</strong> (a table), and <strong>Key Takeaways</strong>. GM Noël Studer's 3x3 Method moments are not charted but are included here.</p>
+                <p>The Narrative Summary is an AI-written reflection on your logged moments in three parts. <strong>Patterns &amp; Recurrent Themes</strong> names the habits that keep costing you, each backed by quotes from your own notes. <strong>Tactical Breakdown</strong> is a table of the skills involved, with the issue observed for each and its impact on your games. <strong>Key Takeaways</strong> tells you what to change, in a few short paragraphs. GM Noël Studer's 3x3 Method moments are not charted but are included here.</p>
                 <p><strong>Example (abridged):</strong></p>
                 <!-- Invented example: Paul will replace with a real sample -->
                 <div class="regex-example-card">
                     <span class="regex-example-label">Sample output</span>
                     <h6 style="font-size: 1em; margin: 14px 0 6px;">Patterns &amp; Recurrent Themes</h6>
-                    <p>Most of your logged mistakes come right after your opponent's move changed the position: you carried on with your own plan without asking what that move threatened. Loose pieces are the common thread, often an undefended minor piece left behind after a trade.</p>
+                    <ul>
+                        <li><strong>You stop looking at the board after a trade.</strong> Several of your mistakes come one or two moves after an exchange, when a piece that used to be defended is suddenly loose. As you put it after one game, "after we traded on e5 I thought everything was still protected and just carried on with my plan."</li>
+                        <li><strong>Your opponent's last move often goes unchecked.</strong> When your opponent makes a quiet move, you tend to treat it as harmless and go back to your own ideas. Your notes say "I didn't ask why my opponent played h4" and "I assumed Qe2 was just developing."</li>
+                    </ul>
                     <h6 style="font-size: 1em; margin: 14px 0 6px;">Tactical Breakdown</h6>
                     <div class="column-table-wrapper">
                     <table class="column-table">
                         <thead>
                             <tr>
-                                <th>Category</th>
-                                <th>Count</th>
-                                <th>Note</th>
+                                <th>Skill</th>
+                                <th>Observed Issue</th>
+                                <th>Strategic Impact</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td>L: Loose Pieces</td>
-                                <td>7</td>
-                                <td>Undefended minor pieces after trades</td>
+                                <td>Piece Safety (Hanging Pieces)</td>
+                                <td>About a third of your moments, steady across periods. Mostly minor pieces left undefended after trades: "my knight on c4 had no defender once the bishop was gone."</td>
+                                <td>Usually a piece or a pawn lost outright, which decided several games that were level until then.</td>
                             </tr>
                             <tr>
-                                <td>C: Checks</td>
-                                <td>4</td>
-                                <td>Missed checks that won material</td>
+                                <td>Tactical Awareness (Forks, Pins, Discovered Attacks)</td>
+                                <td>About a quarter of your moments early on, fewer in the latest period. Knight forks stand out: "I never thought about Nd5 hitting both rooks."</td>
+                                <td>Lost the exchange or a piece in otherwise good positions.</td>
                             </tr>
                             <tr>
-                                <td>A: Alignment</td>
-                                <td>3</td>
-                                <td>Two knight forks, one pin on the e-file</td>
-                            </tr>
-                            <tr>
-                                <td>M: Mobility</td>
-                                <td>2</td>
-                                <td>A bishop shut in by its own pawns</td>
+                                <td>Checking for Mate and Check Threats</td>
+                                <td>A small share of your moments, but rising lately. Checks against your king were overlooked: "I didn't see Qh5+ coming at all."</td>
+                                <td>Turned two winning positions into losses and gave away tempo in others.</td>
                             </tr>
                         </tbody>
                     </table>
                     </div>
                     <h6 style="font-size: 1em; margin: 14px 0 6px;">Key Takeaways</h6>
-                    <ul>
-                        <li>Before each move, ask what your opponent's last move threatens.</li>
-                        <li>After every exchange, check which of your pieces are now undefended.</li>
-                        <li>In sharp positions, look at every check for both sides first.</li>
-                    </ul>
+                    <p><strong>Run the same check after every exchange.</strong> Before your next move, list which of your pieces lost a defender in the trade. Your note "I just recaptured and moved on" describes the exact moment this check would have saved the piece.</p>
+                    <p><strong>Ask what your opponent's move wants.</strong> Even a quiet move can set up a threat. Taking ten seconds to answer that question would have caught the attack you describe in "I assumed Qe2 was just developing."</p>
                 </div>
                 <p>For a walkthrough, see the CARA Chess YouTube channel (<span class="menu-item">Help → Watch Video Tutorials</span>).</p>
                 <p><strong>What is sent.</strong> The summary covers the selected player's games in the Data Source, undated ones included. For each game, CARA sends the moments logged on that player's own moves, including moments not yet saved to the game, along with the game's notes from the Notes tab and how often each category came up over time. Moments logged on the opponent's moves are left out.</p>
@@ -2427,6 +2424,7 @@
                     <li><span class="menu-item">Export Narrative Summary</span> — a PDF of the narrative only. If there is none yet, a <strong>No Narrative</strong> message says "Generate a Narrative Summary first."</li>
                 </ul>
                 <p>The Check Logs part of <span class="menu-item">Copy log to clipboard</span> and <span class="menu-item">Export PDF Report</span> lists only flags saved in the games, for the selected player's own moves, never results of a run you haven't saved. The report header's flagged count (for example "· 4 Shallow" or "· 4 Shallow/Vague") also counts saved flags only.</p>
+                <p><strong>Tracking your progress.</strong> Each time you run the Narrative Summary, for example once a month, save the result with <span class="menu-item">Export PDF Report</span> or <span class="menu-item">Export Narrative Summary</span> and keep the files. Reading them side by side shows how your mistakes change over time. You can also give two reports to an AI chat assistant and ask what changed between them.</p>
                 <p><strong>From the dialogs.</strong></p>
                 <ul>
                     <li><strong>Logged Moments:</strong> <strong>Copy to clipboard</strong> copies the moments as formatted text with a plain-text version, ready to paste into a chess.com forum post (tested in chess.com's normal forum editor, not its HTML view); the boards are not copied. <strong>Export to PDF</strong> saves the rows as shown, boards included. Both use what is on screen, including unsaved edits.</li>
