@@ -40,10 +40,10 @@ class MomentDialog(QDialog):
 
     _CLAMP_TOOLTIPS: List[str] = [
         "Checks — missed or overlooked checking moves",
-        "Loose Pieces — undefended piece or square",
-        "Alignment — pin, skewer, discovered attack, or fork",
-        "Mobility — trapped piece or lack of safe squares",
-        "Pawn Promotion — promotion race or endgame dynamics",
+        "Loose Pieces and Loose Squares — undefended piece or square",
+        "Alignments — pin, skewer, discovered attack, or fork",
+        "Mobility Restrictions — trapped piece or lack of safe squares",
+        "Passed Pawns — a passed pawn left free to advance, or your own one missed",
     ]
     _CLAMP_CHIPS: List[tuple[str, str]] = list(zip(CLAMP_ORDER, _CLAMP_TOOLTIPS))
 

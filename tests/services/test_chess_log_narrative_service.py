@@ -200,7 +200,7 @@ class TestBuildPromptGlossary(unittest.TestCase):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
         prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("Checks", prompt)
-        self.assertIn("Loose Pieces and Squares", prompt)
+        self.assertIn("Loose Pieces and Loose Squares", prompt)
         self.assertIn("Alignments", prompt)
         self.assertIn("Mobility Restrictions", prompt)
         self.assertIn("Passed Pawns", prompt)
@@ -210,7 +210,7 @@ class TestBuildPromptGlossary(unittest.TestCase):
         game = _make_game(entries_per_path={"0": [_clamp("C")]})
         prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
         self.assertIn("knight's reach", prompt)
-        self.assertIn("handing them one", prompt)
+        self.assertIn("no opposing pawn in front of it on its own file or on the files next to it", prompt)
         self.assertIn("boxed in by their candidate move", prompt)
 
     def test_no_glossary_when_no_data(self):

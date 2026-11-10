@@ -536,7 +536,7 @@ class TestDrawNarrativePaginatedTableDetection(unittest.TestCase):
             "| Skill | Observed Issue | Strategic Impact |\n"
             "| --- | --- | --- |\n"
             "| Checks | Missed tactics | Drops material |\n"
-            "| Loose Pieces | Left hanging | Opponent gains tempo |\n"
+            "| Loose Pieces and Loose Squares | Left hanging | Opponent gains tempo |\n"
         )
         _, painter = self._run(narrative)
         # 1 header row + 2 body rows, each with 3 cells = 9 drawRect calls minimum
@@ -608,7 +608,7 @@ class TestExportChartsReportWithTable(unittest.TestCase):
             "| Skill | Observed Issue | Strategic Impact |\n"
             "| --- | --- | --- |\n"
             "| Checks | Missed back-rank threats | Allows opponent counterplay |\n"
-            "| Loose Pieces | Left pieces undefended | Material loss under pressure |\n\n"
+            "| Loose Pieces and Loose Squares | Left pieces undefended | Material loss under pressure |\n\n"
             "## Key Takeaways\n\n"
             "Your note 'I just didn't calculate far enough' shows the pattern clearly.\n"
         )

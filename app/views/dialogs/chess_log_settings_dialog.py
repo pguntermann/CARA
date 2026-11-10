@@ -89,7 +89,7 @@ class ChessLogSettingsDialog(QDialog):
         self._radio_buttons: Dict[str, QRadioButton] = {}
 
         preset_descriptions = {
-            "CLAMP": "Checks · Loose Pieces · Alignment · Mobility · Pawn Promotion",
+            "CLAMP": "Checks · Loose Pieces and Loose Squares · Alignments · Mobility Restrictions · Passed Pawns",
             "CCT": "Checks · Captures · Threats",
             "3x3": "Four guided Whys per game moment",
         }

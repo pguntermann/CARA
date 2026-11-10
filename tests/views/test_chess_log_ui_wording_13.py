@@ -1,4 +1,4 @@
-"""#13: exact Chess Log UI wording — four Whys, tab name, log wording, menu case, Pawn Promotion.
+"""#13: exact Chess Log UI wording — four Whys, tab name, log wording, menu case, CLAMP names.
 
 Each test pins one user-visible string so the manual's quotes stay in step with the app.
 Menu labels and dialog titles keep their Title Case (the part-C case change was reverted).
@@ -65,8 +65,11 @@ class TestSettingsDialogWording(unittest.TestCase):
     def test_3x3_description_says_four_whys(self):
         self.assertIn("Four guided Whys per game moment", _labels(self._dialog()))
 
-    def test_clamp_description_says_pawn_promotion(self):
-        self.assertIn("Checks · Loose Pieces · Alignment · Mobility · Pawn Promotion", _labels(self._dialog()))
+    def test_clamp_description_uses_kabadayi_wording(self):
+        self.assertIn(
+            "Checks · Loose Pieces and Loose Squares · Alignments · Mobility Restrictions · Passed Pawns",
+            _labels(self._dialog()),
+        )
 
     def test_window_title(self):
         self.assertEqual(self._dialog().windowTitle(), "Chess Log Settings")
@@ -114,6 +117,24 @@ class TestChessLogMenuLabels(unittest.TestCase):
         src = (_ROOT / "app" / "views" / "detail_moveslist_view.py").read_text(encoding="utf-8")
         self.assertIn('menu.addAction("Log this moment…")', src)
         self.assertIn('menu.addAction("Show Logged Moments")', src)
+
+
+@requires_qt
+class TestClampButtonTooltips(unittest.TestCase):
+    """CLAMP buttons show the letter and Dr. Can Kabadayi's exact name in the tooltip."""
+
+    def test_clamp_button_tooltips(self):
+        from PyQt6.QtWidgets import QPushButton
+        from app.views.dialogs.moment_dialog import MomentDialog
+        dlg = MomentDialog(config={}, active_preset="CLAMP", move_number=2, san="e5", is_white=False)
+        tips = {b.text(): b.toolTip() for b in dlg.findChildren(QPushButton) if b.text() in {"C", "L", "A", "M", "P"}}
+        self.assertEqual(tips, {
+            "C": "Checks — missed or overlooked checking moves",
+            "L": "Loose Pieces and Loose Squares — undefended piece or square",
+            "A": "Alignments — pin, skewer, discovered attack, or fork",
+            "M": "Mobility Restrictions — trapped piece or lack of safe squares",
+            "P": "Passed Pawns — a passed pawn left free to advance, or your own one missed",
+        })
 
 
 @requires_qt

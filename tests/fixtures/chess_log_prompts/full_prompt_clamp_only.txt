@@ -3,10 +3,10 @@ Below is a summary of the moments I have tagged across my recent games in CARA's
 ## Glossary — CLAMP
 
 - C — Checks: A checking move — either one the opponent's last move enabled that wasn't accounted for, or one the player's own candidate move allows in return.
-- L — Loose Pieces and Squares: A piece or square left undefended or under-defended — the opponent's loose piece going unclaimed, or one of the player's own left hanging by their candidate move.
+- L — Loose Pieces and Loose Squares: A piece or square left undefended or under-defended — the opponent's loose piece going unclaimed, or one of the player's own left hanging by their candidate move.
 - A — Alignments: A dangerous lineup along a file, rank, diagonal, or knight's reach — enabling pins, skewers, forks, or discovered attacks — whether the opponent's last move created it unnoticed, or the player's own candidate move creates it against themselves.
 - M — Mobility Restrictions: A piece left with restricted movement and at risk of being trapped — an opponent's piece that could have been cornered, or one of the player's own boxed in by their candidate move.
-- P — Passed Pawns: A pawn positioned to become unstoppable — the opponent's passed pawn not dealt with in time, or the player's own candidate move handing them one.
+- P — Passed Pawns: A pawn with no opposing pawn in front of it on its own file or on the files next to it — the opponent's passed pawn left free to advance, or the player's own passed pawn missed.
 
 ## Category counts by preset (over time)
 
