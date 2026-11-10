@@ -191,10 +191,3 @@ Shallow.txt
 
 # Claude Code internal state
 .claude/
-
-
-# Local files, not for the PR (#89)
-Alpacas.pgn
-BogusGames.pgn
-create-issues.sh
-chess-log-charts-ui-fixes-directive.md
