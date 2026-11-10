@@ -66,7 +66,6 @@ _3X3_WHYS = (
 
 # CARAChessLog header regexes used by _inject_cl().
 _CL_HDR_RE = re.compile(r'^\[CARAChessLog[A-Za-z]* "')
-_GT_HDR_RE = re.compile(r'^\[CARAGameTags "([^"]*)"\]$')
 
 
 def _cl_entry(preset: str, cat: str, why: str = "") -> dict:
@@ -115,7 +114,7 @@ def _3x3_paths(rng: random.Random) -> dict:
 
 
 def _inject_cl(block: str, paths: dict) -> str:
-    """Replace existing CARAChessLog* tags with new ones; add 🏷 to CARAGameTags.
+    """Replace existing CARAChessLog* tags with new ones; CARAGameTags is left unchanged.
 
     Splits the game block into header lines and move text, rebuilds the header
     section with old CARAChessLog* tags stripped and new ones appended.
@@ -138,27 +137,15 @@ def _inject_cl(block: str, paths: dict) -> str:
         else:
             hdr_raw.append(line)
 
-    # Rebuild header lines: strip old CL tags, update CARAGameTags chip.
+    # Rebuild header lines: strip old CL tags.
     new_hdr: list[str] = []
-    has_game_tags = False
     for line in hdr_raw:
         s = line.strip()
         if not s:
             continue  # drop blank lines within header section
         if _CL_HDR_RE.match(s):
             continue  # strip old CARAChessLog* tags
-        m = _GT_HDR_RE.match(s)
-        if m:
-            chips = [c.strip() for c in m.group(1).split(";") if c.strip()]
-            if "🏷" not in chips:
-                chips = ["🏷"] + chips
-            new_hdr.append(f'[CARAGameTags "{";".join(chips)}"]')
-            has_game_tags = True
-        else:
-            new_hdr.append(line)
-
-    if not has_game_tags:
-        new_hdr.append('[CARAGameTags "🏷"]')
+        new_hdr.append(line)
 
     new_hdr.append(f'[CARAChessLog "{encoded}"]')
     new_hdr.append(f'[CARAChessLogInfo "{info_str}"]')
