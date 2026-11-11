@@ -131,7 +131,10 @@ class TestExportNarrativeReport(unittest.TestCase):
             tmp_path.unlink(missing_ok=True)
 
     def test_has_3x3_produces_shallow_vague_in_narrative_pdf(self):
-        import pypdf as _pypdf
+        try:
+            import pypdf as _pypdf
+        except ImportError:
+            self.skipTest("pypdf not installed")
         svc = ChessLogPDFService({})
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
             tmp_path = Path(tmp.name)
