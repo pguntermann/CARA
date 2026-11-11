@@ -30,6 +30,40 @@ def game_header_text(game) -> str:
     return f"{white} - {black} {result} ({date} - {moves} moves)"
 
 
+def make_game_header(config, text: str, is_first: bool):
+    """Build the game-group header band shared by the Chess Log dialogs.
+
+    Returns a transparent wrapper whose top margin is the gap above the band
+    (none when *is_first*); the styled QLabel is exposed as ``wrapper.band``.
+    Colors, padding and spacing come from ``ui.dialogs.moment.game_header``.
+    """
+    from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+
+    gh = config.get("ui", {}).get("dialogs", {}).get("moment", {}).get("game_header", {})
+    br, bg, bb = gh.get("background_color", [47, 79, 122])
+    tr, tg, tb = gh.get("text_color", [255, 255, 255])
+    pad_v = gh.get("padding_vertical", 7)
+    pad_h = gh.get("padding_horizontal", 16)
+    top = 0 if is_first else gh.get("top_spacing", 30)
+
+    wrapper = QWidget()
+    layout = QVBoxLayout(wrapper)
+    layout.setContentsMargins(0, top, 0, 0)
+    layout.setSpacing(0)
+
+    band = QLabel(text)
+    band.setObjectName("game_header_band")
+    band.setStyleSheet(
+        f"QLabel#game_header_band {{ background-color: rgb({br},{bg},{bb}); "
+        f"color: rgb({tr},{tg},{tb}); font-weight: bold; "
+        f"padding: {pad_v}px {pad_h}px; border: none; }}"
+    )
+    layout.addWidget(band)
+    wrapper.band = band
+    wrapper.top_spacing = top
+    return wrapper
+
+
 def ply_for_path(pgn_game: Optional[chess.pgn.Game], path) -> int:
     """Return the ply index for *path* within *pgn_game* (0-based from root)."""
     if pgn_game is None:

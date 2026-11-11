@@ -81,6 +81,7 @@ from app.utils.pgn_variation_path import decode_path
 from app.views.dialogs._tag_row_helpers import (
     chess_log_miniboard_settings,
     game_header_text as _game_header_text,
+    make_game_header as _make_game_header_band,
     node_info as _node_info_fn,
     ply_for_path as _ply_for_path_fn,
 )
@@ -804,27 +805,8 @@ class ShowTagsDialog(QDialog):
         sep.setStyleSheet(f"background-color: rgb({sr},{sg},{sb}); border: none;")
         return sep
 
-    def _make_game_header(self, game) -> QLabel:
-        _white = str(getattr(game, "white", "") or "").strip() or "Unknown"
-        _black = str(getattr(game, "black", "") or "").strip() or "Unknown"
-        _result = str(getattr(game, "result", "") or "").strip() or "*"
-        _date = str(getattr(game, "date", "") or "").strip() or "????.??.??"
-        try:
-            _moves = int(getattr(game, "moves", 0) or 0)
-        except (TypeError, ValueError):
-            _moves = 0
-        text = f"{_white} - {_black} {_result} ({_date} - {_moves} moves)"
-        label = QLabel(text)
-        br, bg, bb = self._bg_rgb
-        tr, tg, tb = self._text_color_rgb
-        bor, bog, bob = self._border_rgb
-        label.setStyleSheet(
-            f"background-color: rgb({min(255, br+20)},{min(255, bg+20)},{min(255, bb+20)}); "
-            f"color: rgb({tr},{tg},{tb}); "
-            f"padding: 3px 8px; "
-            f"border: 1px solid rgb({bor},{bog},{bob});"
-        )
-        return label
+    def _make_game_header(self, game, is_first: bool = False) -> QWidget:
+        return _make_game_header_band(self.config, _game_header_text(game), is_first)
 
     def _setup_ui(self) -> None:
         # Read Chess Log display settings once (scale + arrow toggles).
@@ -874,7 +856,7 @@ class ShowTagsDialog(QDialog):
                     continue
 
                 if game is not last_game:
-                    self._rows_layout.addWidget(self._make_game_header(game))
+                    self._rows_layout.addWidget(self._make_game_header(game, is_first=last_game is None))
                     last_game = game
                 elif row_count > 0:
                     self._rows_layout.addWidget(self._make_separator())

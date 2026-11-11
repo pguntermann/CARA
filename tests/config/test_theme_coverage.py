@@ -53,6 +53,11 @@ _DATABASE_COLUMN_WIDTH_KEYS = [
 ]
 
 _MOMENT_DIALOG_LAYOUT_KEYS = [
+    "ui.dialogs.moment.game_header.background_color",
+    "ui.dialogs.moment.game_header.text_color",
+    "ui.dialogs.moment.game_header.padding_vertical",
+    "ui.dialogs.moment.game_header.padding_horizontal",
+    "ui.dialogs.moment.game_header.top_spacing",
     "ui.dialogs.moment.bottom_button_top_padding",
     "ui.dialogs.moment.buttons.spacing",
     "ui.dialogs.moment.chips.cct_min_width",
