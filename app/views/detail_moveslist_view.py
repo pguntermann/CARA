@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.controllers.database_controller import DatabaseController
+    from app.controllers.chess_log_controller import ChessLogController
 
 from app.utils.table_export import table_to_delimited, get_visual_column_indices, get_copy_table_config
 from app.utils.font_utils import resolve_font_family, scale_font_size
@@ -46,6 +47,7 @@ class DetailMovesListView(QWidget):
         self._game_model: Optional[GameModel] = None
         self._game_controller: Optional[GameController] = None
         self._database_controller: Optional["DatabaseController"] = None
+        self._chess_log_controller: Optional["ChessLogController"] = None
         self._column_profile_controller: Optional[ColumnProfileController] = None
         self._active_move_ply: int = 0
         self._setup_ui()
@@ -63,7 +65,28 @@ class DetailMovesListView(QWidget):
     def set_database_controller(self, controller: Optional["DatabaseController"]) -> None:
         """Set database controller for persisting PGN edits (update row, mark unsaved)."""
         self._database_controller = controller
-    
+
+    def set_chess_log_controller(self, controller: Optional["ChessLogController"]) -> None:
+        """Set chess log controller for tagging moments."""
+        old = self._chess_log_controller
+        if old is not None:
+            try:
+                old.chess_log_changed.disconnect(self._on_chess_log_changed)
+            except (TypeError, RuntimeError):
+                pass
+        self._chess_log_controller = controller
+        if controller is not None:
+            controller.chess_log_changed.connect(self._on_chess_log_changed)
+
+    def _on_chess_log_changed(self, game) -> None:
+        """Refresh tag icons when the changed game is the active one (None = any)."""
+        if not self._moveslist_model:
+            return
+        active = self._game_model.active_game if self._game_model else None
+        if game is None or game is active:
+            self._moveslist_model.notify_chess_log_changed()
+
+
     def _setup_ui(self) -> None:
         """Setup the moves list UI."""
         layout = QVBoxLayout(self)
@@ -481,6 +504,70 @@ class DetailMovesListView(QWidget):
                 self._database_controller.mark_database_unsaved(db_model)
         self._game_model.metadata_updated.emit()
 
+    def _on_tag_moment(self, index: QModelIndex) -> None:
+        """Open the Tag Moment dialog and record the entry via chess_log_controller."""
+        if not self._chess_log_controller or not self._game_model or not self._game_model.active_game:
+            return
+        if not self._game_controller:
+            return
+
+        # Derive display info from the clicked row (falls back to generic values if invalid)
+        move_number = 1
+        san = ""
+        is_white = True
+        if index.isValid() and self._moveslist_model:
+            row = index.row()
+            move_data = self._moveslist_model.get_move(row)
+            if move_data:
+                move_number = row + 1
+                if index.column() == MovesListModel.COL_BLACK and move_data.black_move:
+                    san = move_data.black_move
+                    is_white = False
+                elif move_data.white_move:
+                    san = move_data.white_move
+                    is_white = True
+                else:
+                    san = move_data.black_move or ""
+                    is_white = False
+
+                # Navigate to this move so active_path matches the right-clicked cell,
+                # regardless of which move was previously selected.
+                ply_index = (move_data.move_number - 1) * 2 + (1 if is_white else 2)
+                if not self._game_controller.navigate_to_ply(ply_index):
+                    return
+
+        active_preset = self._chess_log_controller.preset_for_logging()
+        existing_entries = self._chess_log_controller.get_entries_at_active_path()
+
+        if not self._chess_log_controller.should_confirm_extra_moment(self):
+            return
+
+        from app.views.dialogs.moment_dialog import MomentDialog
+        entries = MomentDialog.tag_moment(
+            self.config, active_preset, move_number, san, is_white,
+            existing_entries, self,
+        )
+        if not entries:
+            return
+
+        self._chess_log_controller.add_moment_at_active_path(entries, self)
+
+    def _on_show_tags(self) -> None:
+        """Open the Show Tags dialog for the current game."""
+        if not self._chess_log_controller or not self._game_model:
+            return
+        game_data = self._game_model.active_game
+        if game_data is None:
+            return
+        from app.views.dialogs.show_tags_dialog import ShowTagsDialog
+        dlg = ShowTagsDialog(
+            self.config,
+            [game_data],
+            self._chess_log_controller,
+            self,
+        )
+        dlg.exec()
+
     def _on_moves_table_context_menu(self, pos: QPoint) -> None:
         """Show context menu for copy actions at the cell under the cursor."""
         from app.views.style import StyleManager
@@ -531,6 +618,35 @@ class DetailMovesListView(QWidget):
             edit_comments_action.triggered.connect(
                 lambda _checked=False, r=row: self._open_move_comment_editor(r)
             )
+
+        menu.addSeparator()
+
+        tag_moment_action = menu.addAction("Log this moment…")
+        can_tag = (
+            self._chess_log_controller is not None
+            and self._game_model is not None
+            and self._game_model.active_game is not None
+            and self._game_controller is not None
+            and index.isValid()
+            and self._moveslist_model is not None
+            and self._moveslist_model.get_move(index.row()) is not None
+        )
+        tag_moment_action.setEnabled(can_tag)
+        tag_moment_action.triggered.connect(
+            lambda _checked=False, idx=index: self._on_tag_moment(idx)
+        )
+
+        show_tags_action = menu.addAction("Show Logged Moments")
+        can_show = (
+            self._chess_log_controller is not None
+            and self._game_model is not None
+            and self._game_model.active_game is not None
+            and self._chess_log_controller.game_has_any_tags()
+        )
+        show_tags_action.setEnabled(can_show)
+        if not can_show:
+            show_tags_action.setToolTip("No logged moments in this game.")
+        show_tags_action.triggered.connect(self._on_show_tags)
 
         menu.addSeparator()
         menu.addAction("Copy Table as CSV (Visual Columns)").triggered.connect(self._copy_table_csv_visual)

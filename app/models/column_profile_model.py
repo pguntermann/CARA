@@ -152,16 +152,25 @@ class ColumnProfile:
     
     def get_column_order(self, default_order: List[str]) -> List[str]:
         """Get column display order for this profile.
-        
+
+        Columns in default_order that are absent from the saved order are
+        appended in default_order sequence so that newly added columns
+        (e.g. col_log) surface automatically in pre-existing profiles.
+
         Args:
-            default_order: Default column order if not set in profile.
-            
+            default_order: Canonical full column order.
+
         Returns:
             List of column names in display order.
         """
-        if self.column_order:
-            return self.column_order.copy()
-        return default_order.copy()
+        if not self.column_order:
+            return default_order.copy()
+        saved = list(self.column_order)
+        saved_set = set(saved)
+        for name in default_order:
+            if name not in saved_set:
+                saved.append(name)
+        return saved
     
     def set_column_order(self, column_order: List[str]) -> None:
         """Set column display order for this profile.

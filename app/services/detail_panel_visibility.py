@@ -64,6 +64,11 @@ DETAIL_PANEL_VISIBILITY_UNITS: Tuple[DetailPanelVisibilityUnit, ...] = (
     DetailPanelVisibilityUnit(
         "notes", "Notes", tab_title="Notes", menu_title="Notes"
     ),
+    # Top-level Chess Log menu is kept visible even when this tab is hidden —
+    # logging works in the Moves List regardless of whether the Charts tab is shown.
+    DetailPanelVisibilityUnit(
+        "chess_log_charts", "Chess Log", tab_title="Chess Log", menu_title=None
+    ),
 )
 
 

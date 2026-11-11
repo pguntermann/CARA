@@ -10,6 +10,7 @@ OPENING_EXPLORER = "opening_explorer"
 GAME_SUMMARY_HIGHLIGHTS = "game_summary_highlights"
 OPENING_ENCYCLOPEDIA = "opening_encyclopedia"
 MOVE_LINK_POPUPS = "move_link_popups"
+CHESS_LOG = "chess_log"
 
 MINIATURE_BOARD_SCALE_KEYS: Tuple[str, ...] = (
     MANUAL_ANALYSIS,
@@ -17,6 +18,7 @@ MINIATURE_BOARD_SCALE_KEYS: Tuple[str, ...] = (
     GAME_SUMMARY_HIGHLIGHTS,
     OPENING_ENCYCLOPEDIA,
     MOVE_LINK_POPUPS,
+    CHESS_LOG,
 )
 
 # Menu labels for View → Miniature Boards
@@ -26,6 +28,7 @@ MINIATURE_BOARD_SCALE_MENU_ITEMS: Tuple[Tuple[str, str], ...] = (
     (GAME_SUMMARY_HIGHLIGHTS, "Game Summary Highlight Cards"),
     (OPENING_ENCYCLOPEDIA, "Opening Encyclopedia"),
     (MOVE_LINK_POPUPS, "Move Link Tooltips"),
+    (CHESS_LOG, "Chess Log"),
 )
 
 MINIATURE_BOARD_SCALE_PRESETS: Tuple[float, ...] = (1.0, 1.25, 1.5, 1.75, 2.0)
@@ -36,6 +39,7 @@ _DEFAULTS: Dict[str, float] = {
     GAME_SUMMARY_HIGHLIGHTS: 1.0,
     OPENING_ENCYCLOPEDIA: 1.0,
     MOVE_LINK_POPUPS: 1.0,
+    CHESS_LOG: 1.25,
 }
 
 

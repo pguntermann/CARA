@@ -33,6 +33,7 @@ class GameData:
                  analyzed: bool = False,
                  annotated: bool = False,
                  has_notes: bool = False,
+                 has_chess_log_tags: bool = False,
                  notes: Optional[str] = None,
                  source_database: str = "",
                  file_position: int = 0,
@@ -57,6 +58,7 @@ class GameData:
             analyzed: Whether the game has been analyzed (has CARAAnalysisData tag).
             annotated: Whether the game has saved annotations (has CARAAnnotations tag).
             has_notes: Whether the game has a CARANotes tag.
+            has_chess_log_tags: Whether the game has CARAChessLog moments.
             notes: Optional cached notes text (from CARANotes tag); None until loaded.
             source_database: Name of the database this game came from (for search results).
             file_position: Original position of game in file (1-based, 0 if not from file).
@@ -84,6 +86,7 @@ class GameData:
         self.analyzed = analyzed
         self.annotated = annotated
         self.has_notes = has_notes
+        self.has_chess_log_tags = has_chess_log_tags
         self.notes = notes  # Cached notes from CARANotes tag; None until loaded
         self.source_database = source_database
         self.file_position = file_position
@@ -140,7 +143,8 @@ class DatabaseModel(QAbstractTableModel):
     COL_REF_PLY = 19
     COL_TAGS = 20
     COL_PGN = 21
-    FIXED_COLUMN_COUNT = 22
+    COL_LOG = 22
+    FIXED_COLUMN_COUNT = 23
     
     def __init__(self, file_path: Optional[str] = None, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the database model.
@@ -172,6 +176,14 @@ class DatabaseModel(QAbstractTableModel):
         # Fuzzy (ignore castling + en-passant)
         self._position_index_fuzzy: Dict[int, List[Tuple[int, int]]] = {}
         self._position_reverse_fuzzy: Dict[int, List[Tuple[int, int]]] = {}
+
+    @property
+    def display_name(self) -> str:
+        """Short display name: file stem for file-based DBs, 'Clipboard' otherwise."""
+        if self.file_path:
+            from pathlib import Path
+            return Path(self.file_path).stem
+        return "Clipboard"
 
     def set_config(self, config: Dict[str, Any]) -> None:
         """Update config and refresh cached theme-driven assets."""
@@ -321,6 +333,8 @@ class DatabaseModel(QAbstractTableModel):
             return "✓" if getattr(game, "annotated", False) else ""
         elif col == self.COL_NOTES:
             return "✓" if getattr(game, "has_notes", False) else ""
+        elif col == self.COL_LOG:
+            return "✓" if getattr(game, "has_chess_log_tags", False) else ""
         elif col == self.COL_SOURCE_DB:
             return game.source_database
         elif col == self.COL_REF_PLY:
@@ -395,6 +409,7 @@ class DatabaseModel(QAbstractTableModel):
                 "Move",
                 "Game tags",
                 "PGN",
+                "Log",
             ]
             if 0 <= section < len(headers):
                 return headers[section]
@@ -1440,6 +1455,8 @@ class DatabaseModel(QAbstractTableModel):
                 return getattr(game, "annotated", False)
             elif column == self.COL_NOTES:
                 return getattr(game, "has_notes", False)
+            elif column == self.COL_LOG:
+                return getattr(game, "has_chess_log_tags", False)
             elif column == self.COL_SOURCE_DB:
                 return game.source_database or ""
             elif column == self.COL_REF_PLY:

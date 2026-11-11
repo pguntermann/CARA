@@ -973,11 +973,13 @@ class PgnService:
             if not has_notes:
                 has_notes = "[CARANotes" in game_pgn
 
-            # Per-game CARA tag bubbles (semicolon-separated)
+            from app.services.chess_log_storage_service import ChessLogStorageService  # local import — avoids circular
+            has_chess_log_tags = ChessLogStorageService.has_moments(headers)
+
+            # Per-game CARA tag bubbles (semicolon-separated).
             game_tags_raw = headers.get("CARAGameTags", "") if headers else ""
             try:
                 from app.utils.game_tags_utils import parse_game_tags, tags_display_text
-
                 game_tags_display = tags_display_text(parse_game_tags(game_tags_raw))
             except Exception:
                 game_tags_display = ""
@@ -1019,6 +1021,7 @@ class PgnService:
                 "CARAAnalysisData",
                 "CARAAnnotations",
                 "CARANotes",
+                "CARAChessLog",
             }
             header_values = {}
             if headers:
@@ -1079,6 +1082,7 @@ class PgnService:
                 "analyzed": analyzed,
                 "annotated": annotated,
                 "has_notes": has_notes,
+                "has_chess_log_tags": has_chess_log_tags,
                 "game_tags_raw": game_tags_raw,
                 "game_tags": game_tags_display,
                 "tags": tag_names,  # Tag names extracted during parsing

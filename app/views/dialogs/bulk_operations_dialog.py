@@ -70,6 +70,7 @@ from app.utils.bulk_regex_presets import (
 from app.models.database_model import DatabaseModel
 from app.utils.font_utils import resolve_font_family, scale_font_size
 from app.utils.external_open import open_user_manual
+from app.views.widgets.busy_spinner import BusySpinner
 from app.utils.path_display_utils import truncate_path_for_display, truncate_text_middle
 from app.utils.path_resolver import get_app_resource_path
 from app.utils.themed_icon import SVG_MENU_INFO, SVG_REGEX, themed_icon_from_svg
@@ -1328,62 +1329,6 @@ class _OperationEditorOverlay(QWidget):
             self.card.setFixedHeight(hint_h)
 
 
-class _BusySpinner(QWidget):
-    """Animated circular spinner for modal busy overlays."""
-
-    def __init__(
-        self,
-        *,
-        color: QColor,
-        track_color: Optional[QColor] = None,
-        size: int = 40,
-        line_width: int = 3,
-        span_degrees: int = 110,
-        parent: Optional[QWidget] = None,
-    ) -> None:
-        super().__init__(parent)
-        self._color = color
-        self._track_color = track_color
-        self._line_width = max(2, int(line_width))
-        self._span_degrees = max(60, min(270, int(span_degrees)))
-        self._angle = 0
-        side = max(24, int(size))
-        self.setFixedSize(side, side)
-        self._timer = QTimer(self)
-        self._timer.setInterval(16)
-        self._timer.timeout.connect(self._tick)
-
-    def start(self) -> None:
-        if not self._timer.isActive():
-            self._timer.start()
-        self.show()
-
-    def stop(self) -> None:
-        self._timer.stop()
-
-    def _tick(self) -> None:
-        self._angle = (self._angle + 8) % 360
-        self.update()
-
-    def paintEvent(self, event) -> None:  # noqa: N802
-        from PyQt6.QtGui import QPainter, QPen
-        from PyQt6.QtCore import QRectF
-
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        inset = self._line_width / 2.0 + 1.0
-        rect = QRectF(inset, inset, self.width() - 2 * inset, self.height() - 2 * inset)
-
-        if self._track_color is not None:
-            track_pen = QPen(self._track_color, float(self._line_width), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-            painter.setPen(track_pen)
-            painter.drawEllipse(rect)
-
-        pen = QPen(self._color, float(self._line_width), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        painter.drawArc(rect, int((-self._angle) * 16), int(self._span_degrees) * 16)
-
-
 class _ProgressOverlay(QWidget):
     """Dimmed overlay with a spinner while bulk operations run, then a compact summary."""
 
@@ -1482,7 +1427,7 @@ class _ProgressOverlay(QWidget):
         card_layout.setSpacing(self.card_spacing)
         card_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
-        self.spinner = _BusySpinner(
+        self.spinner = BusySpinner(
             color=self.spinner_color,
             track_color=self.spinner_track_color,
             size=self.spinner_size,

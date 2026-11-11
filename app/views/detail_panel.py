@@ -16,6 +16,7 @@ from app.views.detail_opening_explorer_view import DetailOpeningExplorerView
 from app.views.detail_annotation_view import DetailAnnotationView
 from app.views.detail_ai_chat_view import DetailAIChatView
 from app.views.detail_notes_view import DetailNotesView
+from app.views.detail_chess_log_charts_view import DetailChessLogChartsView
 from app.models.game_model import GameModel
 from app.models.moveslist_model import MovesListModel
 from app.models.metadata_model import MetadataModel
@@ -43,7 +44,8 @@ class DetailPanel(QWidget):
                  ai_chat_controller = None,
                  game_summary_controller = None,
                  player_stats_controller = None,
-                 metadata_controller = None) -> None:
+                 metadata_controller = None,
+                 chess_log_charts_controller = None) -> None:
         """Initialize the detail panel.
         
         Args:
@@ -69,6 +71,7 @@ class DetailPanel(QWidget):
         self._game_summary_controller = game_summary_controller
         self._player_stats_controller = player_stats_controller
         self._metadata_controller = metadata_controller
+        self._chess_log_charts_controller = chess_log_charts_controller
         self._database_panel = None  # Will be set from MainWindow after database_panel is created
         self._setup_ui()
         
@@ -367,7 +370,13 @@ class DetailPanel(QWidget):
             moves_list_model=self.moveslist_model,
         )
         self.tab_widget.addTab(self.notes_view, "Notes")
-        
+
+        # Chess Log Charts tab (index 9)
+        self.chess_log_charts_view = DetailChessLogChartsView(self.config)
+        if self._chess_log_charts_controller:
+            self.chess_log_charts_view.set_controller(self._chess_log_charts_controller)
+        self.tab_widget.addTab(self.chess_log_charts_view, "Chess Log")
+
         # Connect manual analysis controller if provided
         if self._manual_analysis_controller:
             self.manual_analysis_view.set_analysis_controller(self._manual_analysis_controller)

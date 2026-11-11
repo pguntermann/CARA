@@ -1319,6 +1319,53 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.dialogs.manage_game_tags.spacing.section",
     "ui.dialogs.manage_game_tags.text_color",
     "ui.dialogs.manage_game_tags.width",
+    "ui.dialogs.chess_log_settings.background_color",
+    "ui.dialogs.chess_log_settings.border_color",
+    "ui.dialogs.chess_log_settings.text_color",
+    "ui.dialogs.moment.background_color",
+    "ui.dialogs.moment.border_color",
+    "ui.dialogs.moment.button_height",
+    "ui.dialogs.moment.button_width",
+    "ui.dialogs.moment.chip_bg_color",
+    "ui.dialogs.moment.chip_border_color",
+    "ui.dialogs.moment.chip_hover_border_color",
+    "ui.dialogs.moment.chip_selected_color",
+    "ui.dialogs.moment.chip_text_color",
+    "ui.dialogs.moment.game_header.background_color",
+    "ui.dialogs.moment.game_header.text_color",
+    "ui.dialogs.moment.game_header.padding_vertical",
+    "ui.dialogs.moment.game_header.padding_horizontal",
+    "ui.dialogs.moment.game_header.top_spacing",
+    "ui.dialogs.moment.hint_color",
+    "ui.dialogs.moment.inputs.background_color",
+    "ui.dialogs.moment.inputs.border_color",
+    "ui.dialogs.moment.inputs.focus_border_color",
+    "ui.dialogs.moment.inputs.font_family",
+    "ui.dialogs.moment.inputs.font_size",
+    "ui.dialogs.moment.inputs.text_color",
+    "ui.dialogs.moment.label_font_family",
+    "ui.dialogs.moment.label_font_size",
+    "ui.dialogs.moment.muted_color",
+    "ui.dialogs.moment.separator_color",
+    "ui.dialogs.moment.text_color",
+    "ui.dialogs.moment.width",
+    "ui.dialogs.moment.bottom_button_top_padding",
+    "ui.dialogs.moment.buttons.spacing",
+    "ui.dialogs.moment.chips.cct_min_width",
+    "ui.dialogs.moment.chips.min_width",
+    "ui.dialogs.moment.layout.margins",
+    "ui.dialogs.moment.layout.spacing",
+    "ui.dialogs.moment.why.minimum_height",
+    "ui.dialogs.moment.three_by_three.edit_minimum_height",
+    "ui.dialogs.show_tags.button_save",
+    "ui.dialogs.show_tags.button_cancel",
+    "ui.dialogs.show_tags.label_font_family",
+    "ui.dialogs.show_tags.label_font_size",
+    "ui.dialogs.show_tags.inputs.font_family",
+    "ui.dialogs.show_tags.inputs.font_size",
+    "ui.dialogs.show_tags.fit_min_lines",
+    "ui.dialogs.show_tags.fit_max_lines",
+    "ui.dialogs.show_tags.chip_fade_ms",
     "ui.dialogs.message_dialog.background_color",
     "ui.dialogs.message_dialog.bottom_button_top_padding",
     "ui.dialogs.message_dialog.buttons.border_color",
@@ -1827,6 +1874,12 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.dialogs.search.tag_picker.selected_border_width",
     "ui.dialogs.search.text_color",
     "ui.dialogs.search.width",
+    "ui.dialogs.moment.title",
+    "ui.dialogs.moment.why_placeholder",
+    "ui.dialogs.moment.width",
+    "ui.dialogs.chess_log_settings.title",
+    "ui.dialogs.chess_log_settings.width",
+    "ui.dialogs.chess_log_settings.height",
     "ui.margins.database_panel",
     "ui.margins.detail_panel",
     "ui.margins.status_panel",
@@ -1866,6 +1919,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.database.table.column_widths.col_event",
     "ui.panels.database.table.column_widths.col_file_num",
     "ui.panels.database.table.column_widths.col_moves",
+    "ui.panels.database.table.column_widths.col_log",
     "ui.panels.database.table.column_widths.col_notes",
     "ui.panels.database.table.column_widths.col_num",
     "ui.panels.database.table.column_widths.col_ref_ply",
@@ -2301,6 +2355,34 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.panels.detail.pgn_notation.padding",
     "ui.panels.detail.pgn_notation.placeholder_text",
     "ui.panels.detail.pgn_notation.text_color",
+    "ui.panels.detail.chess_log_charts.ai.default_timeout_seconds",
+    "ui.panels.detail.chess_log_charts.category_colors.CCT.C",
+    "ui.panels.detail.chess_log_charts.category_colors.CCT.C2",
+    "ui.panels.detail.chess_log_charts.category_colors.CCT.T",
+    "ui.panels.detail.chess_log_charts.category_colors.CLAMP.A",
+    "ui.panels.detail.chess_log_charts.category_colors.CLAMP.C",
+    "ui.panels.detail.chess_log_charts.category_colors.CLAMP.L",
+    "ui.panels.detail.chess_log_charts.category_colors.CLAMP.M",
+    "ui.panels.detail.chess_log_charts.category_colors.CLAMP.P",
+    "ui.panels.detail.chess_log_charts.chart.axis_color",
+    "ui.panels.detail.chess_log_charts.chart.background_color",
+    "ui.panels.detail.chess_log_charts.chart.font_family",
+    "ui.panels.detail.chess_log_charts.chart.font_size",
+    "ui.panels.detail.chess_log_charts.chart.grid_color",
+    "ui.panels.detail.chess_log_charts.chart.height",
+    "ui.panels.detail.chess_log_charts.chart.legend_width",
+    "ui.panels.detail.chess_log_charts.chart.line_width",
+    "ui.panels.detail.chess_log_charts.chart.padding",
+    "ui.panels.detail.chess_log_charts.chart.text_color",
+    "ui.panels.detail.chess_log_charts.chart.title_color",
+    "ui.panels.detail.chess_log_charts.colors.background",
+    "ui.panels.detail.chess_log_charts.colors.border",
+    "ui.panels.detail.chess_log_charts.colors.hint_text",
+    "ui.panels.detail.chess_log_charts.colors.input_background",
+    "ui.panels.detail.chess_log_charts.colors.spinner_color",
+    "ui.panels.detail.chess_log_charts.colors.text",
+    "ui.panels.detail.chess_log_charts.token_usage_label.color",
+    "ui.panels.detail.chess_log_charts.token_usage_label.font_size",
     "ui.panels.detail.player_stats.accuracy_distribution.axis_color",
     "ui.panels.detail.player_stats.accuracy_distribution.background_color",
     "ui.panels.detail.player_stats.accuracy_distribution.bar_color",
@@ -2820,6 +2902,7 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "ui.pdf.colors.card_fill",
     "ui.pdf.colors.chart_bar",
     "ui.pdf.colors.chart_grid",
+    "ui.pdf.chess_log.card_fill",
     "ui.panels.detail.summary.pdf_report.board_size",
     "ui.panels.detail.summary.pdf_report.highlight_board_size",
     "ui.panels.detail.summary.pdf_report.board_render_scale",
@@ -3439,6 +3522,38 @@ _REQUIRED_CONFIG_KEY_PATHS: tuple[str, ...] = (
     "user_settings.player_stats_reset.status_success",
     "user_settings.template_filename",
     "version",
+    "prompts.chess_log.narrative_system",
+    "prompts.chess_log.narrative_preamble",
+    "prompts.chess_log.narrative_step",
+    "prompts.chess_log.narrative_glossaries.CLAMP",
+    "prompts.chess_log.narrative_glossaries.CCT",
+    "prompts.chess_log.narrative_glossaries.3x3",
+    "prompts.chess_log.narrative_3x3_structure",
+    "prompts.chess_log.narrative_3x3_moment_framing",
+    "prompts.chess_log.classifier",
+    "prompts.chess_log.classifier_3x3",
+    "ui.dialogs.chess_log_messages.shallow_notes.all_failed.title",
+    "ui.dialogs.chess_log_messages.shallow_notes.all_failed.message_template",
+    "ui.dialogs.chess_log_messages.shallow_notes.partial.title",
+    "ui.dialogs.chess_log_messages.shallow_notes.partial.message_template",
+    "ui.dialogs.chess_log_messages.shallow_notes.none_found.title",
+    "ui.dialogs.chess_log_messages.shallow_notes.none_found.message_template",
+    "ui.dialogs.chess_log_messages.shallow_notes.none_found.save_explanation",
+    "ui.dialogs.shallow.button_save",
+    "ui.dialogs.shallow.button_cancel",
+    "ui.dialogs.shallow.labels.shallow.text",
+    "ui.dialogs.shallow.labels.shallow.tooltip_3x3",
+    "ui.dialogs.shallow.labels.shallow.tooltip_clamp_cct",
+    "ui.dialogs.shallow.labels.shallow.background_color",
+    "ui.dialogs.shallow.labels.shallow.text_color",
+    "ui.dialogs.shallow.labels.vague_lesson.text",
+    "ui.dialogs.shallow.labels.vague_lesson.tooltip",
+    "ui.dialogs.shallow.labels.vague_lesson.background_color",
+    "ui.dialogs.shallow.labels.vague_lesson.text_color",
+    "ui.dialogs.shallow.unchecked_banner.background_color",
+    "ui.dialogs.shallow.unchecked_banner.text_color",
+    "prompts.ai_chat.system_preamble",
+    "prompts.ai_chat.formatting_rules",
 )
 # <sync_config_keys:end>
 
@@ -3532,19 +3647,46 @@ class ConfigLoader:
     
     def _validate(self) -> None:
         """Validate that required configuration keys exist.
-        
+
         Raises:
             ValueError: If required keys are missing.
         """
         required_keys = self._get_required_keys()
         missing_keys = []
-        
+
         for key in required_keys:
             if not self._has_key(key):
                 missing_keys.append(key)
-        
+
         if missing_keys:
             self._fail(f"Missing required configuration keys: {', '.join(missing_keys)}")
+
+        self._validate_prompt_placeholders()
+
+    def _validate_prompt_placeholders(self) -> None:
+        """Validate that narrative_preamble contains its four required placeholders.
+
+        Elo estimation uses value_on_error as a graceful fallback, so existence-only
+        validation suffices there.  Prompt strings have no such fallback: a missing
+        placeholder silently drops a section from the assembled prompt, and an unknown
+        one raises KeyError inside a QThread mid-request.  Load-time validation
+        catches both problems with a clear message before anything reaches the user.
+        """
+        import string as _string
+        preamble_key = "prompts.chess_log.narrative_preamble"
+        if not self._has_key(preamble_key):
+            return  # Already caught by existence check above
+        preamble = self.get(preamble_key)
+        if not isinstance(preamble, str):
+            return
+        required = {"glossary_section", "category_counts_block", "why_notes_block", "game_notes_block"}
+        found = {field_name for _, field_name, _, _ in _string.Formatter().parse(preamble) if field_name}
+        missing = required - found
+        if missing:
+            self._fail(
+                f"prompts.chess_log.narrative_preamble is missing required placeholder(s): "
+                + ", ".join(sorted(f"{{{p}}}" for p in missing))
+            )
     
     def _get_required_keys(self) -> list[str]:
         """Get list of required configuration keys.

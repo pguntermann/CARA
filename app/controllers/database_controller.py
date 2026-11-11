@@ -280,6 +280,7 @@ class DatabaseController:
                 analyzed=game_dict.get("analyzed", False),
                 annotated=game_dict.get("annotated", False),
                 has_notes=game_dict.get("has_notes", False),
+                has_chess_log_tags=game_dict.get("has_chess_log_tags", False),
                 file_position=0,  # Pasted games don't have file position
                 header_values=game_dict.get("header_values") or {},
             )
@@ -806,6 +807,7 @@ class DatabaseController:
                     analyzed=game_dict.get("analyzed", False),
                     annotated=game_dict.get("annotated", False),
                     has_notes=game_dict.get("has_notes", False),
+                    has_chess_log_tags=game_dict.get("has_chess_log_tags", False),
                     file_position=file_pos,  # Store original file position (1-based)
                     header_values=game_dict.get("header_values") or {},
                 )
@@ -1060,6 +1062,7 @@ class DatabaseController:
                         analyzed=game_dict.get("analyzed", False),
                         annotated=game_dict.get("annotated", False),
                         has_notes=game_dict.get("has_notes", False),
+                        has_chess_log_tags=game_dict.get("has_chess_log_tags", False),
                         file_position=file_pos,
                         header_values=game_dict.get("header_values") or {},
                     )
@@ -1210,6 +1213,7 @@ class DatabaseController:
                     analyzed=game_dict.get("analyzed", False),
                     annotated=game_dict.get("annotated", False),
                     has_notes=game_dict.get("has_notes", False),
+                    has_chess_log_tags=game_dict.get("has_chess_log_tags", False),
                     file_position=file_pos,  # Store original file position (1-based)
                     header_values=game_dict.get("header_values") or {},
                 )

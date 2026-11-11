@@ -1,0 +1,97 @@
+Classify each 3x3 self-analysis of a chess move. You give FOUR independent
+verdicts per note: one for each Why answer. The answers DO NOT rescue each
+other — judge every answer on its own words.
+
+A 3x3 self-analysis answers four questions:
+  Why1 — "Why did I choose that move?"
+  Why2 — "Why is my move not ideal?"
+  Why3 — "Why is the better move better than my chosen move?"
+  Why4 — "What do I do in the future so this doesn't happen again?"
+
+Judge Why1, Why2, Why3 as INTENT (one of SPECIFIC, GENERIC, BLANK).
+Judge Why4 as LESSON (one of REAL, FILLER, BLANK).
+
+Do NOT let one answer change the verdict for another. A specific Why1 does
+not make a filler Lesson real. A real Lesson does not make a generic Why1
+specific. Each answer is scored on its own text.
+
+INTENT (for Why1, Why2, Why3)
+=============================
+Read each answer together with the other answers for the same move. An answer may lean on another one ("It wasn't under attack" after "I was guarding my knight"). Judge what it says in that context. Still give each answer its own verdict.
+
+BLANK: an empty answer. A blank answer is never GENERIC.
+
+GENERIC is rare. Use it only for a non-blank answer that says nothing about this game: no piece, square, plan, threat, outcome or reason, even when read with the other answers. Such an answer could be pasted under any move of any game.
+  Examples:
+    "Just a good-looking move."
+    "Seemed like the thing to do."
+    "No real reason."
+    "Just a normal move."
+
+  Text that is not meaningful language (placeholder text, gibberish, random
+  letters, keyboard mashing) counts as nothing. Judge the answer only on its
+  meaningful words; if those are generic, the answer is GENERIC however long it is.
+    "Wanted to keep developing. asdkj qwe zzzz xcvb mnop qwe zzzz xcvb."
+
+SPECIFIC is everything else. All of these are SPECIFIC:
+  - A piece, square, plan, tactic or threat:
+      "Clearing the e-file for my rook."
+      "It left my f2 pawn without a defender."
+  - An outcome, even a big one:
+      "I'd have won the exchange."
+      "That line wins the game."
+  - An answer that leans on another answer, or contradicts it:
+      "That plan was already done."
+      "It wasn't a safe trade after all."
+  - An honest admission of not understanding, or "I'm not sure" followed by a thought. Never treat an honest answer as GENERIC.
+      "I still can't see why the engine prefers it."
+      "Not sure, but trading into the endgame looked good."
+
+LESSON (for Why4)
+=================
+When in doubt, choose REAL.
+
+REAL: the lesson points at something to do or change next game. That can be a habit, a check, a method, an area of chess to pay more attention to, or a chess quality to play with more or less of (activity, aggression, patience). It counts if it is short. It counts if it is phrased as a description of what went wrong, as long as that points at what to change.
+  Examples:
+    "Count attackers and defenders on every capture square."
+    "Before every move, ask what my opponent's last move threatens."
+    "Sit on my hands for ten seconds and recheck the board."
+    "Push for the initiative when I'm ahead in development."
+    "I was too slow to bring my rooks into the game."
+    "Pay more attention to pawn structure."
+
+FILLER: the lesson gives nothing to act on. It is a shrug, a complaint about the game, giving up, doubting yourself instead of naming a change, or a general effort word with nothing chess-specific (focus, concentrate, try harder). A lesson that names an idea and then gives up on it ("…but I can't do that") is FILLER.
+  Examples:
+    "Try harder."
+    "Who knows."
+    "Bad day at the board."
+    "Concentrate more."
+    "I should see more, but I'm just not good enough yet."
+
+BLANK (for Why4): an empty lesson.
+
+Output format
+=============
+Return the verdict list FIRST, before any explanation. Preferably return
+ONLY the verdict list.
+One line per note, exactly this shape (keep ordering WHY1 → WHY2 → WHY3 → LESSON):
+
+<index>: WHY1=<SPECIFIC|GENERIC|BLANK> WHY2=<SPECIFIC|GENERIC|BLANK> WHY3=<SPECIFIC|GENERIC|BLANK> LESSON=<REAL|FILLER|BLANK>
+
+Notes to classify follow, one block per index.
+
+0:
+  Why1: I wanted to activate my rook by opening the d-file.
+  Why2: It dropped a pawn to the bishop fork on b5.
+  Why3: Nf6 maintains the knight and prevents the fork.
+  Why4: Look for piece forks before advancing pawns.
+1:
+  Why1: I thought it was a good move.
+  Why2: My rook was undefended after the move.
+  Why3: Rd1 defends the rook and keeps pressure.
+  Why4: Be more careful.
+2:
+  Why1: (blank)
+  Why2: The move allowed a discovered attack on the queen.
+  Why3: Ke2 sidesteps the discovered attack and keeps the king safe.
+  Why4: (blank)

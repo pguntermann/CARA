@@ -29,6 +29,7 @@ class UserSettingsModel(QObject):
     player_stats_activity_heatmap_changed = pyqtSignal()  # Player Stats activity heatmap display prefs
     player_stats_accuracy_distribution_changed = pyqtSignal()  # Player Stats accuracy histogram prefs
     player_stats_error_patterns_changed = pyqtSignal()  # Player Stats error-pattern coverage cutoff
+    chess_log_charts_changed = pyqtSignal()             # Chess Log Charts binning / X-axis prefs
 
     def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the user settings model.
@@ -660,6 +661,29 @@ class UserSettingsModel(QObject):
         cur = self.get_opening_encyclopedia_dialog()
         cur.update(partial)
         self.set_opening_encyclopedia_dialog(cur)
+
+    def get_chess_log(self) -> Dict[str, Any]:
+        """Get Chess Log settings (active_preset)."""
+        raw = self._settings.get("chess_log", {})
+        if not isinstance(raw, dict):
+            return {"active_preset": "3x3"}
+        return raw.copy()
+
+    def set_chess_log(self, settings: Dict[str, Any]) -> None:
+        """Replace Chess Log settings."""
+        self._settings["chess_log"] = settings.copy()
+        self.settings_changed.emit()
+        self.chess_log_charts_changed.emit()
+
+    def update_chess_log_charts_settings(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Chess Log charts settings (shallow merge into chess_log.charts)."""
+        cur = self.get_chess_log()
+        charts = cur.get("charts", {})
+        if not isinstance(charts, dict):
+            charts = {}
+        charts.update(partial)
+        cur["charts"] = charts
+        self.set_chess_log(cur)
 
     def get_recent_pgn_databases(self) -> list:
         """Get recent PGN database file paths (most recent first)."""

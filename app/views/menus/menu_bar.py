@@ -17,6 +17,7 @@ from app.views.menus.help_menu import setup_help_menu
 from app.views.menus.manual_analysis_menu import setup_manual_analysis_menu
 from app.views.menus.moves_list_menu import setup_moves_list_menu
 from app.views.menus.notes_menu import setup_notes_menu
+from app.views.menus.chess_log_menu import setup_chess_log_menu
 from app.views.menus.pgn_menu import setup_pgn_menu
 from app.views.menus.player_stats_menu import setup_player_stats_menu
 from app.views.menus.view_menu import setup_view_menu
@@ -37,6 +38,7 @@ def setup_menu_bar(mw, menu_bar: QMenuBar) -> None:
     setup_engines_menu(mw, menu_bar)
     setup_ai_summary_menu(mw, menu_bar)
     setup_notes_menu(mw, menu_bar)
+    setup_chess_log_menu(mw, menu_bar)
     setup_view_menu(mw, menu_bar)
     setup_help_menu(mw, menu_bar)
     setup_debug_menu(mw, menu_bar)

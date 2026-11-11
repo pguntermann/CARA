@@ -1175,6 +1175,7 @@ class DatabasePanel(QWidget):
             widths_config.get('col_analyzed', 70),
             widths_config.get('col_annotated', 70),
             widths_config.get('col_notes', 70),
+            widths_config.get('col_log', 80),
             widths_config.get('col_source_db', 120),
             widths_config.get('col_ref_ply', 70),
             widths_config.get('col_tags', 260),
@@ -1393,11 +1394,7 @@ class DatabasePanel(QWidget):
         tab_table.update()
         tab_table.viewport().update()
         
-        # Determine tab label
-        if file_path:
-            tab_label = Path(file_path).stem
-        else:
-            tab_label = "Clipboard"
+        tab_label = model.display_name
         
         # Insert tab before the open-database tab
         tab_index = self._add_tab_index

@@ -459,6 +459,13 @@
           222,
           210
         ]
+      },
+      "chess_log": {
+        "card_fill": [
+          255,
+          255,
+          255
+        ]
       }
     },
     "styles": {
@@ -2124,6 +2131,75 @@
             "content_height": 400,
             "graph_stretch_factor": 1,
             "content_stretch_factor": 3
+          }
+        },
+        "chess_log_charts": {
+          "chart": {
+            "background_color": {
+              "$ref": "$_COLOR_PAPYRUS_WHITE"
+            },
+            "grid_color": {
+              "$ref": "$_COLOR_PEACH_GRID"
+            },
+            "axis_color": {
+              "$ref": "$_COLOR_AXIS_UMBER"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_COCOA_BROWN"
+            },
+            "title_color": {
+              "$ref": "$_COLOR_INK_BODY"
+            }
+          },
+          "colors": {
+            "background": {
+              "$ref": "$_COLOR_PAPYRUS_PANEL"
+            },
+            "text": {
+              "$ref": "$_COLOR_COCOA_BROWN"
+            },
+            "input_background": {
+              "$ref": "$_COLOR_PAPYRUS_FIELD"
+            },
+            "border": {
+              "$ref": "$_COLOR_FOREST_OUTLINE"
+            },
+            "hint_text": {
+              "$ref": "$_COLOR_DRIFTWOOD"
+            },
+            "link": {
+              "$ref": "$_COLOR_BOURBON_TEAL"
+            },
+            "spinner_color": {
+              "$ref": "$_COLOR_BOURBON_TEAL"
+            }
+          },
+          "token_usage_label": {
+            "color": {
+              "$ref": "$_COLOR_DRIFTWOOD"
+            },
+            "font_size": 10
+          },
+          "pdf_report": {
+            "colors": {
+              "warning_fill": [241, 196, 15],
+              "warning_outline": [30, 30, 30]
+            },
+            "table_col_widths_pct": [20, 40, 40]
+          },
+          "category_colors": {
+            "CLAMP": {
+              "C": [184, 80, 50],
+              "L": [184, 130, 30],
+              "A": [30, 100, 140],
+              "M": [32, 110, 88],
+              "P": [130, 70, 120]
+            },
+            "CCT": {
+              "C": [184, 110, 40],
+              "C2": [30, 100, 140],
+              "T": [32, 110, 88]
+            }
           }
         },
         "kpi_statistics": {
@@ -3952,6 +4028,7 @@
             "col_analyzed": 80,
             "col_annotated": 80,
             "col_notes": 80,
+            "col_log": 80,
             "col_source_db": 120,
             "col_ref_ply": 70,
             "col_tags": 260
@@ -4247,6 +4324,148 @@
           "button_size": 22,
           "column_spacing": 8,
           "top_offset": 2
+        }
+      },
+      "moment": {
+        "game_header": {
+          "background_color": {
+            "$ref": "$_COLOR_FOREST_FRAME"
+          },
+          "text_color": [
+            255,
+            255,
+            255
+          ],
+          "padding_vertical": 7,
+          "padding_horizontal": 16,
+          "top_spacing": 30
+        },
+        "width": 420,
+        "button_width": 100,
+        "button_height": 28,
+        "bottom_button_top_padding": 16,
+        "buttons": {
+          "spacing": 10
+        },
+        "layout": {
+          "margins": [12, 10, 12, 10],
+          "spacing": 8
+        },
+        "chips": {
+          "min_width": 36,
+          "cct_min_width": 72
+        },
+        "why": {
+          "minimum_height": 50
+        },
+        "three_by_three": {
+          "edit_minimum_height": 40
+        },
+        "background_color": {
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_FOREST_OUTLINE"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_COCOA_BROWN"
+        },
+        "hint_color": [
+          180,
+          60,
+          40
+        ],
+        "muted_color": {
+          "$ref": "$_COLOR_DRIFTWOOD"
+        },
+        "separator_color": {
+          "$ref": "$_COLOR_PEACH_OUTLINE"
+        },
+        "label_font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "label_font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "chip_bg_color": {
+          "$ref": "$_COLOR_TAUPE_SAND"
+        },
+        "chip_selected_color": {
+          "$ref": "$_COLOR_BOURBON_TEAL"
+        },
+        "chip_text_color": {
+          "$ref": "$_COLOR_COCOA_BROWN"
+        },
+        "chip_border_color": {
+          "$ref": "$_COLOR_PEACH_OUTLINE"
+        },
+        "chip_hover_border_color": {
+          "$ref": "$_COLOR_FOREST_FRAME"
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_COCOA_BROWN"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_PAPYRUS_FIELD"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_PEACH_OUTLINE"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_FOCUS_RING_TEAL"
+          }
+        }
+      },
+      "show_tags": {
+        "label_font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "label_font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          }
+        },
+        "fit_min_lines": 1,
+        "fit_max_lines": 6
+      },
+      "shallow": {
+        "labels": {
+          "shallow": {
+            "background_color": [185, 70, 70],
+            "text_color": [255, 255, 255]
+          },
+          "vague_lesson": {
+            "background_color": [195, 145, 55],
+            "text_color": [255, 255, 255]
+          }
+        },
+        "unchecked_banner": {
+          "background_color": {"$ref": "$_COLOR_SANDALWOOD"},
+          "text_color": {"$ref": "$_COLOR_COCOA_BROWN"}
+        }
+      },
+      "chess_log_settings": {
+        "background_color": {
+          "$ref": "$_COLOR_PAPYRUS_PANEL"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_FOREST_OUTLINE"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_COCOA_BROWN"
         }
       },
       "classification_settings": {

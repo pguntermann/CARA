@@ -3,6 +3,8 @@
 import json
 import requests
 import threading
+import time
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple, Callable
 from enum import Enum
@@ -42,6 +44,42 @@ def set_debug_flags(outbound_enabled: bool = False, inbound_enabled: bool = Fals
     _debug_inbound_enabled = inbound_enabled
 
 
+# Model name substrings for which {"type": "disabled"} must be sent to suppress
+# thinking.  Matches claude-sonnet-5-* and claude-opus-5-* IDs (and future
+# variants).
+# Fable models ("fable-5") are intentionally excluded for two reasons:
+#   1. They use a different thinking API (thinking.type.adaptive + output_config.effort);
+#      {"type": "disabled"} returns HTTP 400 on Fable.
+#   2. Empirically (tested 2026-09-27 with claude-fable-5-1 on a real narrative
+#      prompt), Fable does not self-trigger extended thinking — reasoning_tokens
+#      is absent and the full narrative reply is returned without issue.
+#      Returning None (no thinking override) is therefore safe for Fable.
+_THINKING_DISABLE_MODELS = ("sonnet-5", "opus-5")
+
+
+@dataclass(frozen=True)
+class TokenUsage:
+    """Token counts reported by the provider after a request."""
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
+    reasoning_tokens: Optional[int]   # thinking (Anthropic) or reasoning (OpenAI o-series)
+    reported: bool                     # False when the provider omitted usage entirely
+
+
+@dataclass(frozen=True)
+class AIResult:
+    """Return value from AIService.send_message."""
+    success: bool
+    text: str                   # response text on success; "" on failure
+    error: Optional[str]        # error message on failure; None on success
+    usage: Optional[TokenUsage]
+    model: str
+    # Anthropic-only diagnostics; None for OpenAI / custom / error paths.
+    stop_reason: Optional[str] = None
+    content_block_count: Optional[int] = None
+    content_block_types: Optional[Tuple[str, ...]] = None
+
+
 class AIProvider(str, Enum):
     """AI provider types."""
     OPENAI = "openai"
@@ -51,14 +89,23 @@ class AIProvider(str, Enum):
 
 class AIService:
     """Service for making API calls to AI providers."""
-    
+
     # Cache for models that require max_completion_tokens instead of max_tokens
     # This is a class-level cache so it persists across all instances
     _models_requiring_max_completion_tokens: set = set()
-    
+
     # Cache for models that don't support temperature parameter (or only support default)
     # This is a class-level cache so it persists across all instances
     _models_not_supporting_temperature: set = set()
+
+    # Cache for Anthropic models that reject thinking.type.disabled.  Maps model_id →
+    # the thinking-override dict to substitute on future calls:
+    #   Opus 5.5 / Fable 5 / Mythos 5:  {"thinking": {"type": "adaptive"},
+    #                                      "output_config": {"effort": "low"}}
+    #   Sonnet 5.5:                       {"thinking": {"type": "between_tools"}}
+    # Populated on the first 400 with a recognized "disabled not supported" message;
+    # subsequent calls for that model skip straight to the replacement payload.
+    _models_thinking_override: dict = {}
     
     def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the AI service.
@@ -75,7 +122,19 @@ class AIService:
         # Use config values or fall back to defaults
         self.OPENAI_CHAT_URL = openai_config.get("chat", "https://api.openai.com/v1/chat/completions")
         self.ANTHROPIC_MESSAGES_URL = anthropic_config.get("messages", "https://api.anthropic.com/v1/messages")
-    
+
+    @staticmethod
+    def disable_thinking_for(model: str) -> Optional[Dict[str, Any]]:
+        """Return {"type": "disabled"} for models that burn output budget on thinking.
+
+        Pass the result as the thinking= kwarg to send_message.  Returns None
+        (no thinking override) for all other models.
+        """
+        m = (model or "").lower()
+        if any(name in m for name in _THINKING_DISABLE_MODELS):
+            return {"type": "disabled"}
+        return None
+
     @staticmethod
     def _extract_error_message(response: requests.Response, status_code: int) -> str:
         """Extract a human-readable error message from an API error response."""
@@ -157,8 +216,9 @@ class AIService:
         system_prompt: Optional[str] = None,
         token_limit: Optional[int] = None,
         base_url_override: Optional[str] = None,
-        timeout_seconds: int = 60
-    ) -> Tuple[bool, str]:
+        timeout_seconds: int = 60,
+        thinking: Optional[Dict[str, Any]] = None,
+    ) -> AIResult:
         """Send a message to an AI provider and get response.
         
         Args:
@@ -169,26 +229,29 @@ class AIService:
             system_prompt: Optional system prompt (for OpenAI, included in messages; for Anthropic, separate).
             base_url_override: For custom provider, the base URL (e.g. http://localhost:1234/v1).
             timeout_seconds: Request timeout in seconds.
+            thinking: Optional thinking config dict (e.g. {"type": "disabled"}).
             
         Returns:
-            Tuple of (success: bool, response_text: str or error_message: str).
+            AIResult with success, text, error, usage, and model fields.
         """
         try:
             if provider == AIProvider.OPENAI:
                 return self._send_openai_message(model, api_key, messages, system_prompt, token_limit, timeout_seconds=timeout_seconds)
             elif provider == AIProvider.ANTHROPIC:
-                return self._send_anthropic_message(
-                    model, api_key, messages, system_prompt, token_limit, timeout_seconds=timeout_seconds
-                )
+                return self._send_anthropic_message(model, api_key, messages, system_prompt, token_limit=token_limit, timeout_seconds=timeout_seconds, thinking=thinking)
             elif provider == AIProvider.CUSTOM and base_url_override:
                 chat_url = base_url_override.rstrip("/") + "/chat/completions"
                 return self._send_openai_message(
                     model, api_key or "", messages, system_prompt, token_limit, chat_url=chat_url, timeout_seconds=timeout_seconds
                 )
             else:
-                return False, f"Unknown or misconfigured provider: {provider}"
+                return AIResult(
+                    success=False, text="",
+                    error=f"Unknown or misconfigured provider: {provider}",
+                    usage=None, model=model,
+                )
         except Exception as e:
-            return False, str(e)
+            return AIResult(success=False, text="", error=str(e), usage=None, model=model)
     
     def _send_openai_message(
         self,
@@ -199,7 +262,7 @@ class AIService:
         token_limit: Optional[int] = None,
         chat_url: Optional[str] = None,
         timeout_seconds: int = 60
-    ) -> Tuple[bool, str]:
+    ) -> AIResult:
         """Send message to OpenAI API or OpenAI-compatible endpoint.
         
         Args:
@@ -211,7 +274,7 @@ class AIService:
             timeout_seconds: Request timeout in seconds.
             
         Returns:
-            Tuple of (success: bool, response_text: str or error_message: str).
+            AIResult with success, text, error, usage, and model fields.
         """
         url = chat_url if chat_url is not None else self.OPENAI_CHAT_URL
         # Prepare messages for OpenAI
@@ -285,14 +348,33 @@ class AIService:
                         json.dumps(debug_headers, indent=2) + "\nPayload: " + 
                         json.dumps(debug_payload, indent=2))
         self._debug_console(debug_message, "SEND")
-        
-        response = requests.post(
-            url,
-            headers=headers,
-            json=payload,
-            timeout=timeout_seconds
-        )
-        
+        _endpoint_label = "openai" if chat_url is None else "custom"
+        try:
+            _t0 = time.monotonic()
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=timeout_seconds,
+            )
+        except requests.exceptions.Timeout:
+            _elapsed = time.monotonic() - _t0
+            LoggingService.get_instance().error(
+                f"AI request timeout: model={model}, timeout={timeout_seconds}s, "
+                f"elapsed={_elapsed:.1f}s, endpoint={_endpoint_label}"
+            )
+            return AIResult(
+                success=False, text="",
+                error=f"Request timed out after {timeout_seconds}s ({url})",
+                usage=None, model=model,
+            )
+        except requests.exceptions.ConnectionError:
+            return AIResult(
+                success=False, text="",
+                error=f"Connection failed: could not reach {url}",
+                usage=None, model=model,
+            )
+
         # Debug inbound: log response
         try:
             response_data = response.json() if response.content else {}
@@ -340,13 +422,26 @@ class AIService:
                 self._debug_console(debug_message_retry, "SEND")
                 
                 # Retry request
-                response = requests.post(
-                    url,
-                    headers=headers,
-                    json=payload_retry,
-                    timeout=timeout_seconds
-                )
-                
+                try:
+                    _t0_retry = time.monotonic()
+                    response = requests.post(
+                        url,
+                        headers=headers,
+                        json=payload_retry,
+                        timeout=timeout_seconds
+                    )
+                except requests.exceptions.Timeout:
+                    _elapsed = time.monotonic() - _t0_retry
+                    LoggingService.get_instance().error(
+                        f"AI request timeout: model={model}, timeout={timeout_seconds}s, "
+                        f"elapsed={_elapsed:.1f}s, endpoint={_endpoint_label}-retry"
+                    )
+                    return AIResult(
+                        success=False, text="",
+                        error=f"Request timed out after {timeout_seconds}s ({url})",
+                        usage=None, model=model,
+                    )
+
                 # Debug retry response
                 try:
                     response_data_retry = response.json() if response.content else {}
@@ -356,19 +451,23 @@ class AIService:
                             msg = choice.get("message", {})
                             if "content" in msg and len(msg["content"]) > 200:
                                 msg["content"] = msg["content"][:200] + "... (truncated)"
-                    debug_message_retry = ("Status (RETRY): " + str(response.status_code) + "\nResponse: " + 
+                    debug_message_retry = ("Status (RETRY): " + str(response.status_code) + "\nResponse: " +
                                           json.dumps(debug_response_retry, indent=2))
                     self._debug_console(debug_message_retry, "RECV")
                 except Exception:
-                    debug_message_retry = ("Status (RETRY): " + str(response.status_code) + 
+                    debug_message_retry = ("Status (RETRY): " + str(response.status_code) +
                                           "\nResponse: (non-JSON or error)")
                     self._debug_console(debug_message_retry, "RECV")
-                
+
                 # If retry also failed, return the error
                 if response.status_code != 200:
-                    return False, self._extract_error_message(response, response.status_code)
+                    return AIResult(
+                        success=False, text="",
+                        error=self._extract_error_message(response, response.status_code),
+                        usage=None, model=model,
+                    )
                 # Otherwise, continue processing the successful retry response below (fall through to normal processing)
-            
+
             # Handle temperature error - retry without temperature parameter
             # Check for various temperature error patterns
             # Error messages like: "Unsupported value: 'temperature' does not support 0.7..."
@@ -383,21 +482,34 @@ class AIService:
                 payload_retry = payload.copy()
                 if "temperature" in payload_retry:
                     del payload_retry["temperature"]
-                
+
                 # Debug retry
                 debug_payload_retry = payload_retry.copy()
                 debug_message_retry = ("POST (RETRY) " + str(url) + "\nPayload: " +
                                       json.dumps(debug_payload_retry, indent=2))
                 self._debug_console(debug_message_retry, "SEND")
-                
+
                 # Retry request
-                response = requests.post(
-                    url,
-                    headers=headers,
-                    json=payload_retry,
-                    timeout=timeout_seconds
-                )
-                
+                try:
+                    _t0_retry2 = time.monotonic()
+                    response = requests.post(
+                        url,
+                        headers=headers,
+                        json=payload_retry,
+                        timeout=timeout_seconds
+                    )
+                except requests.exceptions.Timeout:
+                    _elapsed = time.monotonic() - _t0_retry2
+                    LoggingService.get_instance().error(
+                        f"AI request timeout: model={model}, timeout={timeout_seconds}s, "
+                        f"elapsed={_elapsed:.1f}s, endpoint={_endpoint_label}-retry"
+                    )
+                    return AIResult(
+                        success=False, text="",
+                        error=f"Request timed out after {timeout_seconds}s ({url})",
+                        usage=None, model=model,
+                    )
+
                 # Debug retry response
                 try:
                     response_data_retry = response.json() if response.content else {}
@@ -407,73 +519,115 @@ class AIService:
                             msg = choice.get("message", {})
                             if "content" in msg and len(msg["content"]) > 200:
                                 msg["content"] = msg["content"][:200] + "... (truncated)"
-                    debug_message_retry = ("Status (RETRY): " + str(response.status_code) + "\nResponse: " + 
+                    debug_message_retry = ("Status (RETRY): " + str(response.status_code) + "\nResponse: " +
                                           json.dumps(debug_response_retry, indent=2))
                     self._debug_console(debug_message_retry, "RECV")
                 except Exception:
-                    debug_message_retry = ("Status (RETRY): " + str(response.status_code) + 
+                    debug_message_retry = ("Status (RETRY): " + str(response.status_code) +
                                           "\nResponse: (non-JSON or error)")
                     self._debug_console(debug_message_retry, "RECV")
-                
+
                 # If retry also failed, return the error
                 if response.status_code != 200:
-                    return False, self._extract_error_message(response, response.status_code)
+                    return AIResult(
+                        success=False, text="",
+                        error=self._extract_error_message(response, response.status_code),
+                        usage=None, model=model,
+                    )
                 # Otherwise, continue processing the successful retry response below (fall through to normal processing)
-            
+
             # Provide helpful error messages for other common issues
             elif "not supported in the v1/chat/completions" in error_message or "not in v1/chat/completions" in error_message:
                 if "o3-" in model:
-                    return False, (
-                        f"Model {model} requires the v1/responses endpoint, which is not currently supported. "
-                        "Please select a different model (e.g., gpt-4, gpt-3.5-turbo, or o1 models)."
+                    return AIResult(
+                        success=False, text="",
+                        error=(
+                            f"Model {model} requires the v1/responses endpoint, which is not currently supported. "
+                            "Please select a different model (e.g., gpt-4, gpt-3.5-turbo, or o1 models)."
+                        ),
+                        usage=None, model=model,
                     )
                 else:
-                    return False, (
-                        f"Model {model} is not compatible with the chat completions endpoint. "
-                        "This model may require a different API endpoint. Please select a different model."
+                    return AIResult(
+                        success=False, text="",
+                        error=(
+                            f"Model {model} is not compatible with the chat completions endpoint. "
+                            "This model may require a different API endpoint. Please select a different model."
+                        ),
+                        usage=None, model=model,
                     )
             else:
                 # Other errors - return the error message
-                return False, error_message
+                return AIResult(success=False, text="", error=error_message, usage=None, model=model)
         
         try:
             data = response.json()
             if not isinstance(data, dict):
-                return False, (
-                    f"Unexpected API response format (expected JSON object, got {type(data).__name__}). "
-                    "The server may have returned an error or non-standard response."
+                return AIResult(
+                    success=False, text="",
+                    error=(
+                        f"Unexpected API response format (expected JSON object, got {type(data).__name__}). "
+                        "The server may have returned an error or non-standard response."
+                    ),
+                    usage=None, model=model,
                 )
 
             # Extract content from response
             # Structure: {"choices": [{"message": {"content": "..."}}]}
             choices = data.get("choices", [])
             if not choices:
-                # Log the full response for debugging
-                return False, f"Empty choices in API response: {data}"
+                return AIResult(
+                    success=False, text="",
+                    error=f"Empty choices in API response: {data}",
+                    usage=None, model=model,
+                )
             
             choice = choices[0]
             message = choice.get("message", {})
             content = message.get("content", "")
             finish_reason = choice.get("finish_reason", "")
             
+            # Extract token usage
+            usage_data = data.get("usage")
+            if usage_data:
+                completion_details = (usage_data.get("completion_tokens_details") or {})
+                usage = TokenUsage(
+                    input_tokens=usage_data.get("prompt_tokens"),
+                    output_tokens=usage_data.get("completion_tokens"),
+                    reasoning_tokens=completion_details.get("reasoning_tokens"),
+                    reported=True,
+                )
+            else:
+                usage = TokenUsage(input_tokens=None, output_tokens=None, reasoning_tokens=None, reported=False)
+
             # Truncated / thinking-only empty reply (OpenAI and local OpenAI-compatible APIs)
             if finish_reason == "length" and not content:
-                usage = data.get("usage", {})
-                completion_tokens = usage.get("completion_tokens")
-                completion_details = usage.get("completion_tokens_details", {}) or {}
-                reasoning_tokens = completion_details.get("reasoning_tokens")
-                return False, self.output_token_limit_message(
-                    output_tokens=completion_tokens,
-                    reasoning_tokens=reasoning_tokens,
+                raw_usage = usage_data or {}
+                completion_tokens = raw_usage.get("completion_tokens")
+                reasoning_tokens = (raw_usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+                return AIResult(
+                    success=False, text="",
+                    error=self.output_token_limit_message(
+                        output_tokens=completion_tokens,
+                        reasoning_tokens=reasoning_tokens,
+                    ),
+                    usage=usage, model=model,
                 )
             
             if not content:
-                # Log the full response for debugging
-                return False, f"Empty content in API response. Finish reason: {finish_reason}. Full response: {data}"
+                return AIResult(
+                    success=False, text="",
+                    error=f"Empty content in API response. Finish reason: {finish_reason}. Full response: {data}",
+                    usage=usage, model=model,
+                )
             
-            return True, content
+            return AIResult(success=True, text=content, error=None, usage=usage, model=model)
         except Exception as e:
-            return False, f"Error parsing API response: {str(e)}"
+            return AIResult(
+                success=False, text="",
+                error=f"Error parsing API response: {str(e)}",
+                usage=None, model=model,
+            )
     
     def _send_anthropic_message(
         self,
@@ -482,8 +636,9 @@ class AIService:
         messages: List[Dict[str, str]],
         system_prompt: Optional[str] = None,
         token_limit: Optional[int] = None,
-        timeout_seconds: int = 60
-    ) -> Tuple[bool, str]:
+        timeout_seconds: int = 60,
+        thinking: Optional[Dict[str, Any]] = None,
+    ) -> AIResult:
         """Send message to Anthropic API.
         
         Args:
@@ -495,7 +650,7 @@ class AIService:
             timeout_seconds: Request timeout in seconds.
             
         Returns:
-            Tuple of (success: bool, response_text: str or error_message: str).
+            AIResult with success, text, error, usage, and model fields.
         """
         # Prepare messages for Anthropic
         anthropic_messages = []
@@ -527,7 +682,17 @@ class AIService:
         # Add system prompt if provided
         if system_prompt:
             payload["system"] = system_prompt
-        
+
+        if thinking is not None:
+            payload["thinking"] = thinking
+
+        # If this model already rejected thinking.type.disabled in a prior call this session,
+        # substitute the cached override immediately — skip the failed first attempt.
+        if thinking == {"type": "disabled"} and model in self._models_thinking_override:
+            for key in ("thinking", "output_config"):
+                payload.pop(key, None)
+            payload.update(self._models_thinking_override[model])
+
         # Debug outbound: log request payload (hide API key)
         debug_payload = payload.copy()
         debug_headers = {k: ("***" if k == "x-api-key" else v) for k, v in headers.items()}
@@ -535,14 +700,27 @@ class AIService:
                         json.dumps(debug_headers, indent=2) + "\nPayload: " + 
                         json.dumps(debug_payload, indent=2))
         self._debug_console(debug_message, "SEND")
-        
-        response = requests.post(
-            self.ANTHROPIC_MESSAGES_URL,
-            headers=headers,
-            json=payload,
-            timeout=timeout_seconds
-        )
-        
+
+        try:
+            _t0_anth = time.monotonic()
+            response = requests.post(
+                self.ANTHROPIC_MESSAGES_URL,
+                headers=headers,
+                json=payload,
+                timeout=timeout_seconds
+            )
+        except requests.exceptions.Timeout:
+            _elapsed = time.monotonic() - _t0_anth
+            LoggingService.get_instance().error(
+                f"AI request timeout: model={model}, timeout={timeout_seconds}s, "
+                f"elapsed={_elapsed:.1f}s, endpoint=anthropic"
+            )
+            return AIResult(
+                success=False, text="",
+                error=f"Request timed out after {timeout_seconds}s",
+                usage=None, model=model,
+            )
+
         # Debug inbound: log response
         try:
             response_data = response.json() if response.content else {}
@@ -564,22 +742,131 @@ class AIService:
         if response.status_code != 200:
             error_data = response.json() if response.content else {}
             error_message = error_data.get("error", {}).get("message", f"API error: {response.status_code}")
-            return False, error_message
+
+            # Retry once when the model rejects thinking.type.disabled with a recognized message.
+            # Two distinct triggers, each narrow enough to avoid false matches:
+            #   1. "thinking.type.disabled … not supported" → adaptive + effort:low
+            #   2. "between_tools … instead of" → between_tools, no output_config
+            #      (Sonnet 5.5 only; Anthropic docs: "'effort: high' matches the API default",
+            #       which is within between_tools' allowed range, so no output_config needed)
+            # Only fires when (a) we actually sent disabled and (b) this model hasn't been
+            # cached yet — prevents a stale retry if pre-substitution somehow didn't apply.
+            thinking_override = None
+            if thinking == {"type": "disabled"} and model not in self._models_thinking_override:
+                if ("thinking.type.disabled" in error_message
+                        and "not supported" in error_message.lower()):
+                    thinking_override = {"thinking": {"type": "adaptive"},
+                                         "output_config": {"effort": "low"}}
+                elif ("between_tools" in error_message
+                        and "instead of" in error_message.lower()):
+                    thinking_override = {"thinking": {"type": "between_tools"}}
+
+            if thinking_override is not None:
+                self._models_thinking_override[model] = thinking_override
+                payload_retry = {k: v for k, v in payload.items()
+                                 if k not in ("thinking", "output_config")}
+                payload_retry.update(thinking_override)
+                self._debug_console(
+                    "POST (RETRY) " + str(self.ANTHROPIC_MESSAGES_URL) + "\nPayload: " +
+                    json.dumps(payload_retry, indent=2), "SEND")
+                try:
+                    _t0_anth_retry = time.monotonic()
+                    response = requests.post(
+                        self.ANTHROPIC_MESSAGES_URL,
+                        headers=headers,
+                        json=payload_retry,
+                        timeout=timeout_seconds,
+                    )
+                except requests.exceptions.Timeout:
+                    _elapsed = time.monotonic() - _t0_anth_retry
+                    LoggingService.get_instance().error(
+                        f"AI request timeout: model={model}, timeout={timeout_seconds}s, "
+                        f"elapsed={_elapsed:.1f}s, endpoint=anthropic-retry"
+                    )
+                    return AIResult(
+                        success=False, text="",
+                        error=f"Request timed out after {timeout_seconds}s",
+                        usage=None, model=model,
+                    )
+                try:
+                    response_data_retry = response.json() if response.content else {}
+                    debug_response_retry = response_data_retry.copy()
+                    if "content" in debug_response_retry:
+                        for item in debug_response_retry.get("content", []):
+                            if isinstance(item, dict) and "text" in item and len(item["text"]) > 200:
+                                item["text"] = item["text"][:200] + "... (truncated)"
+                    self._debug_console(
+                        "Status (RETRY): " + str(response.status_code) + "\nResponse: " +
+                        json.dumps(debug_response_retry, indent=2), "RECV")
+                except Exception:
+                    self._debug_console(
+                        "Status (RETRY): " + str(response.status_code) +
+                        "\nResponse: (non-JSON or error)", "RECV")
+                if response.status_code != 200:
+                    error_data_retry = response.json() if response.content else {}
+                    error_message_retry = error_data_retry.get("error", {}).get(
+                        "message", f"API error: {response.status_code}")
+                    return AIResult(success=False, text="", error=error_message_retry,
+                                    usage=None, model=model)
+                # Retry succeeded — fall through to response parsing below.
+            else:
+                return AIResult(success=False, text="", error=error_message, usage=None, model=model)
         
         data = response.json()
+        content_blocks = data.get("content", [])
         content = self.anthropic_message_text(data)
-        
-        if not content:
-            stop_reason = data.get("stop_reason", "")
-            if stop_reason == "max_tokens":
-                usage = data.get("usage", {}) or {}
-                return False, self.output_token_limit_message(
-                    output_tokens=usage.get("output_tokens"),
-                )
-            return False, "Empty response from API"
-        
-        return True, content
 
+        stop_reason = data.get("stop_reason", "")
+        block_types = tuple(
+            b.get("type", "") for b in content_blocks if isinstance(b, dict)
+        )
+
+        # Extract token usage
+        usage_data = data.get("usage")
+        if usage_data:
+            usage = TokenUsage(
+                input_tokens=usage_data.get("input_tokens"),
+                output_tokens=usage_data.get("output_tokens"),
+                reasoning_tokens=None,  # Anthropic usage doesn't separate out thinking tokens
+                reported=True,
+            )
+        else:
+            usage = TokenUsage(input_tokens=None, output_tokens=None, reasoning_tokens=None, reported=False)
+
+        if not content:
+            if stop_reason == "max_tokens":
+                return AIResult(
+                    success=False, text="",
+                    error=self.output_token_limit_message(
+                        output_tokens=usage.output_tokens if usage else None,
+                    ),
+                    usage=usage, model=model,
+                    stop_reason=stop_reason,
+                    content_block_count=len(content_blocks),
+                    content_block_types=block_types,
+                )
+            return AIResult(
+                success=False, text="",
+                error="Empty response from API",
+                usage=usage, model=model,
+                stop_reason=stop_reason,
+                content_block_count=len(content_blocks),
+                content_block_types=block_types,
+            )
+
+        if stop_reason == "max_tokens":
+            content = content + (
+                "\n\n[Response was cut off — the model reached the output token limit. "
+                "Try increasing the Tokens limit in the narrative controls.]"
+            )
+
+        return AIResult(
+            success=True, text=content, error=None, usage=usage, model=model,
+            stop_reason=stop_reason,
+            content_block_count=len(content_blocks),
+            content_block_types=block_types,
+        )
+    
     @staticmethod
     def output_token_limit_message(
         output_tokens: Optional[int] = None,
@@ -608,7 +895,7 @@ class AIService:
             if isinstance(block, dict) and block.get("type") == "text"
         ]
         return "".join(parts).strip()
-    
+
     @staticmethod
     def parse_model_string(model_string: str) -> Tuple[str, str]:
         """Parse a model string with provider prefix.

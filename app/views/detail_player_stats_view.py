@@ -1,8 +1,7 @@
 """Player Statistics view for detail panel."""
 
-import bisect
 import math
-from datetime import date, timedelta
+from datetime import date
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
@@ -75,6 +74,17 @@ if TYPE_CHECKING:
     from app.controllers.database_controller import DatabaseController
     from app.services.player_stats_service import AggregatedPlayerStats
     from app.services.error_pattern_service import ErrorPattern
+
+from app.views.widgets._chart_layout_helpers import (
+    GapCompressedTimeLayout,
+    build_gap_compressed_time_layout,
+    effective_calendar_mode,
+    ordinal_to_chart_x,
+    smooth_polyline_path,
+    week_start_monday_ordinal,
+)
+
+_smooth_polyline_path = smooth_polyline_path  # compat alias for accuracy_distribution_chart_widget
 
 
 # Section id -> menu label (Player Stats menu). Order is the default display order.
@@ -750,18 +760,6 @@ class AccuracyVsProgressChartWidget(QWidget):
         self.update()
 
 
-def _accuracy_over_time_ordinal_to_x(
-    o: int, left: float, graph_width: float, omin: int, omax: int
-) -> float:
-    span = max(1, omax - omin)
-    return left + (o - omin) / span * graph_width
-
-
-# Infer X-axis tick density when ``calendar_mode`` was not set on the series.
-_AXIS_FALLBACK_DAY_MAX_SPAN_DAYS = 31
-_AXIS_FALLBACK_WEEK_MAX_SPAN_DAYS = 120
-_AXIS_FALLBACK_MONTH_MAX_SPAN_DAYS = 960
-
 # strftime("%b") follows the process locale; keep chart labels English regardless of OS language.
 _EN_MONTH_ABBREV = (
     "",
@@ -813,50 +811,6 @@ def _short_label_for_bin_dates(lab0: str, lab1: str) -> str:
         s = str(lab0).strip()
         return s[:12] + "…" if len(s) > 12 else s
     return _format_axis_tick_day_month(date.fromordinal(oc))
-
-
-def _smooth_polyline_path(run: List[QPointF], *, strength: float = 1.0) -> Optional[QPainterPath]:
-    """Cubic Bézier chain (Catmull–Rom style) through ``run`` for a flowing line.
-
-    Vertices are preserved as segment endpoints; the curve may bulge slightly past
-    straight chords (especially at sharp turns). ``strength`` scales handle tension
-    (0 ≈ straight segments, ~1 default, >1 more wavy).
-    """
-    n = len(run)
-    if n < 2:
-        return None
-    path = QPainterPath(run[0])
-    if n == 2:
-        path.lineTo(run[1])
-        return path
-    if strength < 0.05:
-        for k in range(n - 1):
-            path.lineTo(run[k + 1])
-        return path
-    k = strength / 6.0
-
-    def _pt(i: int) -> QPointF:
-        return run[max(0, min(n - 1, i))]
-
-    for i in range(n - 1):
-        p_im1 = _pt(i - 1) if i > 0 else QPointF(2 * run[0].x() - run[1].x(), 2 * run[0].y() - run[1].y())
-        p_i = run[i]
-        p_ip1 = run[i + 1]
-        p_ip2 = (
-            run[i + 2]
-            if i + 2 < n
-            else QPointF(2 * run[n - 1].x() - run[n - 2].x(), 2 * run[n - 1].y() - run[n - 2].y())
-        )
-        c1 = QPointF(
-            p_i.x() + (p_ip1.x() - p_im1.x()) * k,
-            p_i.y() + (p_ip1.y() - p_im1.y()) * k,
-        )
-        c2 = QPointF(
-            p_ip1.x() - (p_ip2.x() - p_i.x()) * k,
-            p_ip1.y() - (p_ip2.y() - p_i.y()) * k,
-        )
-        path.cubicTo(c1, c2, p_ip1)
-    return path
 
 
 def _closest_point_on_segment(p: QPointF, a: QPointF, b: QPointF) -> Tuple[QPointF, float]:
@@ -958,135 +912,6 @@ def _bin_ordinal_center_from_iso(lab0: str, lab1: str) -> Optional[int]:
         return None
 
 
-class GapCompressedTimeLayout:
-    """Non-linear map calendar ordinal → horizontal fraction so long game-free spans use less width."""
-
-    __slots__ = ("_knots", "_cum", "_compressed_bounds")
-
-    def __init__(
-        self,
-        knots: List[int],
-        cum_display: List[float],
-        compressed_span_boundary_ordinals: frozenset[int],
-    ) -> None:
-        self._knots = tuple(knots)
-        self._cum = tuple(cum_display)
-        self._compressed_bounds = compressed_span_boundary_ordinals
-
-    @property
-    def compressed_span_boundary_ordinals(self) -> frozenset[int]:
-        """Knot ordinals at ends of segments where calendar span exceeded the cap (visual hint targets)."""
-        return self._compressed_bounds
-
-    def ordinal_to_frac(self, o: int) -> float:
-        if not self._knots:
-            return 0.0
-        o = max(self._knots[0], min(self._knots[-1], o))
-        for i in range(len(self._knots) - 1):
-            lo, hi = self._knots[i], self._knots[i + 1]
-            if lo <= o <= hi:
-                span = hi - lo
-                f0, f1 = self._cum[i], self._cum[i + 1]
-                if span <= 0:
-                    return f1
-                t = (o - lo) / span
-                return f0 + t * (f1 - f0)
-        return self._cum[-1]
-
-    def frac_to_ordinal(self, frac: float) -> int:
-        """Inverse of ``ordinal_to_frac`` for hover / crosshair date hints."""
-        if not self._knots:
-            return 0
-        frac = max(0.0, min(1.0, frac))
-        cum = self._cum
-        knots = self._knots
-        i = bisect.bisect_right(cum, frac) - 1
-        i = max(0, min(i, len(cum) - 2))
-        f0, f1 = cum[i], cum[i + 1]
-        lo, hi = knots[i], knots[i + 1]
-        denom = f1 - f0
-        if denom <= 1e-15:
-            return int(hi)
-        t = (frac - f0) / denom
-        return int(round(lo + t * (hi - lo)))
-
-
-def _build_gap_compressed_time_layout(
-    omin: int,
-    omax: int,
-    bin_center_ordinals: List[int],
-    max_segment_calendar_days: int,
-) -> Optional[GapCompressedTimeLayout]:
-    """Layout where each segment's horizontal weight is capped (compresses long gaps with no bins).
-
-    Knots span from ``min(omin, first_bin)`` to ``max(omax, last_bin)`` so large calendar gaps
-    between bins are real segments (not lost to axis-only clipping). Callers map ``[omin, omax]``
-    to the plot width via :func:`_ordinal_to_chart_x` (renormalized fractions).
-    """
-    if omax <= omin or max_segment_calendar_days < 1:
-        return None
-    uniq = sorted({int(c) for c in bin_center_ordinals})
-    if len(uniq) < 2:
-        return None
-    k0 = min(omin, uniq[0])
-    kn = max(omax, uniq[-1])
-    if kn <= k0:
-        return None
-    knots: List[int] = [k0]
-    for c in uniq:
-        if c <= k0:
-            continue
-        if c >= kn:
-            break
-        if c > knots[-1]:
-            knots.append(c)
-    if kn > knots[-1]:
-        knots.append(kn)
-    fixed: List[int] = [knots[0]]
-    for k in knots[1:]:
-        if k > fixed[-1]:
-            fixed.append(k)
-    knots = fixed
-    if len(knots) < 2:
-        return None
-    weights: List[float] = []
-    compressed_bounds: set[int] = set()
-    for i in range(len(knots) - 1):
-        d = knots[i + 1] - knots[i]
-        weights.append(max(1.0, float(min(d, max_segment_calendar_days))))
-        if d > max_segment_calendar_days:
-            compressed_bounds.add(int(knots[i]))
-            compressed_bounds.add(int(knots[i + 1]))
-    total = sum(weights)
-    if total <= 0:
-        return None
-    cum: List[float] = [0.0]
-    for w in weights:
-        cum.append(cum[-1] + w / total)
-    cum[-1] = 1.0
-    return GapCompressedTimeLayout(knots, cum, frozenset(compressed_bounds))
-
-
-def _ordinal_to_chart_x(
-    o: int,
-    left: float,
-    graph_width: float,
-    omin: int,
-    omax: int,
-    layout: Optional[GapCompressedTimeLayout],
-) -> float:
-    if layout is not None and omax > omin:
-        o = max(omin, min(omax, o))
-        f = layout.ordinal_to_frac(o)
-        f0 = layout.ordinal_to_frac(omin)
-        f1 = layout.ordinal_to_frac(omax)
-        span_f = f1 - f0
-        if span_f <= 1e-15:
-            return _accuracy_over_time_ordinal_to_x(o, left, graph_width, omin, omax)
-        return left + (f - f0) / span_f * graph_width
-    return _accuracy_over_time_ordinal_to_x(o, left, graph_width, omin, omax)
-
-
 def _paint_gap_compressed_span_markers(
     painter: QPainter,
     layout: GapCompressedTimeLayout,
@@ -1108,7 +933,7 @@ def _paint_gap_compressed_span_markers(
     pen.setCapStyle(Qt.PenCapStyle.FlatCap)
     painter.setPen(pen)
     for o_ord in sorted(bounds):
-        x = _ordinal_to_chart_x(o_ord, left, graph_width, omin, omax, layout)
+        x = ordinal_to_chart_x(o_ord, left, graph_width, omin, omax, layout)
         xi = int(round(x))
         painter.drawLine(xi, int(top), xi, int(bottom))
 
@@ -1127,7 +952,7 @@ def _chart_x_from_bin_labels(
     oc = _bin_ordinal_center_from_iso(lab0, lab1)
     if oc is not None and omax > omin:
         oc = max(omin, min(omax, oc))
-        return _ordinal_to_chart_x(oc, left, graph_width, omin, omax, time_axis_layout)
+        return ordinal_to_chart_x(oc, left, graph_width, omin, omax, time_axis_layout)
     return left + (time_pct / 100.0 * graph_width)
 
 
@@ -1283,7 +1108,7 @@ class AccuracyOverTimeChartWidget(QWidget):
                 oc = _bin_ordinal_center_from_iso(row[5], row[6])
                 if oc is not None:
                     centers.append(oc)
-            self._time_axis_layout = _build_gap_compressed_time_layout(
+            self._time_axis_layout = build_gap_compressed_time_layout(
                 ordinal_min,
                 ordinal_max,
                 centers,
@@ -1331,18 +1156,10 @@ class AccuracyOverTimeChartWidget(QWidget):
     def _effective_calendar_mode(self) -> str:
         if self._calendar_mode:
             return self._calendar_mode
-        span = max(0, self._ordinal_max - self._ordinal_min)
-        if span <= _AXIS_FALLBACK_DAY_MAX_SPAN_DAYS:
-            return "day"
-        if span <= _AXIS_FALLBACK_WEEK_MAX_SPAN_DAYS:
-            return "week"
-        if span <= _AXIS_FALLBACK_MONTH_MAX_SPAN_DAYS:
-            return "month"
-        return "year"
+        return effective_calendar_mode(self._ordinal_min, self._ordinal_max)
 
     def _week_start_monday_ordinal(self, ord_val: int) -> int:
-        d = date.fromordinal(ord_val)
-        return (d - timedelta(days=d.weekday())).toordinal()
+        return week_start_monday_ordinal(ord_val)
 
     def _calendar_axis_ticks(self) -> List[Tuple[int, bool, str]]:
         """(ordinal, is_major, label) — label empty for tick without text."""
@@ -1481,7 +1298,7 @@ class AccuracyOverTimeChartWidget(QWidget):
             else:
                 tick_list = self._calendar_axis_ticks()
                 for o_ord, is_major, _lbl in tick_list:
-                    x = _ordinal_to_chart_x(
+                    x = ordinal_to_chart_x(
                         o_ord,
                         left,
                         graph_width,
@@ -1552,7 +1369,7 @@ class AccuracyOverTimeChartWidget(QWidget):
             for o_ord, is_major, lbl in tick_list:
                 if not lbl or not is_major:
                     continue
-                x = _ordinal_to_chart_x(
+                x = ordinal_to_chart_x(
                     o_ord,
                     left,
                     graph_width,
@@ -1585,7 +1402,7 @@ class AccuracyOverTimeChartWidget(QWidget):
             painter.setPen(pen_ln)
             if len(run) > 1:
                 if self._progression_line_smooth and self._line_style == Qt.PenStyle.SolidLine:
-                    spath = _smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
+                    spath = smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
                     if spath is not None:
                         painter.drawPath(spath)
                     else:
@@ -1839,7 +1656,7 @@ class AccuracyOverTimeChartWidget(QWidget):
 
         # If we draw a smoothed curve, hit-test against that curve so the circle stays on the line.
         if self._progression_line_smooth and self._line_style == Qt.PenStyle.SolidLine:
-            spath = _smooth_polyline_path(points, strength=self._progression_line_smooth_strength)
+            spath = smooth_polyline_path(points, strength=self._progression_line_smooth_strength)
             if spath is not None:
                 best_pixel, best_dist_sq = _closest_point_on_painter_path(mp, spath, n_hint=len(points))
                 if best_pixel is not None:
@@ -2018,7 +1835,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 oc = _bin_ordinal_center_from_iso(row[2], row[3])
                 if oc is not None:
                     centers_m.append(oc)
-            self._time_axis_layout = _build_gap_compressed_time_layout(
+            self._time_axis_layout = build_gap_compressed_time_layout(
                 ordinal_min,
                 ordinal_max,
                 centers_m,
@@ -2148,18 +1965,10 @@ class MoveQualityOverTimeChartWidget(QWidget):
     def _effective_calendar_mode(self) -> str:
         if self._calendar_mode:
             return self._calendar_mode
-        span = max(0, self._ordinal_max - self._ordinal_min)
-        if span <= _AXIS_FALLBACK_DAY_MAX_SPAN_DAYS:
-            return "day"
-        if span <= _AXIS_FALLBACK_WEEK_MAX_SPAN_DAYS:
-            return "week"
-        if span <= _AXIS_FALLBACK_MONTH_MAX_SPAN_DAYS:
-            return "month"
-        return "year"
+        return effective_calendar_mode(self._ordinal_min, self._ordinal_max)
 
     def _week_start_monday_ordinal(self, ord_val: int) -> int:
-        d = date.fromordinal(ord_val)
-        return (d - timedelta(days=d.weekday())).toordinal()
+        return week_start_monday_ordinal(ord_val)
 
     def _calendar_axis_ticks(self) -> List[Tuple[int, bool, str]]:
         omin, omax = self._ordinal_min, self._ordinal_max
@@ -2293,7 +2102,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
             else:
                 tick_list = self._calendar_axis_ticks()
                 for o_ord, is_major, _lbl in tick_list:
-                    x = _ordinal_to_chart_x(
+                    x = ordinal_to_chart_x(
                         o_ord,
                         left,
                         graph_width,
@@ -2367,7 +2176,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
             for o_ord, is_major, lbl in tick_list:
                 if not lbl or not is_major:
                     continue
-                x = _ordinal_to_chart_x(
+                x = ordinal_to_chart_x(
                     o_ord,
                     left,
                     graph_width,
@@ -2400,7 +2209,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
             painter.setPen(pen)
             if len(run) > 1:
                 if self._progression_line_smooth and line_style == Qt.PenStyle.SolidLine:
-                    spath = _smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
+                    spath = smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
                     if spath is not None:
                         painter.drawPath(spath)
                     else:
@@ -2503,7 +2312,7 @@ class MoveQualityOverTimeChartWidget(QWidget):
                 if self._progression_line_smooth and line_style == Qt.PenStyle.SolidLine:
                     run = series_runs[j] if 0 <= j < len(series_runs) else []
                     if len(run) >= 2:
-                        spath = _smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
+                        spath = smooth_polyline_path(run, strength=self._progression_line_smooth_strength)
                         if spath is not None:
                             hy_from_curve = _painter_path_y_at_x(spath, hx, n_hint=len(run))
                 if hy_from_curve is not None:

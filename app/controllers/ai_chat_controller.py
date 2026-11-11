@@ -10,6 +10,11 @@ from app.services.ai_service import AIService, AIProvider
 from app.services.user_settings_service import UserSettingsService
 from app.services.pgn_formatter_service import PgnFormatterService
 from app.services.logging_service import LoggingService
+from app.utils.ai_provider_config import (
+    get_active_provider_label as _get_active_provider_label,
+    get_available_models as _get_available_models,
+    resolve_default_provider,
+)
 
 
 class AIRequestThread(QThread):
@@ -49,7 +54,7 @@ class AIRequestThread(QThread):
     def run(self) -> None:
         """Execute the AI request in the background thread."""
         ai_service = AIService(self.config)
-        success, response = ai_service.send_message(
+        result = ai_service.send_message(
             self.provider,
             self.model,
             self.api_key,
@@ -59,7 +64,10 @@ class AIRequestThread(QThread):
             base_url_override=self.base_url_override,
             timeout_seconds=self.timeout_seconds
         )
-        self.response_received.emit(success, response)
+        self.response_received.emit(
+            result.success,
+            result.text if result.success else (result.error or ""),
+        )
 
 
 class AIChatController(QObject):
@@ -275,71 +283,36 @@ Please provide a brief analysis of this position, including:
     
     def get_available_models(self) -> List[str]:
         """Get list of available models with provider prefixes.
-        
-        Returns:
-            List of model strings in format "Provider: model" (e.g., ["OpenAI: gpt-4", "Anthropic: claude-3-5-sonnet"]).
+
+        Returns model strings in format ``"Provider: model"``
+        (e.g., ``["OpenAI: gpt-4", "Anthropic: claude-3-5-sonnet"]``).
         """
-        models: List[str] = []
-        ai_settings = self.user_settings_service.get_settings().get("ai_models", {})
-        use_openai, use_anthropic, use_custom = self._get_provider_preferences()
-        
-        if use_openai:
-            openai_settings = ai_settings.get("openai", {})
-            openai_api_key = openai_settings.get("api_key", "")
-            openai_models = openai_settings.get("models", []) or []
-            if openai_api_key:
-                for model in openai_models:
-                    models.append(f"OpenAI: {model}")
-        
-        if use_anthropic:
-            anthropic_settings = ai_settings.get("anthropic", {})
-            anthropic_api_key = anthropic_settings.get("api_key", "")
-            anthropic_models = anthropic_settings.get("models", []) or []
-            if anthropic_api_key:
-                for model in anthropic_models:
-                    models.append(f"Anthropic: {model}")
-        
-        if use_custom:
-            custom_settings = ai_settings.get("custom", {})
-            if not custom_settings.get("enabled", False):
-                pass
-            else:
-                custom_base_url = (custom_settings.get("base_url") or "").strip()
-                custom_models = custom_settings.get("models", []) or []
-                if custom_base_url and custom_models:
-                    for model in custom_models:
-                        models.append(f"Custom: {model}")
-        
-        return models
+        settings = self.user_settings_service.get_settings()
+        model_ids = _get_available_models(settings)
+        if not model_ids:
+            return []
+        label = _get_active_provider_label(settings)
+        if not label:
+            return []
+        return [f"{label}: {m}" for m in model_ids]
     
     def get_default_model(self) -> Optional[str]:
         """Get the default model from settings.
-        
+
         Returns:
             Model string in format "Provider: model" or None if not configured.
         """
-        ai_settings = self.user_settings_service.get_settings().get("ai_models", {})
-        use_openai, use_anthropic, use_custom = self._get_provider_preferences()
-        
-        # Check OpenAI first
-        if use_openai:
-            openai_settings = ai_settings.get("openai", {})
-            if openai_settings.get("api_key") and openai_settings.get("model"):
-                return f"OpenAI: {openai_settings['model']}"
-        
-        # Check Anthropic
-        if use_anthropic:
-            anthropic_settings = ai_settings.get("anthropic", {})
-            if anthropic_settings.get("api_key") and anthropic_settings.get("model"):
-                return f"Anthropic: {anthropic_settings['model']}"
-        
-        # Check Custom (only if enabled)
-        if use_custom:
-            custom_settings = ai_settings.get("custom", {})
-            if custom_settings.get("enabled", False) and custom_settings.get("base_url", "").strip() and custom_settings.get("model"):
-                return f"Custom: {custom_settings['model']}"
-        
-        return None
+        settings = self.user_settings_service.get_settings()
+        result = resolve_default_provider(settings)
+        if result is None:
+            return None
+        provider, model, _api_key, _base_url = result
+        provider_label = {
+            AIProvider.OPENAI: "OpenAI",
+            AIProvider.ANTHROPIC: "Anthropic",
+            AIProvider.CUSTOM: "Custom",
+        }.get(provider, str(provider))
+        return f"{provider_label}: {model}"
     
     def set_selected_model(self, model_string: str) -> None:
         """Set the selected model.
@@ -400,27 +373,6 @@ Please provide a brief analysis of this position, including:
                 return AIProvider.CUSTOM, model, api_key, base_url
         
         return None, None, None, None
-    
-    def _get_provider_preferences(self) -> tuple[bool, bool, bool]:
-        """Get provider toggle states from user settings.
-        
-        Returns:
-            Tuple of (use_openai_models, use_anthropic_models, use_custom_models) with enforced exclusivity.
-        """
-        settings = self.user_settings_service.get_settings()
-        ai_summary = settings.get("ai_summary", {})
-        use_openai = ai_summary.get("use_openai_models", True)
-        use_anthropic = ai_summary.get("use_anthropic_models", False)
-        use_custom = ai_summary.get("use_custom_models", False)
-        
-        # Enforce exactly one provider: if multiple or none True, default to OpenAI
-        count = sum([use_openai, use_anthropic, use_custom])
-        if count != 1:
-            use_openai = True
-            use_anthropic = False
-            use_custom = False
-        
-        return use_openai, use_anthropic, use_custom
     
     def _build_move_label_cache(self, game) -> None:
         """Build cache mapping ply indices to move labels for the active game."""
@@ -493,7 +445,15 @@ Please provide a brief analysis of this position, including:
         if provider == AIProvider.CUSTOM and not base_url_override:
             self.error_occurred.emit("Please configure a custom endpoint base URL in AI Model Settings.")
             return False
-        
+        ai_chat_prompts = (self.config or {}).get("prompts", {}).get("ai_chat", {})
+        system_preamble = ai_chat_prompts.get("system_preamble")
+        formatting_rules = ai_chat_prompts.get("formatting_rules")
+        if not system_preamble or not formatting_rules:
+            self.error_occurred.emit(
+                "AI Chat prompts are missing from config.json — reinstall or restore the file."
+            )
+            return False
+
         # Get position info first (before adding message)
         fen, pgn, ply_index = self._get_position_info()
         
@@ -522,23 +482,11 @@ Please provide a brief analysis of this position, including:
         self.message_added.emit("user", user_message)  # Emit original message without context for display
         self._last_conversation_ply = ply_index
         
-        # Formatting rules that must be included in every system prompt
-        formatting_rules = """CRITICAL FORMATTING RULES - YOU MUST FOLLOW THESE:
-1. NEVER use numbered lists (1., 2., 3., etc.) - write in paragraph form only
-2. NEVER use bullet points (-, *, •, etc.) - write in paragraph form only
-3. NEVER use headings or section breaks - write in continuous paragraph form only
-4. Keep all responses SHORT - aim for 2-3 sentences maximum
-5. Write in plain, continuous paragraph form with no formatting, lists, or structure
-6. Be direct and to the point - no lengthy explanations unless explicitly requested
-7. Moves that were NOT actually played in the game but you still want to reference must be bolded using double asterisks: **14.Re4**
-8. Moves that WERE actually played in the game must be wrapped exactly as [%14.Re4] for White or [%14...Re4] for Black using the notations provided. Never bold these real moves—only use the [%move] syntax.
-9. Only use the [%move] syntax for moves that exactly match the provided list of actual game moves."""
-        
         # Build system prompt - always include formatting rules and PGN context
         if len(self._conversation) == 1:
             # First message: include full initial context
             initial_prompt = self._generate_initial_prompt(fen, pgn, ply_index)
-            system_prompt = f"""You are a chess analysis assistant. Analyze chess positions based on FEN notation and game context.
+            system_prompt = f"""{system_preamble}
 
 {formatting_rules}
 
@@ -549,7 +497,7 @@ Please provide a brief analysis of this position, including:
             # Subsequent messages: regenerate prompt with current FEN but keep the stored PGN
             # This ensures the model always has access to both current position and full game context
             current_prompt = self._generate_initial_prompt(fen, self._stored_pgn, ply_index)
-            system_prompt = f"""You are a chess analysis assistant. Analyze chess positions based on FEN notation and game context.
+            system_prompt = f"""{system_preamble}
 
 {formatting_rules}
 

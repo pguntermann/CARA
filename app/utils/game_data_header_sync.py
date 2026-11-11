@@ -30,6 +30,7 @@ _HEAVY_HEADER_TAGS = frozenset(
         "CARAAnalysisData",
         "CARAAnnotations",
         "CARANotes",
+        "CARAChessLog",
     }
 )
 
@@ -71,6 +72,17 @@ def game_data_updates_for_header_tag(
         updates["has_notes"] = False if removed else True
         if removed:
             updates["notes"] = None
+    elif tag_name == "CARAChessLog":
+        # Same definition as everywhere else: at least one valid moment, not
+        # merely "tag present".
+        if removed:
+            updates["has_chess_log_tags"] = False
+        else:
+            from app.services.chess_log_storage_service import ChessLogStorageService
+
+            updates["has_chess_log_tags"] = ChessLogStorageService.has_moments(
+                {ChessLogStorageService.TAG_NAME: new_value or ""}
+            )
 
     # Keep parse-time header_values cache in sync for dynamic database columns.
     if tag_name and tag_name not in _HEAVY_HEADER_TAGS:

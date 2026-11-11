@@ -423,6 +423,8 @@ class UserSettingsService:
                     model.set_ai_models(template_value)
                 elif key == "ai_summary":
                     model.set_ai_summary(template_value)
+                elif key == "chess_log":
+                    model.set_chess_log(template_value)
                 elif key == "recent_pgn_databases":
                     model.set_recent_pgn_databases(
                         template_value if isinstance(template_value, list) else []
@@ -472,6 +474,8 @@ class UserSettingsService:
                         model.set_ai_models(section_dict)
                     elif key == "ai_summary":
                         model.set_ai_summary(section_dict)
+                    elif key == "chess_log":
+                        model.set_chess_log(section_dict)
                     elif key == "opening_encyclopedia_dialog":
                         model.set_opening_encyclopedia_dialog(section_dict)
                     needs_save = True
@@ -1118,7 +1122,7 @@ class UserSettingsService:
     
     def update_ai_summary_settings(self, settings: Dict[str, Any]) -> None:
         """Update AI summary provider settings.
-        
+
         Args:
             settings: Dictionary with provider toggles (use_openai_models, use_anthropic_models).
         """
@@ -1127,6 +1131,21 @@ class UserSettingsService:
         current.update(settings)
         self._normalize_ai_summary_settings(current)
         model.set_ai_summary(current)
+
+    def get_chess_log(self) -> Dict[str, Any]:
+        """Return Chess Log settings (active_preset)."""
+        return self.get_model().get_chess_log()
+
+    def update_chess_log_settings(self, partial: Dict[str, Any]) -> None:
+        """Merge-update Chess Log settings in memory (saved on exit or explicit save)."""
+        model = self.get_model()
+        current = model.get_chess_log()
+        current.update(partial)
+        model.set_chess_log(current)
+
+    def update_chess_log_charts_settings(self, partial: Dict[str, Any]) -> None:
+        """Merge keys into Chess Log charts settings (shallow merge into chess_log.charts)."""
+        self.get_model().update_chess_log_charts_settings(partial)
     
     def update_moves_list_profiles(self, profiles: Dict[str, Any]) -> None:
         """Persist the full moves list profile map (replaces the stored dict).

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -70,6 +71,16 @@ class TestMoveLinkPopupPlacement(unittest.TestCase):
 
 
 class TestTooltipStyleBoardFlag(unittest.TestCase):
+    def setUp(self):
+        self._settings_patcher = patch(
+            "app.services.user_settings_service.UserSettingsService.get_instance",
+            side_effect=RuntimeError("test isolation"),
+        )
+        self._settings_patcher.start()
+
+    def tearDown(self):
+        self._settings_patcher.stop()
+
     def test_style_configs_expose_the_board_switch(self) -> None:
         loader = ConfigLoader()
         for style_ref in (

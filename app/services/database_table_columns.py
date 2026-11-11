@@ -114,6 +114,7 @@ DATABASE_TABLE_COLUMNS: Tuple[DatabaseTableColumn, ...] = (
     DatabaseTableColumn("col_analyzed", "Analyzed", DatabaseModel.COL_ANALYZED),
     DatabaseTableColumn("col_annotated", "Annotated", DatabaseModel.COL_ANNOTATED),
     DatabaseTableColumn("col_notes", "Notes", DatabaseModel.COL_NOTES),
+    DatabaseTableColumn("col_log", "Log", DatabaseModel.COL_LOG),
     DatabaseTableColumn(
         "col_source_db",
         "Source DB",
@@ -148,6 +149,7 @@ _DEFAULT_WIDTHS: Dict[str, int] = {
     "col_analyzed": 80,
     "col_annotated": 80,
     "col_notes": 80,
+    "col_log": 80,
     "col_source_db": 120,
     "col_ref_ply": 70,
     "col_tags": 260,

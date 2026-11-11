@@ -340,6 +340,13 @@
           224,
           230
         ]
+      },
+      "chess_log": {
+        "card_fill": [
+          255,
+          255,
+          255
+        ]
       }
     },
     "styles": {
@@ -2121,6 +2128,79 @@
             "content_height": 400,
             "graph_stretch_factor": 1,
             "content_stretch_factor": 3
+          }
+        },
+        "chess_log_charts": {
+          "chart": {
+            "background_color": {
+              "$ref": "$_COLOR_BACKGROUND_4"
+            },
+            "grid_color": {
+              "$ref": "$_COLOR_CHART_GRIDLINE"
+            },
+            "axis_color": {
+              "$ref": "$_COLOR_CHART_AXIS"
+            },
+            "text_color": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "title_color": {
+              "$ref": "$_COLOR_TEXT_3"
+            }
+          },
+          "colors": {
+            "background": {
+              "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+            },
+            "text": {
+              "$ref": "$_COLOR_TEXT_SECONDARY"
+            },
+            "input_background": {
+              "$ref": "$_COLOR_BACKGROUND_5"
+            },
+            "border": {
+              "$ref": "$_COLOR_BUTTON_BORDER"
+            },
+            "hint_text": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "link": [
+              50,
+              110,
+              200
+            ],
+            "spinner_color": [
+              70,
+              100,
+              170
+            ]
+          },
+          "token_usage_label": {
+            "color": {
+              "$ref": "$_COLOR_TEXT_4"
+            },
+            "font_size": 10
+          },
+          "pdf_report": {
+            "colors": {
+              "warning_fill": [241, 196, 15],
+              "warning_outline": [30, 30, 30]
+            },
+            "table_col_widths_pct": [20, 40, 40]
+          },
+          "category_colors": {
+            "CLAMP": {
+              "C": [200, 80, 60],
+              "L": [180, 140, 0],
+              "A": [0, 120, 200],
+              "M": [0, 160, 90],
+              "P": [140, 80, 180]
+            },
+            "CCT": {
+              "C": [200, 110, 30],
+              "C2": [0, 120, 200],
+              "T": [0, 160, 90]
+            }
           }
         },
         "kpi_statistics": {
@@ -4047,6 +4127,7 @@
             "col_analyzed": 80,
             "col_annotated": 80,
             "col_notes": 80,
+            "col_log": 80,
             "col_source_db": 120,
             "col_ref_ply": 70,
             "col_tags": 260
@@ -4348,6 +4429,150 @@
           "button_size": 22,
           "column_spacing": 8,
           "top_offset": 2
+        }
+      },
+      "moment": {
+        "game_header": {
+          "background_color": {
+            "$ref": "$_COLOR_ACCENT_PRIMARY"
+          },
+          "text_color": [
+            255,
+            255,
+            255
+          ],
+          "padding_vertical": 7,
+          "padding_horizontal": 16,
+          "top_spacing": 30
+        },
+        "width": 420,
+        "button_width": 100,
+        "button_height": 28,
+        "bottom_button_top_padding": 16,
+        "buttons": {
+          "spacing": 10
+        },
+        "layout": {
+          "margins": [12, 10, 12, 10],
+          "spacing": 8
+        },
+        "chips": {
+          "min_width": 36,
+          "cct_min_width": 72
+        },
+        "why": {
+          "minimum_height": 50
+        },
+        "three_by_three": {
+          "edit_minimum_height": 40
+        },
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "hint_color": [
+          190,
+          50,
+          50
+        ],
+        "muted_color": {
+          "$ref": "$_COLOR_TEXT_4"
+        },
+        "separator_color": {
+          "$ref": "$_COLOR_SEPERATOR_BACKGROUND"
+        },
+        "label_font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "label_font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "chip_bg_color": {
+          "$ref": "$_COLOR_BACKGROUND_5"
+        },
+        "chip_selected_color": {
+          "$ref": "$_COLOR_ACCENT_PRIMARY"
+        },
+        "chip_text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
+        },
+        "chip_border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "chip_hover_border_color": [
+          100,
+          120,
+          160
+        ],
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          },
+          "text_color": {
+            "$ref": "$_COLOR_TEXT_PRIMARY"
+          },
+          "background_color": {
+            "$ref": "$_COLOR_BACKGROUND_SECONDARY"
+          },
+          "border_color": {
+            "$ref": "$_COLOR_BUTTON_BORDER"
+          },
+          "focus_border_color": {
+            "$ref": "$_COLOR_INPUT_FOCUS_BORDER"
+          }
+        }
+      },
+      "show_tags": {
+        "label_font_family": {
+          "$ref": "$_FONT_FAMILY_PRIMARY"
+        },
+        "label_font_size": {
+          "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+        },
+        "inputs": {
+          "font_family": {
+            "$ref": "$_FONT_FAMILY_PRIMARY"
+          },
+          "font_size": {
+            "$ref": "$_FONT_SIZE_BASE_MEDIUM"
+          }
+        },
+        "fit_min_lines": 1,
+        "fit_max_lines": 6
+      },
+      "shallow": {
+        "labels": {
+          "shallow": {
+            "background_color": [185, 70, 70],
+            "text_color": [255, 255, 255]
+          },
+          "vague_lesson": {
+            "background_color": [195, 145, 55],
+            "text_color": [255, 255, 255]
+          }
+        },
+        "unchecked_banner": {
+          "background_color": {"$ref": "$_COLOR_BACKGROUND_3"},
+          "text_color": {"$ref": "$_COLOR_TEXT_SECONDARY"}
+        }
+      },
+      "chess_log_settings": {
+        "background_color": {
+          "$ref": "$_COLOR_BACKGROUND_PRIMARY"
+        },
+        "border_color": {
+          "$ref": "$_COLOR_BUTTON_BORDER"
+        },
+        "text_color": {
+          "$ref": "$_COLOR_TEXT_SECONDARY"
         }
       },
       "classification_settings": {

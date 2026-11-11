@@ -335,6 +335,7 @@ class MetadataController:
             "BlackElo": DatabaseModel.COL_BLACK_ELO,
             "CARAAnalysisData": DatabaseModel.COL_ANALYZED,
             "CARAAnnotations": DatabaseModel.COL_ANNOTATED,
+            "CARAChessLog": DatabaseModel.COL_LOG,
             "CARAGameTags": getattr(DatabaseModel, "COL_TAGS", None),
         }
         col = tag_to_column.get(tag_name)

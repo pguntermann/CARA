@@ -1,0 +1,54 @@
+Classify each of these player self-notes about a chess move as SHALLOW or DEEP.
+
+The question is simple: does the note give the player something to learn from about this move? A DEEP note diagnoses the mistake, even briefly. A SHALLOW note doesn't.
+
+DEEP is the normal case. Check the SHALLOW patterns below first. If none of them fits, the note is DEEP. If you are unsure whether a pattern fits, choose DEEP.
+
+SHALLOW: the note gives no diagnosis of this move. That means one of these patterns:
+
+1. It only says the player doesn't understand, can't follow, or doesn't see why the move was bad or why the engine move is better, and says nothing concrete about this position. A remark about the size of the mistake (CPL, the eval drop) adds no diagnosis. Neither does a guess about the engine's general taste ("it must be positional", "the engine likes the bishop pair") that the player doesn't tie to a piece, square, threat or plan on this board.
+     "I can't tell what's wrong with it."
+     "Engine line is beyond me. Lost a lot of eval though."
+     "No idea. Maybe the engine just likes having two bishops."
+
+2. It isn't about the move at all: a note to ignore the game, a placeholder, an abandoned or disconnected game.
+     "Placeholder, skip this one."
+     "Opponent left after move 2."
+
+3. It writes the move off as pointless, as accomplishing nothing, or as having no purpose, and adds only the result, without saying what the player missed, intended, or should have played instead. Calling a move passive, weak or bad is not writing it off.
+     "Did nothing useful and let them win a pawn."
+
+4. Its only explanation is that the player thought the move was fine or safe, or a denial of some motive, without saying what made it unsafe.
+     "Didn't mean anything by it, it looked safe."
+
+5. It dismisses the moment because the position was already lost or the player should have resigned, and gives no lesson about the move.
+     "Position was hopeless by then, nothing to learn here."
+
+6. It calls the move a repeat of an earlier mistake ("same mistake", "again", "second time") and adds only a fact about the board, not what the player missed or intended.
+     "Did it again, the e5 square was covered."
+   Compare: "Again I missed the back-rank mate; I didn't see their rook could reach e1." That is DEEP, because it says what the player didn't see.
+
+DEEP: everything else. A note is DEEP when it names anything concrete about this move, even in a few words and even as a bare fact:
+  - A piece, square, tactic or threat that was hung, missed or overlooked.
+  - What the player intended or was focused on, even tentatively.
+  - A better move or plan, with what it would have achieved.
+  - A miscount or miscalculation that is spelled out.
+  - "I'm not sure why" or "I don't understand", followed by a guess that names a piece, square, threat or plan in this position.
+  Examples:
+    "Hung the knight on c3."
+    "Missed the fork on e6."
+    "I was trying to open the f-file, but my bishop was left loose."
+    "Not sure why it's bad. Maybe because it lets their queen reach h4."
+    "Rxd4 wins a pawn and keeps the rook active."
+
+Judge each note on its own words.
+
+Return one line per note: <index>: SHALLOW or <index>: DEEP.
+
+0: I blundered my bishop by not checking captures.
+1: Missed it.
+2: I went to push my pawn not seeing the queen fork on f7.
+3: There was a discovered attack on my queen that I missed.
+4: [3x3] Why I played it: I wanted to activate my rook. | What was wrong: It walked into a pin on the e-file. | Why the better move is better: Re1 avoids the pin and keeps the rook active. | Lesson: Check for pins before rook moves.
+5: I was focused on my queen not realising my knight was hanging.
+6: This is a passive move, letting them seize the open file.

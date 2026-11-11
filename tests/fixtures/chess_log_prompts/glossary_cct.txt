@@ -1,0 +1,3 @@
+- C — Checks: A checking move — either one the opponent's last move enabled that wasn't accounted for, or one the player's own candidate move allows in return.
+- C — Captures: A piece or square left undefended or under-defended, the opponent's loose piece going unclaimed, or one of the player's own left hanging by their candidate move.
+- T — Threats: An aggressive move, such as attacking a higher-value piece, creating a mating sequence, or setting up a tactical fork, that forces the opponent to respond defensively on their very next turn to avoid immediate material or positional loss.

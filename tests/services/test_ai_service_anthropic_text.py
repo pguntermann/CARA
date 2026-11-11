@@ -73,16 +73,16 @@ class TestAnthropicMaxTokensEmptyReply(unittest.TestCase):
         mock_post.return_value = mock_response
 
         service = AIService()
-        success, message = service._send_anthropic_message(
+        result = service._send_anthropic_message(
             model="claude-sonnet-4-5",
             api_key="test-key",
             messages=[{"role": "user", "content": "hello"}],
             token_limit=3500,
         )
 
-        self.assertFalse(success)
-        self.assertIn("Increase the max tokens setting", message)
-        self.assertIn("2000", message)
+        self.assertFalse(result.success)
+        self.assertIn("Increase the max tokens setting", result.error or "")
+        self.assertIn("2000", result.error or "")
         payload = mock_post.call_args.kwargs["json"]
         self.assertEqual(payload["max_tokens"], 3500)
 
@@ -100,14 +100,14 @@ class TestAnthropicMaxTokensEmptyReply(unittest.TestCase):
         mock_post.return_value = mock_response
 
         service = AIService()
-        success, message = service._send_anthropic_message(
+        result = service._send_anthropic_message(
             model="claude-sonnet-4-5",
             api_key="test-key",
             messages=[{"role": "user", "content": "hello"}],
         )
 
-        self.assertFalse(success)
-        self.assertEqual(message, "Empty response from API")
+        self.assertFalse(result.success)
+        self.assertEqual(result.error, "Empty response from API")
 
 
 if __name__ == "__main__":

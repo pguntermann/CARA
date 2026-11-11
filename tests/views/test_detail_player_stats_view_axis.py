@@ -3,11 +3,11 @@
 from datetime import date
 
 from app.views.detail_player_stats_view import (
-    _build_gap_compressed_time_layout,
     _effective_progression_x_axis_mode,
     _plot_x_uniform_bin_index,
     _x_axis_week_minors_in_month_mode,
 )
+from app.views.widgets._chart_layout_helpers import build_gap_compressed_time_layout as _build_gap_compressed_time_layout
 
 
 def test_x_axis_week_minors_in_month_mode_respects_span() -> None:

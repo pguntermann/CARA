@@ -1453,17 +1453,160 @@ class MainWindow(QMainWindow):
                     self.controller.get_database_controller().mark_database_unsaved(database_model)
             self.controller.set_status("Notes saved to current game")
 
+    def _save_chess_log_for_current_game(self) -> None:
+        """Save Chess Log moments to the active game's PGN tag (in memory)."""
+        if not self.controller:
+            return
+        chess_log_controller = self.controller.get_chess_log_controller()
+        if chess_log_controller and chess_log_controller.save_tags_for_current_game():
+            self.controller.set_status("Chess Log saved to current game")
+
+    def _save_chess_logs_for_all_games(self) -> None:
+        """Persist dirty Chess Log edits for all games in the multi-game cache."""
+        if not self.controller:
+            return
+        chess_log_controller = self.controller.get_chess_log_controller()
+        if not chess_log_controller:
+            return
+        saved, failed = chess_log_controller.save_all_dirty_games()
+        if saved == 0 and failed == 0:
+            self.controller.set_status("No unsaved Chess Log changes")
+        elif failed == 0:
+            self.controller.set_status(
+                f"Chess Log saved for {saved} game{'s' if saved != 1 else ''}"
+            )
+        else:
+            self.controller.set_status(
+                f"Chess Log saved for {saved} game{'s' if saved != 1 else ''}; "
+                f"{failed} failed"
+            )
+
+    def _show_chess_logs_for_all_games(self) -> None:
+        """Open Show Chess Logs dialog scoped to tagged games in the active database."""
+        if not self.controller:
+            return
+        db_controller = self.controller.get_database_controller()
+        if not db_controller:
+            return
+        db = db_controller.get_active_database()
+        if not db:
+            self.controller.set_status("No active database")
+            return
+        games = [g for g in db.get_all_games() if getattr(g, "has_chess_log_tags", False)]
+        if not games:
+            self.controller.set_status("No logged games in the active database")
+            return
+        chess_log_controller = self.controller.get_chess_log_controller()
+        if not chess_log_controller:
+            return
+        from app.views.dialogs.show_tags_dialog import ShowTagsDialog
+        dlg = ShowTagsDialog(
+            config=self.config,
+            games=games,
+            controller=chess_log_controller,
+            parent=self,
+        )
+        dlg.exec()
+
+    def _show_saved_shallow_logs(self) -> None:
+        """Open Shallow/Vague Logs dialog — shows stored Check Logs results."""
+        if not self.controller:
+            return
+        db_controller = self.controller.get_database_controller()
+        if not db_controller:
+            return
+        db = db_controller.get_active_database()
+        if not db:
+            self.controller.set_status("No active database")
+            return
+        chess_log_controller = self.controller.get_chess_log_controller()
+        if not chess_log_controller:
+            return
+        games = [g for g in db.get_all_games() if getattr(g, "has_chess_log_tags", False)]
+        if not games:
+            MessageDialog.show_information(self.config, "Shallow/Vague Logs", "No logged games in the active database.", self)
+            return
+        if not chess_log_controller.has_any_checked_answer(games):
+            MessageDialog.show_information(
+                self.config, "Shallow/Vague Logs",
+                "No saved Check Logs results for this database. "
+                "Run Check Logs from the Chess Log tab first.",
+                self,
+            )
+            return
+        shallow_keys, vague_keys = chess_log_controller.get_shallow_vague_keys(games)
+        if not shallow_keys and not vague_keys:
+            msgs = (self.config or {}).get("ui", {}).get("dialogs", {}).get(
+                "chess_log_messages", {}
+            ).get("shallow_notes", {}).get("none_found", {})
+            title = msgs.get("title", "Nothing Flagged")
+            message = msgs.get(
+                "message_template",
+                "No shallow notes or vague lessons found — great job.",
+            )
+            count_unchecked = chess_log_controller.count_unchecked_answers(games)
+            if count_unchecked > 0:
+                s = "s" if count_unchecked != 1 else ""
+                have = "haven't" if count_unchecked != 1 else "hasn't"
+                message = (
+                    f"{message}<br><br>{count_unchecked} note{s} {have} been checked yet"
+                    " (new or edited since the last Check Logs). Run Check Logs to check them."
+                )
+            MessageDialog.show_information(self.config, title, message, self)
+            return
+        from app.views.dialogs.show_shallow_tags_dialog import ShowShallowTagsDialog
+        dlg = ShowShallowTagsDialog(
+            config=self.config,
+            games=games,
+            controller=chess_log_controller,
+            shallow_keys=shallow_keys,
+            vague_keys=vague_keys,
+            classified_keys=frozenset(),
+            check_run_info=None,
+            window_title="Shallow/Vague Logs",
+            saved_mode=True,
+            parent=self,
+        )
+        dlg.exec()
+
+    def _clear_chess_log_for_current_game(self) -> None:
+        """Clear Chess Log moments for the current game (removes CARAChessLog tags in memory)."""
+        if not self.controller:
+            return
+        chess_log_controller = self.controller.get_chess_log_controller()
+        if chess_log_controller:
+            chess_log_controller.clear_tags_for_current_game()
+            self.controller.set_status("Chess Log cleared for current game")
+
+    def _on_highlight_chess_log_moves_toggled(self, checked: bool) -> None:
+        """Handle 'Highlight Logged Moments in Moves List' toggle."""
+        if not hasattr(self, '_settings_service') or self._settings_service is None:
+            return
+        self._settings_service.update_chess_log_settings({"highlight_chess_log_moves_in_list": checked})
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
+            self.detail_panel.moveslist_model.set_highlight_chess_log_moves(checked)
+
     def _show_ai_model_settings(self) -> None:
         """Show the AI model settings dialog."""
         from app.views.dialogs.ai_model_settings_dialog import AIModelSettingsDialog
         from app.services.user_settings_service import UserSettingsService
-        
+
         settings_service = UserSettingsService.get_instance()
         dialog = AIModelSettingsDialog(self.config, settings_service, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._refresh_ai_summary_models()
             self._refresh_ai_summary_menu_state()
-    
+            self._refresh_chess_log_charts_ai_state()
+
+    def _show_chess_log_settings(self) -> None:
+        """Show the Chess Log settings dialog (active preset selection)."""
+        from app.views.dialogs.chess_log_settings_dialog import ChessLogSettingsDialog
+        from app.services.user_settings_service import UserSettingsService
+
+        settings_service = UserSettingsService.get_instance()
+        dialog = ChessLogSettingsDialog(self.config, settings_service, self)
+        dialog.exec()
+
     def _show_annotation_preferences(self) -> None:
         """Show annotation preferences dialog."""
         from app.views.dialogs.annotation_preferences_dialog import AnnotationPreferencesDialog
@@ -1898,12 +2041,14 @@ class MainWindow(QMainWindow):
         player_stats_controller = self.controller.get_player_stats_controller()
         metadata_controller = self.controller.get_metadata_controller()
         notes_controller = self.controller.get_notes_controller()
+        chess_log_charts_controller = self.controller.get_chess_log_charts_controller()
         self.detail_panel = DetailPanel(self.config, game_model, game_controller,
                                         notes_controller, engine_model,
                                         manual_analysis_controller, database_model, classification_model,
                                         annotation_controller, board_widget, ai_chat_controller,
                                         game_summary_controller, player_stats_controller,
-                                        metadata_controller)
+                                        metadata_controller,
+                                        chess_log_charts_controller=chess_log_charts_controller)
 
         # Wire per-game tag bubbles widget (board overlay) to models/controllers
         if board_widget is not None and hasattr(board_widget, "game_tags_widget") and board_widget.game_tags_widget:
@@ -1967,6 +2112,9 @@ class MainWindow(QMainWindow):
                 )
             if hasattr(self.detail_panel, 'moves_view'):
                 self.detail_panel.moves_view.set_database_controller(database_controller)
+                self.detail_panel.moves_view.set_chess_log_controller(
+                    self.controller.get_chess_log_controller()
+                )
             if hasattr(self.detail_panel, 'pgn_view'):
                 self.detail_panel.pgn_view.set_database_controller(database_controller)
             if hasattr(self.detail_panel, 'player_stats_view'):
@@ -1982,6 +2130,28 @@ class MainWindow(QMainWindow):
                 lambda active_only: self.database_panel.get_selected_games(active_only)
             )
             self.database_panel.selection_changed.connect(player_stats_controller.notify_selection_changed)
+
+            # Inject selected-games callback for Chess Log Charts
+            cl_charts_controller = self.controller.get_chess_log_charts_controller()
+            cl_charts_controller.set_get_selected_games_callback(
+                lambda active_only: self.database_panel.get_selected_games(active_only)
+            )
+            self.database_panel.selection_changed.connect(cl_charts_controller.notify_selection_changed)
+            from app.services.user_settings_service import UserSettingsService as _USS
+            _USS.get_instance().get_model().chess_log_charts_changed.connect(
+                lambda: cl_charts_controller.set_user_settings(
+                    _USS.get_instance().get_settings()
+                )
+            )
+            # AI Summary provider / model toggles write the shared settings; keep Charts in step.
+            _USS.get_instance().get_model().ai_settings_changed.connect(
+                cl_charts_controller.on_ai_settings_changed
+            )
+            if hasattr(self.detail_panel, "chess_log_charts_view"):
+                _cl_view = self.detail_panel.chess_log_charts_view
+                _USS.get_instance().get_model().ai_settings_changed.connect(_cl_view.refresh_ai_state)
+                _cl_view.set_controller(cl_charts_controller)
+                self._refresh_chess_log_charts_ai_state()
 
         # Set moves list model in game analysis controller and on chessboard (for move classification badges)
         if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
@@ -3438,10 +3608,15 @@ class MainWindow(QMainWindow):
     def _apply_miniature_board_arrow(self, arrow_key: str, enabled: bool) -> None:
         """Push arrow visibility into live miniature-board surfaces."""
         from app.utils.miniature_board_arrows import (
+            CHESS_LOG_BEST_ALTERNATIVE,
+            CHESS_LOG_PLAYED,
             GAME_SUMMARY_BEST_ALTERNATIVE,
             GAME_SUMMARY_PLAYED,
             OPENING_EXPLORER,
         )
+
+        if arrow_key in (CHESS_LOG_PLAYED, CHESS_LOG_BEST_ALTERNATIVE):
+            return  # Chess Log dialogs are modal (exec()); arrows are read on open.
 
         if arrow_key == OPENING_EXPLORER:
             explorer = getattr(getattr(self, "detail_panel", None), "opening_explorer_view", None)
@@ -3472,12 +3647,16 @@ class MainWindow(QMainWindow):
     def _apply_miniature_board_scale(self, surface_key: str, scale_factor: float) -> None:
         """Push a new scale into live UI that already shows miniature boards."""
         from app.utils.miniature_board_scales import (
+            CHESS_LOG,
             GAME_SUMMARY_HIGHLIGHTS,
             MANUAL_ANALYSIS,
             MOVE_LINK_POPUPS,
             OPENING_ENCYCLOPEDIA,
             OPENING_EXPLORER,
         )
+
+        if surface_key == CHESS_LOG:
+            return  # Chess Log dialogs are modal (exec()); scale is read on open.
 
         if surface_key == MANUAL_ANALYSIS:
             return  # PV hover recreates its board on next hover using the model value.
@@ -3719,6 +3898,13 @@ class MainWindow(QMainWindow):
             if hasattr(ai_chat_view, 'refresh_model_list'):
                 ai_chat_view.refresh_model_list()
     
+    def _refresh_chess_log_charts_ai_state(self) -> None:
+        """Notify Chess Log Charts controller that AI settings may have changed."""
+        from app.services.user_settings_service import UserSettingsService
+        settings = UserSettingsService.get_instance().get_settings()
+        if hasattr(self, "controller") and hasattr(self.controller, "get_chess_log_charts_controller"):
+            self.controller.get_chess_log_charts_controller().set_user_settings(settings)
+
     def _refresh_ai_summary_menu_state(self) -> None:
         """Refresh the AI Summary menu checkboxes based on current settings."""
         from app.services.user_settings_service import UserSettingsService
@@ -3891,10 +4077,21 @@ class MainWindow(QMainWindow):
             "annotations": "view_annotations_action",
             "ai_summary": "view_ai_summary_action",
             "notes": "view_notes_action",
+            "chess_log_charts": "view_chess_log_charts_action",
         }.get(unit_id)
         if not attr:
             return None
         return getattr(self, attr, None)
+
+    def _apply_unit_submenus(self, unit_id: str, visible: bool) -> None:
+        """Hide/show submenus that belong to a visibility unit."""
+        if unit_id == "chess_log_charts":
+            submenu = getattr(self, "chess_log_charts_settings_menu", None)
+            if submenu is not None:
+                submenu.menuAction().setVisible(visible)
+            sep = getattr(self, "_chess_log_charts_settings_separator", None)
+            if sep is not None:
+                sep.setVisible(visible)
 
     def _apply_detail_panel_visibility(self) -> None:
         """Apply Show/Hide settings to detail tabs, related menus, and View shortcuts."""
@@ -3927,6 +4124,8 @@ class MainWindow(QMainWindow):
                 action.blockSignals(True)
                 action.setChecked(visible)
                 action.blockSignals(False)
+
+            self._apply_unit_submenus(unit.id, visible)
 
         self._ensure_visible_detail_tab()
 
@@ -3993,7 +4192,8 @@ class MainWindow(QMainWindow):
 
         Args:
             index: Tab index (0=Moves List, 1=Metadata, 2=Manual Analysis, 3=Opening Explorer,
-                   4=Game Summary, 5=Player Stats, 6=Annotations, 7=AI Summary, 8=Notes).
+                   4=Game Summary, 5=Player Stats, 6=Annotations, 7=AI Summary, 8=Notes,
+                   9=Chess Log).
 
         Returns:
             True if the tab was selected, False otherwise.
@@ -4484,6 +4684,23 @@ class MainWindow(QMainWindow):
             moveslist_model.set_highlight_annotated_moves(highlight_annotated_moves)
         if hasattr(self, 'highlight_annotated_moves_action'):
             self.highlight_annotated_moves_action.setChecked(highlight_annotated_moves)
+
+        # Chess Log moves list indicator: wire controller and load toggle state
+        chess_log_settings = settings.get("chess_log", {})
+        highlight_chess_log_moves = chess_log_settings.get("highlight_chess_log_moves_in_list", False)
+        if hasattr(self, 'detail_panel') and hasattr(self.detail_panel, 'moveslist_model'):
+            moveslist_model = self.detail_panel.moveslist_model
+            chess_log_ctrl = self.controller.get_chess_log_controller() if self.controller else None
+            if chess_log_ctrl:
+                moveslist_model.set_chess_log_controller(chess_log_ctrl)
+            try:
+                from app.utils.chess_log_moment_icon import ChessLogMomentIconProvider
+                moveslist_model.set_chess_log_icon_provider(ChessLogMomentIconProvider(self.config))
+            except Exception:
+                pass
+            moveslist_model.set_highlight_chess_log_moves(highlight_chess_log_moves)
+        if hasattr(self, 'highlight_chess_log_moves_action'):
+            self.highlight_chess_log_moves_action.setChecked(highlight_chess_log_moves)
         
         # ===== BOARD MENU SETTINGS (in menu order) =====
         # Show Game Info

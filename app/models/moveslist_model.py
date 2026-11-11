@@ -219,6 +219,9 @@ class MovesListModel(QAbstractTableModel):
         self._column_visibility: Dict[int, bool] = {}  # Map column index to visibility
         self._annotation_model: Optional["AnnotationModel"] = None
         self._highlight_annotated_moves: bool = False
+        self._chess_log_controller = None
+        self._highlight_chess_log_moves: bool = False
+        self._chess_log_icon_provider = None
         # Initialize all columns as visible by default
         for col in range(self.columnCount()):
             self._column_visibility[col] = True
@@ -279,6 +282,45 @@ class MovesListModel(QAbstractTableModel):
         if self._highlight_annotated_moves != on:
             self._highlight_annotated_moves = on
             self._emit_all_rows_changed()
+
+    def set_chess_log_controller(self, ctrl) -> None:
+        """Set the Chess Log controller used to determine which plies are tagged."""
+        self._chess_log_controller = ctrl
+        self._emit_all_rows_changed()
+
+    def set_highlight_chess_log_moves(self, on: bool) -> None:
+        """Enable/disable the per-move Chess Log 'logged moment' decoration.
+
+        When on, tagged plies get a themed SVG icon via Qt.DecorationRole
+        on COL_WHITE / COL_BLACK (drawn to the left of the move by the
+        default delegate). Never emoji.
+        """
+        if self._highlight_chess_log_moves != on:
+            self._highlight_chess_log_moves = on
+            self._emit_all_rows_changed()
+
+    def set_chess_log_icon_provider(self, provider) -> None:
+        """Install a themed-icon provider (see ChessLogMomentIconProvider).
+
+        Called from the view/main-window after the Moves List is built and
+        again after each theme change, so the cached icons always carry
+        the active theme's tints.
+        """
+        self._chess_log_icon_provider = provider
+        self._emit_all_rows_changed()
+
+    def notify_chess_log_changed(self) -> None:
+        """Refresh tag indicators after Chess Log entries are added, saved, or cleared."""
+        if self._highlight_chess_log_moves:
+            self._emit_all_rows_changed()
+
+    def _is_ply_tagged(self, ply_index: int) -> bool:
+        """Return True if the mainline ply has at least one Chess Log entry in memory."""
+        if not self._highlight_chess_log_moves or self._chess_log_controller is None:
+            return False
+        tags = self._chess_log_controller.get_tags_for_current_game()
+        path_key = encode_path(mainline_path_for_ply(ply_index))
+        return bool(tags.get(path_key))
 
     def _on_annotations_changed(self, path_key: str) -> None:
         """Handle annotation model change; emit dataChanged for the affected mainline row."""
@@ -448,11 +490,28 @@ class MovesListModel(QAbstractTableModel):
                     return QBrush(QColor(inv_r, inv_g, inv_b))
             return None
         
+        if role == Qt.ItemDataRole.DecorationRole:
+            if self._chess_log_icon_provider is None:
+                return None
+            if logical_col == self.COL_WHITE:
+                ply = 2 * row + 1
+            elif logical_col == self.COL_BLACK:
+                ply = 2 * row + 2
+            else:
+                return None
+            if not self._is_ply_tagged(ply):
+                return None
+            active_row = (self._active_move_ply - 1) // 2 if self._active_move_ply > 0 else -1
+            is_active_row = (row == active_row and self._highlight_color is not None)
+            return self._chess_log_icon_provider.icon_for_row(
+                is_current_move_row=is_active_row,
+            )
+
         if role != Qt.ItemDataRole.DisplayRole:
             return None
-        
+
         move = self._moves[row]
-        
+
         if logical_col == self.COL_NUM:
             return move.move_number
         elif logical_col == self.COL_WHITE:

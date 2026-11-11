@@ -9,6 +9,8 @@ GAME_SUMMARY_PLAYED = "game_summary_played"
 GAME_SUMMARY_BEST_ALTERNATIVE = "game_summary_best_alternative"
 MOVE_LINK_PLAYED = "move_link_played"
 MOVE_LINK_BEST_ALTERNATIVE = "move_link_best_alternative"
+CHESS_LOG_PLAYED = "chess_log_played"
+CHESS_LOG_BEST_ALTERNATIVE = "chess_log_best_alternative"
 
 # Legacy single toggle from earlier builds
 _LEGACY_GAME_SUMMARY = "game_summary_highlights"
@@ -19,6 +21,8 @@ _DEFAULTS: Dict[str, bool] = {
     GAME_SUMMARY_BEST_ALTERNATIVE: True,
     MOVE_LINK_PLAYED: True,
     MOVE_LINK_BEST_ALTERNATIVE: True,
+    CHESS_LOG_PLAYED: True,
+    CHESS_LOG_BEST_ALTERNATIVE: True,
 }
 
 

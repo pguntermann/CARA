@@ -230,6 +230,8 @@ def _game_date_to_ordinal(date_str: str) -> Optional[int]:
 def _game_date_ordinal_for_trends(date_str: str) -> Optional[int]:
     """Ordinal for time-series charts (accuracy, move quality, ACPL by phase).
 
+    Also reused by chess_log_stats_service — do not make private.
+
     Fully specified PGN dates use the real calendar day. Partial dates use stable
     stand-ins so games still contribute to bins (otherwise long games with
     ``YYYY.??.??`` or ``YYYY.MM.??`` were dropped entirely while still showing
@@ -259,7 +261,9 @@ def _game_date_ordinal_for_trends(date_str: str) -> Optional[int]:
 
 
 def _ordinal_target_bin_count(chart_cfg: Dict[str, Any], n_samples: int) -> int:
-    """Effective number of progression bins from ``target_progression_bins`` (capped by density and max)."""
+    """Effective number of progression bins from ``target_progression_bins`` (capped by density and max).
+
+    Also reused by chess_log_stats_service — do not make private."""
     target = int(chart_cfg.get("target_progression_bins", 100))
     max_ord = int(chart_cfg.get("max_ordinal_bins", 120))
     if max_ord < 2:
@@ -270,7 +274,9 @@ def _ordinal_target_bin_count(chart_cfg: Dict[str, Any], n_samples: int) -> int:
 
 
 def _ordinal_fallback_mode(chart_cfg: Dict[str, Any]) -> str:
-    """``quantile``: ~equal games per bin (more resolution in busy periods). ``equal_width``: equal calendar spans."""
+    """``quantile``: ~equal games per bin (more resolution in busy periods). ``equal_width``: equal calendar spans.
+
+    Also reused by chess_log_stats_service — do not make private."""
     raw = str(chart_cfg.get("ordinal_fallback_mode", "quantile")).strip().lower()
     return "quantile" if raw == "quantile" else "equal_width"
 
@@ -281,6 +287,8 @@ def _calendar_bin_center_time_pct(lo_o: int, hi_o: int, t_min: int, t_max: int) 
     Ordinal-quantile bins slice the game list by equal counts; their median accuracy still
     refers to real dates (``lab0``–``lab1``). Using rank index for ``time_pct`` placed points
     on the wrong calendar position when game density over time was uneven.
+
+    Also reused by chess_log_stats_service — do not make private.
     """
     span = float(t_max - t_min)
     if span <= 0:

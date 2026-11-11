@@ -20,6 +20,7 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     mw._setup_theme_menu(view_menu)
 
     from app.utils.miniature_board_scales import (
+        CHESS_LOG,
         GAME_SUMMARY_HIGHLIGHTS,
         MANUAL_ANALYSIS,
         MINIATURE_BOARD_SCALE_MENU_ITEMS,
@@ -28,6 +29,8 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
         OPENING_EXPLORER,
     )
     from app.utils.miniature_board_arrows import (
+        CHESS_LOG_BEST_ALTERNATIVE,
+        CHESS_LOG_PLAYED,
         GAME_SUMMARY_BEST_ALTERNATIVE,
         GAME_SUMMARY_PLAYED,
         MOVE_LINK_BEST_ALTERNATIVE,
@@ -124,6 +127,29 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
             )
             surface_menu.addAction(alt_action)
             mw.miniature_board_arrow_actions[MOVE_LINK_BEST_ALTERNATIVE] = alt_action
+        elif surface_key == CHESS_LOG:
+            surface_menu.addSeparator()
+            played_action = QAction("Show Played Move", mw)
+            played_action.setCheckable(True)
+            played_action.setChecked(True)
+            played_action.triggered.connect(
+                lambda checked=False, key=CHESS_LOG_PLAYED: mw._on_miniature_board_arrow_toggled(
+                    key, checked
+                )
+            )
+            surface_menu.addAction(played_action)
+            mw.miniature_board_arrow_actions[CHESS_LOG_PLAYED] = played_action
+
+            alt_action = QAction("Show Best Alternative Move", mw)
+            alt_action.setCheckable(True)
+            alt_action.setChecked(True)
+            alt_action.triggered.connect(
+                lambda checked=False, key=CHESS_LOG_BEST_ALTERNATIVE: mw._on_miniature_board_arrow_toggled(
+                    key, checked
+                )
+            )
+            surface_menu.addAction(alt_action)
+            mw.miniature_board_arrow_actions[CHESS_LOG_BEST_ALTERNATIVE] = alt_action
 
     view_menu.addSeparator()
 
@@ -207,6 +233,14 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
     mw.view_notes_action.triggered.connect(lambda: mw._switch_detail_tab_by_id("notes"))
     view_menu.addAction(mw.view_notes_action)
 
+    mw.view_chess_log_charts_action = QAction("Chess Log", mw)
+    mw.view_chess_log_charts_action.setShortcut(QKeySequence("F10"))
+    mw.view_chess_log_charts_action.setCheckable(True)
+    mw.view_chess_log_charts_action.triggered.connect(
+        lambda: mw._switch_detail_tab_by_id("chess_log_charts")
+    )
+    view_menu.addAction(mw.view_chess_log_charts_action)
+
     mw.view_previous_detail_tab_action = QAction("Previous detail tab", mw)
     mw.view_previous_detail_tab_action.triggered.connect(
         lambda: mw._cycle_detail_tab(-1)
@@ -263,4 +297,5 @@ def setup_view_menu(mw, menu_bar: QMenuBar) -> None:
         mw.view_annotations_action,
         mw.view_ai_summary_action,
         mw.view_notes_action,
+        mw.view_chess_log_charts_action,
     ]

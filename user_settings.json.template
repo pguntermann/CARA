@@ -807,7 +807,8 @@
     "player_stats": true,
     "annotations": true,
     "ai_summary": true,
-    "notes": true
+    "notes": true,
+    "chess_log_charts": true
   },
   "database_table_columns": {
     "columns": {
@@ -1212,5 +1213,8 @@
   "bulk_operation_plans": {},
   "keyboard_shortcuts": {
     "overrides": {}
+  },
+  "chess_log": {
+    "active_preset": "3x3"
   }
 }

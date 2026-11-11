@@ -177,3 +177,17 @@ update_version.py
 
 /.tools/
 
+# Test PGN files
+TaggingTestGames.pgn
+TaggingTestGames_synthetic_*.pgn
+
+# Rotated / numbered log files (cara_YYYY-MM-DD.log.N)
+*.log.*
+
+# Generated PDF exports and temp classification files
+*.pdf
+Deep.txt
+Shallow.txt
+
+# Claude Code internal state
+.claude/

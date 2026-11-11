@@ -164,6 +164,12 @@ class MiniChessBoardWidget(QWidget):
         # Get best next move arrow color (same as main board)
         bestnextmove_arrow_config = board_config.get('bestnextmove_arrow', {})
         self.arrow_color = bestnextmove_arrow_config.get('color', [0, 0, 255])
+
+        # Two-arrow mode colors (Chess Log only): played = yellow, best = reddish.
+        playedmove_arrow_config = board_config.get('playedmove_arrow', {})
+        self._played_arrow_color: List[int] = playedmove_arrow_config.get('color', [255, 255, 0])
+        bestalternative_config = board_config.get('bestalternativemove_arrow', {})
+        self._best_arrow_color: List[int] = bestalternative_config.get('color', [200, 0, 100])
         
         # Calculate widget size (board + border)
         widget_size = self.board_size + self.border_size * 2
@@ -488,7 +494,7 @@ class MiniChessBoardWidget(QWidget):
     
     def set_move(self, move: Optional[chess.Move], show_arrow: bool) -> None:
         """Set the move to display with an arrow.
-        
+
         Args:
             move: Chess move to show arrow for, or None to hide arrow.
             show_arrow: Whether to show the arrow (if "Show best move arrow" is enabled).
@@ -510,4 +516,17 @@ class MiniChessBoardWidget(QWidget):
         self._move_to_show = self._arrows[0][0] if self._arrows else None
         self._show_arrow = bool(self._arrows)
         self.update()
+
+    def set_played_and_best(
+        self,
+        played: Optional[chess.Move],
+        best: Optional[chess.Move] = None,
+    ) -> None:
+        """Chess Log two-arrow mode: played (yellow) + best (reddish, if different)."""
+        arrows: List[Tuple[chess.Move, List[int]]] = []
+        if played is not None:
+            arrows.append((played, list(self._played_arrow_color)))
+        if best is not None and best != played:
+            arrows.append((best, list(self._best_arrow_color)))
+        self.set_arrows(arrows)
 

@@ -27,6 +27,8 @@ from app.controllers.player_stats_controller import PlayerStatsController
 from app.controllers.metadata_controller import MetadataController
 from app.controllers.search_controller import SearchController
 from app.controllers.notes_controller import NotesController
+from app.controllers.chess_log_controller import ChessLogController
+from app.controllers.chess_log_charts_controller import ChessLogChartsController
 from app.services.version_check_service import VersionCheckService
 from app.controllers.debug_controller import DebugController
 from app.controllers.menu_options_sync_controller import MenuOptionsSyncController
@@ -65,7 +67,12 @@ class AppController:
 
         # Initialize notes controller (depends on game controller)
         self.notes_controller = NotesController(config, self.game_controller)
-        
+
+        # Initialize Chess Log controller (depends on game controller and database controller)
+        self.chess_log_controller = ChessLogController(
+            config, self.game_controller, self.database_controller, self.user_settings_service
+        )
+
         # Initialize column profile controller
         self.column_profile_controller = ColumnProfileController()
 
@@ -170,6 +177,13 @@ class AppController:
         )
         self.bulk_analysis_controller.finished.connect(self._on_bulk_analysis_finished_refresh_player_stats)
         
+        # Initialize Chess Log Charts controller
+        self.chess_log_charts_controller = ChessLogChartsController(
+            config,
+            self.database_controller,
+        )
+        self.chess_log_charts_controller.set_chess_log_controller(self.chess_log_controller)
+
         # Initialize metadata controller (depends on game controller and database controller)
         self.metadata_controller = MetadataController(
             self.game_controller.get_game_model(),
@@ -210,6 +224,7 @@ class AppController:
             "database_controller",
             "game_controller",
             "notes_controller",
+            "chess_log_controller",
             "move_classification_controller",
             "game_summary_controller",
             "engine_controller",
@@ -782,6 +797,14 @@ class AppController:
         """
         return self.notes_controller
 
+    def get_chess_log_controller(self) -> ChessLogController:
+        """Get the Chess Log controller.
+
+        Returns:
+            The ChessLogController instance for managing Chess Log moments.
+        """
+        return self.chess_log_controller
+
     def get_database_model_for_active_game(self) -> Optional[DatabaseModel]:
         """Return the database model that contains the active game, or None."""
         game_model = self.game_controller.get_game_model()
@@ -979,6 +1002,9 @@ class AppController:
         """
         return self.player_stats_controller
     
+    def get_chess_log_charts_controller(self) -> ChessLogChartsController:
+        return self.chess_log_charts_controller
+
     def get_search_controller(self) -> SearchController:
         """Get the search controller.
         
