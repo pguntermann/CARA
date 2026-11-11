@@ -79,6 +79,34 @@ def sanitize_narrative_markdown(text: str) -> str:
     return "\n".join(out)
 
 
+def _presets_in_scope(
+    games: List[GameData],
+    player_cf: str,
+    color_filter: str,
+    get_tags_for_game: Callable,
+) -> Set[str]:
+    """Preset names that appear on the player's own moments in the filtered games."""
+    presets: Set[str] = set()
+    for game in games:
+        if not _game_matches_player_color(game, player_cf, color_filter):
+            continue
+        for entries in own_moves_paths(game, get_tags_for_game(game), player_cf).values():
+            presets.update(e["preset"] for e in entries if e.get("preset"))
+    return presets
+
+
+def build_system_prompt(preset_names: Set[str], cl_prompts: Dict[str, Any]) -> str:
+    """System prompt: the method-neutral base plus notes for the methods in use only.
+
+    Method-specific wording lives in ``narrative_method_notes`` so a prompt for
+    one method never names another.
+    """
+    notes = cl_prompts["narrative_method_notes"]
+    blocks = [cl_prompts["narrative_system"].rstrip()]
+    blocks.extend(notes[p] for p in sorted(preset_names) if notes.get(p))
+    return "\n\n".join(blocks)
+
+
 def build_prompt(
     games: List[GameData],
     player: str = "",
@@ -267,7 +295,9 @@ def generate_narrative(
     )
 
     thinking = AIService.disable_thinking_for(model)
-    system_prompt = cl_prompts["narrative_system"]
+    system_prompt = build_system_prompt(
+        _presets_in_scope(games, player_cf, color_filter, get_tags_for_game), cl_prompts
+    )
 
     service = AIService(config=config)
     messages = [{"role": "user", "content": prompt}]

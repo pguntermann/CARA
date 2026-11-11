@@ -20,6 +20,7 @@ from app.services.chess_log_narrative_service import (
     _bin_month_label,
     _format_trend_counts,
     build_prompt,
+    build_system_prompt,
     generate_narrative,
     sanitize_narrative_markdown,
     _parse_response,
@@ -1011,7 +1012,7 @@ class Test3x3NarrativePromptBuilding(unittest.TestCase):
 class TestSystemPromptCCTRules(unittest.TestCase):
 
     def _get_system_prompt(self) -> str:
-        return _SYSTEM_PROMPT
+        return build_system_prompt({"CCT"}, _cl)
 
     def test_letter_disambiguation_rule_present(self):
         sp = self._get_system_prompt()
@@ -1020,12 +1021,13 @@ class TestSystemPromptCCTRules(unittest.TestCase):
 
     def test_bidirectional_framing_rule_present(self):
         sp = self._get_system_prompt()
-        self.assertIn("a tag can describe either side of the board", sp)
+        self.assertIn("A tag can describe either side of the board", sp)
         self.assertIn("do not assume a tag always means", sp)
 
     def test_skill_column_forbids_clamp_labels(self):
         sp = self._get_system_prompt()
-        self.assertIn("Do NOT use CLAMP letters", sp)
+        self.assertIn("Do NOT use the logging method's category letters", sp)
+        self.assertNotIn("CLAMP", _SYSTEM_PROMPT)
         self.assertNotIn("Use the exact CLAMP/CCT/3x3 category or question labels", sp)
 
     def test_skill_column_requires_generic_concept_labels(self):
@@ -1219,3 +1221,62 @@ class TestBuildPromptExcludesOrphans(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Method-aware prompts — a prompt names only the methods in the data
+# ---------------------------------------------------------------------------
+
+_METHOD_TERMS = {
+    "CLAMP": ["CLAMP", "Loose Pieces", "Alignments", "Mobility Restrictions", "Passed Pawns"],
+    "CCT": ["CCT", "Captures", "Threats"],
+    "3x3": ["3x3", "Why1", "Why-question", "Studer"],
+}
+
+
+class TestPromptsNameOnlyMethodsInUse(unittest.TestCase):
+
+    def _prompts(self, entry_factory) -> tuple[str, str]:
+        """Return (system_prompt, user_prompt) for a single-method library."""
+        game = _make_game(entries_per_path={"0": [entry_factory()]})
+        user = build_prompt(
+            [game], config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths,
+        )
+        with patch("app.services.chess_log_narrative_service.AIService") as MockAIService:
+            service = MagicMock()
+            service.send_message.return_value = AIResult(
+                success=True, text="ok", error=None, usage=None, model="gpt-4o")
+            MockAIService.return_value = service
+            generate_narrative(
+                games=[game], provider="openai", model="gpt-4o", api_key="k",
+                base_url_override=None, config=_CONFIG,
+                get_tags_for_game=ChessLogStorageService.load_resolved_paths,
+            )
+            system = service.send_message.call_args[1]["system_prompt"]
+        return system, user
+
+    def _assert_names_only(self, method: str, system: str, user: str):
+        for other, terms in _METHOD_TERMS.items():
+            if other == method:
+                continue
+            for term in terms:
+                self.assertNotIn(term, system, f"{term!r} in system prompt for {method}-only data")
+                self.assertNotIn(term, user, f"{term!r} in user prompt for {method}-only data")
+
+    def test_3x3_only_prompt_does_not_name_clamp_or_cct(self):
+        system, user = self._prompts(lambda: _threex("Why1", "wanted to develop"))
+        self._assert_names_only("3x3", system, user)
+
+    def test_clamp_only_prompt_does_not_name_cct_or_3x3(self):
+        system, user = self._prompts(lambda: _clamp("C", "missed a check"))
+        self._assert_names_only("CLAMP", system, user)
+
+    def test_cct_only_prompt_does_not_name_clamp_or_3x3(self):
+        system, user = self._prompts(lambda: _cct("Checks", "missed a check"))
+        self._assert_names_only("CCT", system, user)
+        self.assertIn("Captures", system)  # the CCT letter note is still sent
+
+    def test_mixed_library_gets_each_methods_note(self):
+        system = build_system_prompt({"CLAMP", "CCT"}, _cl)
+        self.assertIn("Captures", system)
