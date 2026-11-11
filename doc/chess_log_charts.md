@@ -348,6 +348,7 @@ prompts.chess_log.narrative_system        — system prompt passed to AIService
 prompts.chess_log.narrative_preamble      — user message template (4 placeholders)
 prompts.chess_log.narrative_step          — appended after the preamble
 prompts.chess_log.narrative_glossaries    — dict: {"CLAMP": "…", "CCT": "…", "3x3": ""}
+prompts.chess_log.narrative_method_notes — dict: {"CLAMP": "", "CCT": "…", "3x3": ""}; appended to the system prompt only when that method is in the data
 prompts.chess_log.narrative_3x3_structure — Why-note structure block
 prompts.chess_log.narrative_3x3_moment_framing — per-moment inline framing line
 prompts.chess_log.classifier              — CLAMP/CCT classifier prompt (SHALLOW/DEEP per note)
