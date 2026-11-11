@@ -1,4 +1,4 @@
-Below is a summary of the moments I have tagged across my recent games in CARA's Chess Log.
+Below is a summary of the moments I have logged across my recent games in CARA's Chess Log.
 
 ## Glossary — CCT
 
@@ -42,6 +42,6 @@ Please write:
 
 2. **Tactical Breakdown** (a markdown pipe table, not prose): exactly the header row `| Skill | Observed Issue | Strategic Impact |` followed by an alignment separator row `| --- | --- | --- |` and one row per chess-concept theme supported by the data. In the Skill column, use generic chess-concept labels (King Safety, Piece Coordination, Pawn Structure, Calculation Depth, Time Management, Move Order, etc.) — do NOT use the logging method's category letters, category names, or question labels. At most 1 to 2 verbatim quotes per row. No prose outside the table in this section. Every row must fill all three columns — if you cannot write a substantive Strategic Impact, drop the row rather than leave it blank.
 
-3. **Key Takeaways** (1 to 3 short paragraphs of continuous prose, not a numbered or bulleted list): begin each paragraph with a bold sentence-fragment lead-in naming the actionable takeaway in 3 to 8 words, followed by a period, then the paragraph body (e.g. `**Slow down in king-attack positions.** When my tagged notes mention...`). Each paragraph anchored to a specific quote or short phrase from my own why-notes or whole-game notes, naming a concrete, actionable next step. Do not restate the earlier sections in miniature. At most 1 to 2 verbatim quotes per paragraph.
+3. **Key Takeaways** (1 to 3 short paragraphs of continuous prose, not a numbered or bulleted list): begin each paragraph with a bold sentence-fragment lead-in naming the actionable takeaway in 3 to 8 words, followed by a period, then the paragraph body (e.g. `**Slow down in king-attack positions.** When my logged notes mention...`). Each paragraph anchored to a specific quote or short phrase from my own why-notes or whole-game notes, naming a concrete, actionable next step. Do not restate the earlier sections in miniature. At most 1 to 2 verbatim quotes per paragraph.
 
 Format all three as markdown sections with the exact headers `## Patterns & Recurrent Themes`, `## Tactical Breakdown`, and `## Key Takeaways`, in that order. When citing a specific move from a game, use the full move+color pairing (e.g. `16. b4, NotThePainter vs mattsartin`).

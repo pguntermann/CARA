@@ -118,7 +118,7 @@ class TestBuildPromptCategoryCounts(unittest.TestCase):
     def test_no_moments_produces_no_moments_placeholder(self):
         game = _make_game()  # no tags
         prompt = build_prompt([game], config=_CONFIG, get_tags_for_game=ChessLogStorageService.load_resolved_paths)
-        self.assertIn("no moments tagged", prompt)
+        self.assertIn("no moments logged", prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -1021,8 +1021,8 @@ class TestSystemPromptCCTRules(unittest.TestCase):
 
     def test_bidirectional_framing_rule_present(self):
         sp = self._get_system_prompt()
-        self.assertIn("A tag can describe either side of the board", sp)
-        self.assertIn("do not assume a tag always means", sp)
+        self.assertIn("A logged category can describe either side of the board", sp)
+        self.assertIn("do not assume an entry always means", sp)
 
     def test_skill_column_forbids_clamp_labels(self):
         sp = self._get_system_prompt()
@@ -1280,3 +1280,47 @@ class TestPromptsNameOnlyMethodsInUse(unittest.TestCase):
     def test_mixed_library_gets_each_methods_note(self):
         system = build_system_prompt({"CLAMP", "CCT"}, _cl)
         self.assertIn("Captures", system)
+
+
+# ---------------------------------------------------------------------------
+# Wording — prompts say "logged", never "tagged"
+# ---------------------------------------------------------------------------
+
+class TestPromptsSayLoggedNotTagged(unittest.TestCase):
+
+    _TAG_WORD = r"\btag(?:s|ged|ging)?\b"
+
+    def test_built_prompts_contain_no_tag_wording(self):
+        import re
+        game = _make_game(entries_per_path={
+            "0": [_clamp("C", "missed a check")],
+            "0.0": [_cct("Checks", "missed a check")],
+            "0.0.0": [_threex("Why1", "wanted to develop")],
+        })
+        user = build_prompt(
+            [game], config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths)
+        system = build_system_prompt({"CLAMP", "CCT", "3x3"}, _cl)
+        empty = build_prompt(
+            [_make_game()], config=_CONFIG,
+            get_tags_for_game=ChessLogStorageService.load_resolved_paths)
+        for name, text in (("system", system), ("user", user), ("empty", empty)):
+            self.assertIsNone(
+                re.search(self._TAG_WORD, text, re.IGNORECASE),
+                f"{name} prompt still uses tag wording")
+
+    def test_every_narrative_and_check_logs_prompt_in_config_is_free_of_tag_wording(self):
+        import re
+
+        def strings(node):
+            if isinstance(node, str):
+                yield node
+            elif isinstance(node, dict):
+                for v in node.values():
+                    yield from strings(v)
+
+        for key, value in _cl.items():
+            for text in strings(value):
+                self.assertIsNone(
+                    re.search(self._TAG_WORD, text, re.IGNORECASE),
+                    f"prompts.chess_log.{key} still uses tag wording")

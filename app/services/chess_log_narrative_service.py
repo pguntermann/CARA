@@ -201,7 +201,7 @@ def build_prompt(
             + _format_category_counts(flat_counts)
         )
     else:
-        category_counts_block = "(no moments tagged)"
+        category_counts_block = "(no moments logged)"
 
     why_notes_block = _format_why_notes(why_notes, cl_prompts["narrative_3x3_moment_framing"])
     game_notes_block = _format_game_notes(game_notes)
@@ -438,7 +438,7 @@ def _format_category_counts(
 ) -> str:
     """Flat (non-trend) category counts — used as fallback when aggregate returns empty."""
     if not category_counts:
-        return "(no moments tagged)"
+        return "(no moments logged)"
     lines = []
     for preset in sorted(category_counts):
         lines.append(f"**{preset}**")
