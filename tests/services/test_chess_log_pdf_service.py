@@ -59,8 +59,8 @@ class TestFilenameHelpers(unittest.TestCase):
         self.assertTrue(name.endswith(".pdf"), name)
 
     def test_charts_filename_includes_player_name(self):
-        name = default_chess_log_charts_pdf_filename("Paul")
-        self.assertIn("Paul", name)
+        name = default_chess_log_charts_pdf_filename("Alice")
+        self.assertIn("Alice", name)
 
     def test_charts_filename_sanitizes_spaces(self):
         name = default_chess_log_charts_pdf_filename("Paul Morphy")
@@ -82,8 +82,8 @@ class TestFilenameHelpers(unittest.TestCase):
     def test_narrative_filename_includes_player_name(self):
         if not _QT_OK:
             self.skipTest("Qt unavailable")
-        name = default_chess_log_narrative_pdf_filename("Paul")
-        self.assertIn("Paul", name)
+        name = default_chess_log_narrative_pdf_filename("Alice")
+        self.assertIn("Alice", name)
 
     def test_narrative_filename_sanitizes_spaces(self):
         if not _QT_OK:
@@ -104,7 +104,7 @@ class TestExportNarrativeReport(unittest.TestCase):
         try:
             result = svc.export_narrative_report(
                 tmp_path,
-                player_name="Paul",
+                player_name="Alice",
                 source_label="Active Database",
                 narrative_text="A test narrative.",
                 model_label="Anthropic claude-opus-4-7",
@@ -141,7 +141,7 @@ class TestExportNarrativeReport(unittest.TestCase):
         try:
             svc.export_narrative_report(
                 tmp_path,
-                player_name="Paul",
+                player_name="Alice",
                 source_label="CLAMP + 3x3",
                 narrative_text="## Summary\n\nText.",
                 model_label="claude-sonnet-4-6",
@@ -222,7 +222,7 @@ class TestExportTagsSmoke(unittest.TestCase):
         try:
             result = svc.export_charts_report(
                 tmp_path,
-                player_name="Paul",
+                player_name="Alice",
                 source_label="Active Database",
                 chart_pixmaps=[("CLAMP", pixmap)],
                 narrative_text="Test narrative text.",
@@ -620,7 +620,7 @@ class TestExportChartsReportWithTable(unittest.TestCase):
         try:
             result = svc.export_charts_report(
                 tmp_path,
-                player_name="Paul",
+                player_name="Alice",
                 source_label="Active Database",
                 chart_pixmaps=[("CLAMP", pixmap)],
                 narrative_text=narrative,
@@ -1228,7 +1228,7 @@ class TestNarrativeTokenLabelAbsentFromPDF(unittest.TestCase):
         try:
             svc.export_charts_report(
                 tmp_path,
-                player_name="Paul",
+                player_name="Alice",
                 source_label="Test DB",
                 chart_pixmaps=[("CLAMP", pixmap)],
                 narrative_text="Here is the narrative text.",
@@ -1507,7 +1507,7 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
     def test_with_narrative_shows_counts_generated_ai_model(self):
         """When narrative is present, counts/Generated/AI model appear; no Exported line."""
         text = self._export_charts_and_extract(
-            player_name="Paul",
+            player_name="Alice",
             source_label="Active Database: DB.pgn",
             narrative_text="This is the narrative.",
             model_label="Anthropic claude-opus-4-7",
@@ -1517,7 +1517,7 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
             m_moments=20,
             s_flagged=15,
         )
-        self.assertIn("Player: Paul", text)
+        self.assertIn("Player: Alice", text)
         self.assertIn("Source: Active Database: DB.pgn", text)
         self.assertIn("12 games", text)
         self.assertIn("8 with logged moments", text)
@@ -1531,7 +1531,7 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
     def test_without_narrative_shows_player_source_generated(self):
         """When no narrative, Player, Source, and Generated (export time) appear; no counts/AI model."""
         text = self._export_charts_and_extract(
-            player_name="Paul",
+            player_name="Alice",
             source_label="Active Database: DB.pgn",
             narrative_text="",
             model_label="Anthropic claude-opus-4-7",
@@ -1541,7 +1541,7 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
             m_moments=20,
             s_flagged=15,
         )
-        self.assertIn("Player: Paul", text)
+        self.assertIn("Player: Alice", text)
         self.assertIn("Source: Active Database: DB.pgn", text)
         self.assertIn("Generated:", text)
         self.assertNotIn("Exported:", text)
@@ -1551,14 +1551,14 @@ class TestChartsReportHeaderMetadata(unittest.TestCase):
 
     def test_title_unchanged(self):
         """Title must remain 'Chess Log Charts — {player}'."""
-        text = self._export_charts_and_extract(player_name="Paul", narrative_text="")
+        text = self._export_charts_and_extract(player_name="Alice", narrative_text="")
         self.assertIn("Chess Log Charts", text)
 
     def test_filename_unchanged(self):
         """default_chess_log_charts_pdf_filename is unaffected by Directive 15b."""
-        name = default_chess_log_charts_pdf_filename("Paul")
+        name = default_chess_log_charts_pdf_filename("Alice")
         self.assertIn("ChessLogCharts", name)
-        self.assertIn("Paul", name)
+        self.assertIn("Alice", name)
         self.assertTrue(name.endswith(".pdf"))
 
     def test_with_narrative_generated_uses_captured_time_not_now(self):

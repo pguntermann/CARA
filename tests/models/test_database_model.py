@@ -11,8 +11,8 @@ class TestDatabaseModelDisplayName(unittest.TestCase):
         return DatabaseModel(file_path=file_path)
 
     def test_display_name_returns_stem_for_file_path(self):
-        model = self._make_model("/home/user/games/PaulChessGames.pgn")
-        self.assertEqual(model.display_name, "PaulChessGames")
+        model = self._make_model("/home/user/games/MyChessGames.pgn")
+        self.assertEqual(model.display_name, "MyChessGames")
 
     def test_display_name_returns_clipboard_for_none(self):
         model = self._make_model(None)

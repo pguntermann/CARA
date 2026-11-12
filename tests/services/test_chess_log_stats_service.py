@@ -369,14 +369,14 @@ class TestGetAllPlayers(unittest.TestCase):
     # --- per-color correctness (the bug being fixed) ---
 
     def test_only_white_tagged_credits_white_not_black(self):
-        # NotThePainter (White) tags their own moves; kpepin (Black) tags nothing.
+        # ExamplePlayer (White) tags their own moves; ExampleOpponent (Black) tags nothing.
         games = [
-            self._white_tagged("NotThePainter", "kpepin", "2025.01.01"),
-            self._white_tagged("NotThePainter", "kpepin", "2025.02.01"),
+            self._white_tagged("ExamplePlayer", "ExampleOpponent", "2025.01.01"),
+            self._white_tagged("ExamplePlayer", "ExampleOpponent", "2025.02.01"),
         ]
         names = self._names(games)
-        self.assertIn("NotThePainter", names)
-        self.assertNotIn("kpepin", names)  # kpepin's moves were never tagged
+        self.assertIn("ExamplePlayer", names)
+        self.assertNotIn("ExampleOpponent", names)  # ExampleOpponent's moves were never tagged
 
     def test_only_black_tagged_credits_black_not_white(self):
         games = [
