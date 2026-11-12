@@ -1,6 +1,6 @@
 ## Why-note structure — 3x3
 
-Each 3x3-tagged moment may include answers to up to four questions, always asked in this order, though the player may skip any of them:
+Each logged 3x3 moment may include answers to up to four questions, always asked in this order, though the player may skip any of them:
 
 1. Why did I choose that move?
 2. Why is my move not ideal?
