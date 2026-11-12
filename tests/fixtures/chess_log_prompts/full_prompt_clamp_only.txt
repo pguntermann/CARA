@@ -46,4 +46,4 @@ Please write:
 
 3. **Key Takeaways** (1 to 3 short paragraphs of continuous prose, not a numbered or bulleted list): begin each paragraph with a bold sentence-fragment lead-in naming the actionable takeaway in 3 to 8 words, followed by a period, then the paragraph body (e.g. `**Slow down in king-attack positions.** When my logged notes mention...`). Each paragraph anchored to a specific quote or short phrase from my own why-notes or whole-game notes, naming a concrete, actionable next step. Do not restate the earlier sections in miniature. At most 1 to 2 verbatim quotes per paragraph.
 
-Format all three as markdown sections with the exact headers `## Patterns & Recurrent Themes`, `## Tactical Breakdown`, and `## Key Takeaways`, in that order. When citing a specific move from a game, use the full move+color pairing (e.g. `16. b4, NotThePainter vs mattsartin`).
+Format all three as markdown sections with the exact headers `## Patterns & Recurrent Themes`, `## Tactical Breakdown`, and `## Key Takeaways`, in that order. When citing a specific move from a game, use the full move+color pairing (e.g. `16. b4, ExamplePlayer vs ExampleOpponent`).
