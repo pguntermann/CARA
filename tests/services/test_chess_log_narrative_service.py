@@ -328,7 +328,7 @@ class TestSystemPromptInstructions(unittest.TestCase):
     def test_system_prompt_has_citation_format_rule(self):
         sp = self._get_system_prompt()
         self.assertIn("full move+color pairing", sp)
-        self.assertIn("NotThePainter vs mattsartin", sp)
+        self.assertIn("ExamplePlayer vs ExampleOpponent", sp)
 
     def test_system_prompt_has_quote_density_cap(self):
         sp = self._get_system_prompt()

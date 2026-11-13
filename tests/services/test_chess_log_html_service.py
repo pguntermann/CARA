@@ -377,13 +377,13 @@ class TestNewlinesInNotes(unittest.TestCase):
 class TestNarrativeHeaderLines(unittest.TestCase):
     def test_narrative_html_header_player_source_counts(self):
         h = _svc().narrative_html(
-            "Paul", "62-game CLAMP", "## Heading\n\nBody.",
+            "Alice", "62-game CLAMP", "## Heading\n\nBody.",
             n_games=62, g_games=47, m_moments=120, s_flagged=115,
             generated_at="2026-10-31 14:22",
             model_label="claude-sonnet-4-6",
         )
         self.assertIn("Chess Log &#8212; Narrative Summary", h)
-        self.assertIn("Player: Paul", h)
+        self.assertIn("Player: Alice", h)
         self.assertIn("Source: 62-game CLAMP", h)
         self.assertIn("62 games", h)
         self.assertIn("47 with logged moments", h)
@@ -395,7 +395,7 @@ class TestNarrativeHeaderLines(unittest.TestCase):
 
     def test_has_3x3_produces_shallow_vague_label(self):
         h = _svc().narrative_html(
-            "Paul", "CLAMP + 3x3", "## Summary\n\nText.",
+            "Alice", "CLAMP + 3x3", "## Summary\n\nText.",
             n_games=10, g_games=8, m_moments=25, s_flagged=5, has_3x3=True,
             generated_at="2026-11-01 10:00",
             model_label="claude-sonnet-4-6",
@@ -627,7 +627,7 @@ class TestHtmlDocumentWrapper(unittest.TestCase):
     def test_middle_dot_in_counts_is_ncr(self):
         # The counts line in narrative_html uses · as separator
         h = _svc().narrative_html(
-            "Paul", "src", "## H\n\nBody.",
+            "Alice", "src", "## H\n\nBody.",
             n_games=5, g_games=3, m_moments=10, s_flagged=8,
         )
         self.assertIn("&#183;", h)   # middle dot (U+00B7)
